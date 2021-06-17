@@ -37,3 +37,6 @@
 *.DS_Store
 *thumbs.db
 *desktop.ini
+
+# Python
+*__pycache__/
