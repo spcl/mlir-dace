@@ -38,5 +38,11 @@
 *thumbs.db
 *desktop.ini
 
-# Python
+# Python Cache
 *__pycache__/
+
+# CMake Build
+build/
+
+# Notes & Ideas folder
+.idea/
