@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+
+# IDE & OS
+*.vscode/
+*.DS_STORE
+*.DS_Store
+*thumbs.db
+*desktop.ini
