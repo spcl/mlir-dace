@@ -1,1 +1,1 @@
-add_subdirectory(sdir)
+add_subdirectory(SDIR)
