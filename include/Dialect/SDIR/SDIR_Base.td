@@ -17,15 +17,16 @@ def SDIR_Dialect : Dialect {
 // SDIR Types
 //===----------------------------------------------------------------------===//
 
-def SDIR_IsStateType : CPred<"$_self.isa<::mlir::sdir::StateType>()">;
+/*def SDIR_IsStateType : CPred<"$_self.isa<::mlir::sdir::StateType>()">;
 def SDIR_State : Type<SDIR_IsStateType, "a state machine element">;
+*/
 
 //===----------------------------------------------------------------------===//
 // SDIR Operation
 //===----------------------------------------------------------------------===//
 
 // Base class for all SDIR ops.
-class SDIR_Op<string mnemonic, list<OpTrait> traits = []> :
+/*class SDIR_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<SDIR_Dialect, mnemonic, traits> {
 
     // For each SDIR op, the following static functions need to be defined in
@@ -38,6 +39,6 @@ class SDIR_Op<string mnemonic, list<OpTrait> traits = []> :
     let parser = [{ return ::parse$cppClass(parser, result); }];
     let printer = [{ ::print(*this, p); }];
     let verifier = [{ return ::verify(*this); }];
-}
+}*/
 
 #endif // SDIR_BASE
