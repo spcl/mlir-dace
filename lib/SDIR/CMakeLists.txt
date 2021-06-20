@@ -1,9 +1,9 @@
 add_mlir_dialect_library(
-        MLIRSDIR
-        SDIRDialect.cpp
-        SDIROps.cpp
+        MLIR_SDIR
+        SDIR_Dialect.cpp
+        SDIR_Ops.cpp
 
         ADDITIONAL_HEADER_DIRS {PROJECT_SOURCE_DIR}/include/SDIR
-        DEPENDS MLIRSDIROpsIncGen
+        DEPENDS MLIRSDIR_OpsIncGen
 	LINK_LIBS PUBLIC MLIRIR
 )

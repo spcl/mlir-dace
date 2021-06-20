@@ -1,7 +1,7 @@
 #ifndef SDIR_OPS
 #define SDIR_OPS
 
-include "SDIRDialect.td"
+include "SDIR_Dialect.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//

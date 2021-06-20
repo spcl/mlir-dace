@@ -1,5 +1,5 @@
-#include "SDIR/SDIRDialect.h"
-#include "SDIR/SDIROps.h"
+#include "SDIR/SDIR_Dialect.h"
+#include "SDIR/SDIR_Ops.h"
 
 using namespace mlir;
 using namespace mlir::sdir;
@@ -11,6 +11,6 @@ using namespace mlir::sdir;
 void SDIRDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "SDIR/SDIROps.cpp.inc"
+#include "SDIR/SDIR_Ops.cpp.inc"
       >();
 }

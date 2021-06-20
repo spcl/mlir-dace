@@ -11,7 +11,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-#include "SDIR/SDIRDialect.h"
+#include "SDIR/SDIR_Dialect.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();

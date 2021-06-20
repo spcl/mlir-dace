@@ -7,6 +7,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define GET_OP_CLASSES
-#include "SDIR/SDIROps.h.inc"
+#include "SDIR/SDIR_Ops.h.inc"
 
 #endif // SDIR_SDIR_OPS_H
