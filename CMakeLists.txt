@@ -1,13 +1,13 @@
-cmake_minimum_required(VERSION 3.10)
-
+cmake_minimum_required(VERSION 3.13.4)
 project(sdir-opt LANGUAGES CXX C)
 
-# TODO: Check if this can be shortened
-include(CheckLanguage)
+set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
 set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
 
-# Replace with own path to build of MLIR
+# Replace with own path to build of LLVM / MLIR
+set(LLVM_INSTALL_UTILS ON)
+set(LLVM_EXTERNAL_LIT /home/xdb/bachelor-thesis/llvm-project/build/bin/llvm-lit)
 set(MLIR_DIR /home/xdb/bachelor-thesis/llvm-project/build/lib/cmake/mlir)
 
 find_package(MLIR REQUIRED CONFIG)
@@ -35,4 +35,5 @@ add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(include)
 add_subdirectory(lib)
+add_subdirectory(test)
 add_subdirectory(sdir-opt)
