@@ -3,7 +3,7 @@ name: check-sdir
 on: push
 
 jobs:
-  Build and Test:
+  Build_and_Test:
     runs-on: ubuntu-latest
 
     steps:
