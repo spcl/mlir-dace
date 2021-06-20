@@ -2,14 +2,12 @@
 #define SDIR_OPS
 
 include "SDIR_Dialect.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Concrete Operations
 //===----------------------------------------------------------------------===//
 
-def SDIR_FooOp : SDIR_Op<"foo", [NoSideEffect,
-                                             SameOperandsAndResultType]> {
+def SDIR_FooOp : SDIR_Op<"foo", [SameOperandsAndResultType]> {
     let summary = "Foo operation";
     let description = [{
         Foo operation. For example:
