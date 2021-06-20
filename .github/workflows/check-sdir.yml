@@ -1,6 +1,11 @@
 name: check-sdir
 
-on: push
+on:   
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   Build_and_Test:
@@ -26,7 +31,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -G Ninja ..
+        cmake -G Ninja .. -DLLVM_BUILD_DIR=${{github.workspace}}/llvm-project/build
         cmake --build . --target check-sdir
 
       

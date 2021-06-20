@@ -5,9 +5,13 @@ set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
 set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
 
-# Replace with own path to build of LLVM / MLIR
-set(LLVM_EXTERNAL_LIT /home/xdb/bachelor-thesis/llvm-project/build/bin/llvm-lit)
-set(MLIR_DIR /home/xdb/bachelor-thesis/llvm-project/build/lib/cmake/mlir)
+# TODO: Remove on release. Just to ease local building
+if(NOT DEFINED LLVM_BUILD_DIR)
+    set(LLVM_BUILD_DIR /home/xdb/bachelor-thesis/llvm-project/build)
+endif()
+
+set(LLVM_EXTERNAL_LIT ${LLVM_BUILD_DIR}/bin/llvm-lit)
+set(MLIR_DIR ${LLVM_BUILD_DIR}/lib/cmake/mlir)
 
 find_package(MLIR REQUIRED CONFIG)
 
