@@ -3,14 +3,26 @@ name: check-sdir
 on: push
 
 jobs:
-  build:
+  Build and Test:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install dependencies
+      run: sudo apt-get update
+
+    - name: Build MLIR
+      run: sudo apt-get update
+      run: git clone https://github.com/llvm/llvm-project
+      run: mkdir llvm-project/build
+      run: cd llvm-project/build
+      run: cmake -G Ninja ../llvm -DLLVM_ENABLE_PROJECTS=mlir -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
+      run: cmake --build . --target-mlir 
+      run: cd ${{github.workspace}}
+
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build
+      run: cmake -B ${{github.workspace}}/build -G Ninja
 
     - name: Build & Test
       working-directory: ${{github.workspace}}/build
