@@ -1,15 +1,9 @@
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/ToolOutputFile.h"
 
 #include "SDIR/SDIR_Dialect.h"
 
@@ -25,6 +19,5 @@ int main(int argc, char **argv) {
   // will be *parsed* by the tool, not the one generated
   // registerAllDialects(registry);
 
-  return failed(
-    mlir::MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
+  return failed(mlir::MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
 }
