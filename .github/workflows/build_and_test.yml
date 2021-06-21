@@ -21,9 +21,7 @@ jobs:
       id: cache-mlir
       uses: actions/cache@v2
       with:
-        path: |
-          llvm-project/llvm/cmake
-          llvm-project/mlir
+        path: llvm-project
         key: ${{ runner.os }}-mlir
 
     - name: Clone MLIR
@@ -61,10 +59,7 @@ jobs:
     - name: Load MLIR cache
       uses: actions/cache@v2
       with:
-        path: |
-          llvm-project/llvm/cmake
-          llvm-project/mlir
-          llvm-project/build
+        path: llvm-project
         key: ${{ runner.os }}-mlir
 
     - name: Build & Test
