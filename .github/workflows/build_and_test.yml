@@ -1,4 +1,4 @@
-name: check-sdir
+name: Build and Test
 
 on:   
   push:
@@ -8,18 +8,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  Build_and_Test:
+  check-sdir:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install ninja-build
 
+    - name: Checking MLIR cache
+      id: cache-mlir
+      uses: actions/cache@v2
+      with:
+        path: llvm-project/build
+        key: ${{ runner.os }}-mlir
+
     - name: Build MLIR
+      if: steps.cache-mlir.outputs.cache-hit != 'true'
       run: |
         git clone https://github.com/llvm/llvm-project
         mkdir llvm-project/build
