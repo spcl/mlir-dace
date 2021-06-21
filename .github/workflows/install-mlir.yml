@@ -7,11 +7,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install ninja-build
-
     - name: Check MLIR cache
       id: cache-mlir
       uses: actions/cache@v2
@@ -29,6 +24,12 @@ jobs:
       with:
         path: llvm-project/build
         key: ${{ runner.os }}-mlir
+
+    - name: Install dependencies
+      if: steps.cache-mlir-build.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install ninja-build
 
     - name: Build MLIR
       if: steps.cache-mlir-build.outputs.cache-hit != 'true'
