@@ -30,7 +30,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -G Ninja .. -DLLVM_BUILD_DIR=${{github.workspace}}/llvm-project/build
+        cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
         cmake --build . --target check-sdir
 
       

@@ -6,12 +6,10 @@ set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
 
 # TODO: Remove on release. Just to ease local building
-if(NOT DEFINED LLVM_BUILD_DIR)
-    set(LLVM_BUILD_DIR /home/xdb/bachelor-thesis/llvm-project/build)
+if(NOT DEFINED MLIR_DIR)
+    set(LLVM_EXTERNAL_LIT /home/xdb/bachelor-thesis/llvm-project/build/bin/llvm-lit)
+    set(MLIR_DIR /home/xdb/bachelor-thesis/llvm-project/build/lib/cmake/mlir)
 endif()
-
-set(LLVM_EXTERNAL_LIT ${LLVM_BUILD_DIR}/bin/llvm-lit)
-set(MLIR_DIR ${LLVM_BUILD_DIR}/lib/cmake/mlir)
 
 find_package(MLIR REQUIRED CONFIG)
 
