@@ -17,9 +17,6 @@ jobs:
         sudo apt-get update
         sudo apt-get install ninja-build
 
-    - name: Clone MLIR
-      run: 
-
     - name: Check MLIR cache
       id: cache-mlir
       uses: actions/cache@v2
