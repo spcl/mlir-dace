@@ -25,7 +25,8 @@ jobs:
       uses: actions/cache@v2
       with:
         path: |
-          llvm-project/build
+          llvm-project/build/bin/llvm-lit
+          llvm-project/build/lib/cmake
           llvm-project/llvm/cmake
         key: ${{ runner.os }}-mlir
 
@@ -59,7 +60,8 @@ jobs:
       uses: actions/cache@v2
       with:
         path: 
-          llvm-project/build
+          llvm-project/build/bin/llvm-lit
+          llvm-project/build/lib/cmake
           llvm-project/llvm/cmake
         key: ${{ runner.os }}-mlir
 
