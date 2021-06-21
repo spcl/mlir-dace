@@ -62,7 +62,10 @@ jobs:
       id: cache-mlir
       uses: actions/cache@v2
       with:
-        path: llvm-project
+        path:
+          llvm-project/llvm/cmake
+          llvm-project/mlir
+          llvm-project/build
         key: ${{ runner.os }}-mlir
 
     - name: Build & Test
