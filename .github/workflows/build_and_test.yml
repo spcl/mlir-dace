@@ -20,7 +20,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install ninja-build
 
-    - name: Checking MLIR cache
+    - name: Clone MLIR
+        run: git clone https://github.com/llvm/llvm-project
+
+    - name: Check MLIR cache
       id: cache-mlir
       uses: actions/cache@v2
       with:
@@ -30,7 +33,6 @@ jobs:
     - name: Build MLIR
       if: steps.cache-mlir.outputs.cache-hit != 'true'
       run: |
-        git clone https://github.com/llvm/llvm-project
         mkdir llvm-project/build
         cd llvm-project/build
         cmake -G Ninja ../llvm -DLLVM_ENABLE_PROJECTS=mlir -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
