@@ -59,10 +59,9 @@ jobs:
         sudo apt-get install ninja-build
 
     - name: Load MLIR cache
-      id: cache-mlir
       uses: actions/cache@v2
       with:
-        path:
+        path: |
           llvm-project/llvm/cmake
           llvm-project/mlir
           llvm-project/build
