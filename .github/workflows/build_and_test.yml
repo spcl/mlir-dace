@@ -10,7 +10,7 @@ on:
 jobs:
   install-mlir:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Install dependencies
       run: |
@@ -42,6 +42,18 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install ninja-build
+
+    - name: Check MLIR cache
+      id: cache-mlir
+      uses: actions/cache@v2
+      with:
+        path: llvm-project/build
+        key: ${{ runner.os }}-mlir
 
     - name: Build & Test
       run: |
