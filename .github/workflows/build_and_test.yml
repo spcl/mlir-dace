@@ -21,7 +21,7 @@ jobs:
         sudo apt-get install ninja-build
 
     - name: Clone MLIR
-        run: git clone https://github.com/llvm/llvm-project
+      run: git clone https://github.com/llvm/llvm-project
 
     - name: Check MLIR cache
       id: cache-mlir
