@@ -22,17 +22,23 @@ jobs:
       uses: actions/cache@v2
       with:
         path: |
-          llvm-project/build/bin/llvm-lit
-          llvm-project/build/lib/cmake
           llvm-project/llvm/cmake
+          llvm-project/mlir
         key: ${{ runner.os }}-mlir
 
     - name: Clone MLIR
       if: steps.cache-mlir.outputs.cache-hit != 'true'
       run: git clone https://github.com/llvm/llvm-project
+    
+    - name: Check MLIR Build cache
+      id: cache-mlir-build
+      uses: actions/cache@v2
+      with:
+        path: llvm-project/build
+        key: ${{ runner.os }}-mlir
 
     - name: Build MLIR
-      if: steps.cache-mlir.outputs.cache-hit != 'true'
+      if: steps.cache-mlir-build.outputs.cache-hit != 'true'
       run: |
         mkdir llvm-project/build
         cd llvm-project/build
@@ -56,10 +62,7 @@ jobs:
       id: cache-mlir
       uses: actions/cache@v2
       with:
-        path: 
-          llvm-project/build/bin/llvm-lit
-          llvm-project/build/lib/cmake
-          llvm-project/llvm/cmake
+        path: llvm-project
         key: ${{ runner.os }}-mlir
 
     - name: Build & Test
