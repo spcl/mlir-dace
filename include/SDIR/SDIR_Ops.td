@@ -1,7 +1,6 @@
 #ifndef SDIR_OPS
 #define SDIR_OPS
 
-include "mlir/IR/OpBase.td"
 include "SDIR/SDIR_Dialect.td"
 include "SDIR/SDIR_Types.td"
 
@@ -9,11 +8,10 @@ include "SDIR/SDIR_Types.td"
 // Base class for all SDIR ops
 //===----------------------------------------------------------------------===//
 
-class SDIR_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<SDIR_Dialect, mnemonic, traits>;
+class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mnemonic, traits>{}
 
 //===----------------------------------------------------------------------===//
-// Concrete Operations
+// FooOp
 //===----------------------------------------------------------------------===//
 
 def SDIR_FooOp : SDIR_Op<"foo", [SameOperandsAndResultType]> {
@@ -33,16 +31,24 @@ def SDIR_FooOp : SDIR_Op<"foo", [SameOperandsAndResultType]> {
     }];
 }
 
+//===----------------------------------------------------------------------===//
+// StateOp
+//===----------------------------------------------------------------------===//
+
 def SDIR_StateOp : SDIR_Op<"state"> {
     let summary = "State operation";
     let description = [{
         State operation. For example:
 
-        %0 = sdir.state() {label = "state_0"} : !SDIR_State
+        %0 = sdir.state() {label = "state_0"} : !sdir.state
     }];
 
-    let arguments = (ins );
-    let results = (outs I32:$res);
+    let arguments = (ins StrAttr:$label);
+    let results = (outs I32);
+
+    let assemblyFormat = [{
+         attr-dict `:` type(results)
+    }];
 }
 
 #endif // SDIR_OPS
