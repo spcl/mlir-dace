@@ -46,3 +46,7 @@ build/
 
 # Notes & Ideas folder
 .idea/
+
+# LaTeX files
+*.aux
+*.log
