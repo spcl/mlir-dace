@@ -1,0 +1,16 @@
+\newcommand{\smc}[3]{
+    \begin{figure}[h]
+         \centering
+         \begin{subfigure}[h]{0.49\textwidth}
+             \centering
+             \includegraphics[width=\textwidth]{img/#1}
+         \end{subfigure}
+         \hfill
+         \begin{subfigure}[h]{0.49\textwidth}
+             \centering
+             \lstinputlisting[breaklines]{mlir/#1.mlir}
+         \end{subfigure}
+            \caption{#2}
+            \label{#3}
+    \end{figure}
+}

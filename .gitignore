@@ -50,3 +50,4 @@ build/
 # LaTeX files
 *.aux
 *.log
+*.toc
