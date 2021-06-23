@@ -9,7 +9,12 @@ using namespace mlir::sdir;
 
 void SDIRDialect::initialize() {
   addOperations<
-#define GET_OP_LIST
-#include "SDIR/SDIR_Ops.cpp.inc"
-      >();
+    #define GET_OP_LIST
+    #include "SDIR/SDIR_Ops.cpp.inc"
+  >();
+
+  addTypes<
+    #define GET_TYPEDEF_LIST
+    #include "SDIR/SDIR_OpsTypes.cpp.inc"
+  >();
 }
