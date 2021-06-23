@@ -44,6 +44,9 @@
 # CMake Build
 build/
 
+# SDFG Generator
+sdfg_gen/gen
+
 # Notes & Ideas folder
 .idea/
 
