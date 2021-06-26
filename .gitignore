@@ -46,6 +46,7 @@ build/
 
 # SDFG Generator
 sdfg_gen/gen
+.dacecache
 
 # Notes & Ideas folder
 .idea/
