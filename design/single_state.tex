@@ -1,11 +1,13 @@
 \section{Single state}
+States are represented by an SSACFG region with the dialect-specific keyword \codeword{sdir.state}. See Figure \ref{fig:state}. The state body contains all the runnable subgraphs. States need to use dialect ops for reading/writing global arrays and can therefore not access them directly.
+The op \codeword{sdir.get_access} is used to achieve this. This op is exclusive for the state region and may not be used by sub-regions. See Figure \ref{fig:state_in_out}.
+\smc{state}{Single state}
+\smc{state_in_out}{State input and output}
 
-\subsection{Tasklets and Memlets}
-
-\smc{tasklet_memlet}{Three simple graphs}{fig:three graphs}
-
-\subsection{Library nodes}
-
-\subsection{Map scopes}
-
-\subsection{Streams and consume scopes}
+\addsub{keywords}
+\addsub{memlet}
+\addsub{tasklet}
+\addsub{lib}
+\addsub{map}
+\addsub{stream}
+\addsub{view}

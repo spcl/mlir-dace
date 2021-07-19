@@ -1,0 +1,14 @@
+\subsection{Tasklets} \label{section:tasklet}
+Tasklets are defined as pure functions working on primitive types or \codeword{sdir.memlets}. See Figure \ref{fig:tasklet}.
+In order to clearly mark the function as a tasklet the keyword \codeword{func} gets replaced by the dialect-specific keyword \codeword{sdir.tasklet}. In order to solve the problem of naming the outputs, an attribute gets added, which lists the output names in the order they get returned. This allows tasklets to work on primitive types directly and restricts reading from outputs or writing to inputs by default.
+\smc{tasklet}{Tasklet}
+
+\subsubsection{Language limitation}
+Tasklets must be written in MLIR despite SDFGs supporting many more (Python, C++, OpenCL, SystemVerilog). Currently there are no plans to support the full range of languages as that would complicate compilation quite a bit.
+
+\subsubsection{Calling tasklets}
+To call a tasklet an op called \codeword{sdir.call} gets added. It works similar to \codeword{std.call} but syntactically an arrow is used to separate the inputs and outputs instead of an assignment, since data is written to an \codeword{sdir.memlet} and not assigned to a new variable. This makes the distinction clear and as an added benefit visually shows the flow of data. Example:\codeword{\%c = sdir.call @add(\%a, \%b)}.
+
+\subsubsection{Example SDFG}
+By combining all the concepts so far, one can represent simple SDFGs in SDIR. Such a simple SDFG is shown in Figure \ref{fig:simple_sdfg}, which simply adds A and B and writes the result to C.
+\smc{simple_sdfg}{Simple SDFG}

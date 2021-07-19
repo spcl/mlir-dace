@@ -1,0 +1,8 @@
+\subsection{Memlets} \label{section:memlet}
+Memlets are represented by using \codeword{sdir.memlet}, which extends the builtin \codeword{memref} to allow for attributes. See Figure \ref{fig:state_in_out}. Using index and layout maps on \codeword{sdir.memlets} any subregion of the underlying array can be selected. Transient arrays get constructed using \codeword{sdir.alloc_transient()} as opposed to \codeword{sdir.alloc()} for global arrays. Arrays created inside of a state are only accessible by the same state whereas arrays created outside of all states are accessible by all states. See Figure \ref{fig:transient_array}.
+\smc{transient_array}{Transient arrays}
+\\
+
+\subsubsection{Parameterized sizes}
+ One can also pass parameters to \codeword{sdir.alloc()} to define the size at runtime as seen on here:\codeword{\%A = sdir.alloc(\%n) : !sdir.memlet<?xi32>}. In this case the question mark \codeword{?} gets replaced by the value of \codeword{\%n}.
+ 

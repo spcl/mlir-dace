@@ -1,0 +1,6 @@
+\subsection{Streams and consume scopes}
+Streams use the type \codeword{sdir.stream}, which works similar to \codeword{sdir.memlet}, but it introduces two ops \codeword{sdir.stream_push} and \codeword{sdir.stream_pop}. To create streams one can use \codeword{sdir.alloc_stream()} for global and \codeword{sdir.alloc_transient_stream()} for transient streams, just like \codeword{sdir.memlet}. Since reading or writing directly to streams is forbidden, \codeword{sdir.stream} doesn't have reading or writing ops apart from push and pop. See Figure \ref{fig:stream}.
+\codeblock{stream}{Stream}
+
+Consume scopes are composed similarly to maps. However instead of \codeword{ranged} one needs to define the number of processing elements and the stopping condition with the attributes \codeword{num_pes} and \codeword{condition}. The condition function must have the signature \codeword{stream -> boolean}. The consume operation stops when the stream is empty. The first basic block gets called with the id of the processing element and the element retrieved by \codeword{sdir.stream_pop}. See Figure \ref{fig:consume}.
+\smc{consume}{Consume scope}

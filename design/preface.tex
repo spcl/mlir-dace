@@ -1,0 +1,5 @@
+\section{Preface}
+This document explains the representation of SDFG concepts in a MLIR dialect called SDIR (Stateful Dataflow Intermediate Representation). The goals were to constrain the supported SDFGs as little as possible, to stay as MLIR-esque as possible (to enable the use of MLIR tools) and to be as lossless as possible (a round-trip should result in the provided input). 
+Keep in mind, that the shown code snippets have been adjusted to focus on the corresponding concept and to save space. Especially op types have been mostly omitted. \codeword{\%0} and \codeword{\%1} are used as constant zeros and ones. Comments regarding errors are welcome.\\
+
+\textbf{This is a work in progress. There are no correctness or completeness guarantees. Any liability will be declined.}

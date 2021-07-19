@@ -1,0 +1,35 @@
+\newcommand{\codeword}[1]{
+    \textcolor{blue}{\lstinline{#1}}
+}
+
+\newcommand{\codeblock}[2]{
+    \begin{figure}[!ht]
+        \centering
+        \begin{tabular}{c}
+            \lstinputlisting[]{mlir/#1.mlir}
+        \end{tabular}
+        \caption{#2}
+        \label{fig:#1}
+    \end{figure}
+}
+
+\newcommand{\smc}[2]{
+    \begin{figure}[!ht]
+        \centering
+        \begin{subfigure}[!ht]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\textwidth]{img/#1}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[!ht]{0.63\textwidth}
+            \lstinputlisting[]{mlir/#1.mlir}
+        \end{subfigure}
+            \caption{#2}
+            \label{fig:#1}
+    \end{figure}
+}
+
+\newcommand{\addsub}[1]{
+    \FloatBarrier
+    \input{subsections/#1}
+}

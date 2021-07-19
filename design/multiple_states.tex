@@ -1,1 +1,6 @@
-\section{Multiple states}
+\section{Multiple states} \label{section:multistate}
+For multiple states a builtin graph region is used as states can form a cyclic graph. Transitions have either assignments or conditions. Both are implemented with the \codeword{sdir.edge} op using the \codeword{assign} and \codeword{condition} attributes. See Figure \ref{fig:multistate}.
+\smc{multistate}{Multiple states}
+
+\addsub{entry_state}
+\addsub{nested_sdfg}

@@ -1,11 +1,21 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
+\usepackage[a4paper]{geometry}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{graphicx}
 \usepackage{listings}
+\usepackage{xcolor}
+\usepackage[section]{placeins}
+\usepackage{hyperref}
 
-\input{smc}
+\input{commands}
+
+\setlength{\parindent}{0pt}
+
+% Dark mode
+%\pagecolor[rgb]{0,0,0}
+%\color[rgb]{1,1,1}
 
 \title{SDIR Design}
 \author{Berke Ates}
@@ -15,6 +25,7 @@
 \maketitle
 \tableofcontents
 
+\include{preface}
 \include{single_state}
 \include{multiple_states}
 \include{file_compatibility}

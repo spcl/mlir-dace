@@ -1,0 +1,4 @@
+\subsection{Map scopes}
+Maps get represented by a region labeled by \codeword{sdir.map}. A similar syntax to \codeword{affine.parallel} is being used. The region of the map has access to the \codeword{sdir.memlet} of the enclosing state and therefore can directly access them. Symbols are used for the map variables in order to ensure that they do not get edited in the map region as well as provide a way to perform simple arithmetic in a compact way. See Figure \ref{fig:map}.
+\smc{map}{Map scope}
+

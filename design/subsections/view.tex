@@ -1,0 +1,2 @@
+\subsection{View nodes}
+A view node simply changes the view on a memory location. In SDIR this is the same as recasting a \codeword{sdir.memlet}. One may be inclined to use \codeword{sdir.memlet_cast} similar to \codeword{memref_cast} in the builtin dialect. However one might need \codeword{sdir.memlet_cast} outside of view nodes (such as selecting a subsection of the input-arrays). To clearly mark these casts as view nodes one instead uses the keyword \codeword{sdir.view_cast}, which works exactly like \codeword{sdir.memlet_cast}.
