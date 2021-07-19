@@ -16,7 +16,7 @@ jobs:
 
     - name: Clone MLIR
       if: steps.cache-mlir.outputs.cache-hit != 'true'
-      run: git clone -–depth 1 https://github.com/llvm/llvm-project
+      run: git clone --depth 1 https://github.com/llvm/llvm-project
     
     - name: Check MLIR Build cache
       id: cache-mlir-build
