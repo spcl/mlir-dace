@@ -3,6 +3,8 @@
 using namespace mlir;
 using namespace mlir::sdir;
 
+#include "SDIR/SDIR_OpsDialect.cpp.inc"
+
 //===----------------------------------------------------------------------===//
 // SDIR dialect
 //===----------------------------------------------------------------------===//

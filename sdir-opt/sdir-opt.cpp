@@ -19,5 +19,5 @@ int main(int argc, char **argv) {
   // will be *parsed* by the tool, not the one generated
   // registerAllDialects(registry);
 
-  return failed(mlir::MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
+  return mlir::asMainReturnCode(mlir::MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
 }
