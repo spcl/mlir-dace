@@ -21,10 +21,17 @@ jobs:
         sudo apt-get install ninja-build
 
     - name: Load MLIR cache
+      id: mlir-cache
       uses: actions/cache@v2
       with:
         path: llvm-project
         key: ${{ runner.os }}-mlir
+
+    - name: Check MLIR cache
+      if: steps.mlir-cache.outputs.cache-hit != 'true'
+      run: |
+        echo "MLIR cache miss. Please install MLIR first."
+        exit 1
 
     - name: Build & Test
       run: |
