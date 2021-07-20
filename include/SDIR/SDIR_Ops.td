@@ -32,23 +32,26 @@ def SDIR_FooOp : SDIR_Op<"foo", [SameOperandsAndResultType]> {
 }
 
 //===----------------------------------------------------------------------===//
-// StateOp
+// State Region
 //===----------------------------------------------------------------------===//
 
-def SDIR_StateOp : SDIR_Op<"state"> {
-    let summary = "State operation";
+def SDIR_StateOp : SDIR_Op<"state", [
+    SingleBlock,
+    NoTerminator
+]> {
+    let summary = "State region";
     let description = [{
-        State operation. For example:
+        Describes a state where the subgraphs are placed in the region. 
 
-        %0 = sdir.state() {label = "state_0"} : !sdir.state
+        Example:
+        sdir.state @state_0{
+
+        } 
     }];
 
-    let arguments = (ins StrAttr:$label);
-    let results = (outs I32);
-
-    let assemblyFormat = [{
-         attr-dict `:` type(results)
-    }];
+    let arguments = (ins SymbolNameAttr:$name);
+    let regions = (region SizedRegion<1>:$region);
+    let assemblyFormat = [{attr-dict $name $region}];
 }
 
 #endif // SDIR_OPS
