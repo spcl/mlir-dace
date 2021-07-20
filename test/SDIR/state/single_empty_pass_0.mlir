@@ -4,8 +4,3 @@
 sdir.state @state_0{
 
 }
-
-// CHECK-LABEL: sdir.state @randomName
-sdir.state @randomName{
-
-}
