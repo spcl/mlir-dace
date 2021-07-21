@@ -1,7 +1,8 @@
 // RUN: sdir-opt %s | sdir-opt | FileCheck %s
 
-// CHECK-NOT: module
-// CHECK: sdir.state
+// Module is always implicitly top-level
+// CHECK: module
+// CHECK-NEXT: sdir.state
 // CHECK-DAG: nosync = false
 // CHECK-DAG: instrument = "No_Instrumentation"
 // CHECK-SAME: @state_0
