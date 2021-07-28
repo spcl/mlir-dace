@@ -2,6 +2,7 @@
 
 // CHECK: sdir.tasklet 
 // CHECK-SAME: @get_zero
+// CHECK-SAME: i32
 // CHECK-NEXT: [[NAME:%[a-zA-Z0-9_]*]]
 // CHECK-NEXT: sdir.return [[NAME]]
 sdir.tasklet @get_zero() -> i32{
