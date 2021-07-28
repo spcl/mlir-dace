@@ -2,13 +2,14 @@
 #define SDIR_SDIR_DIALECT_H
 
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/FunctionImplementation.h"
 
-#include "mlir/IR/Types.h"
+#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 
+#include "mlir/IR/Types.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/PatternMatch.h"
 
 #include "SDIR/SDIR_OpsDialect.h.inc"
 
