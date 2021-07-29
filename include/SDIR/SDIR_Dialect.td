@@ -2,6 +2,8 @@
 #define SDIR_Dialect
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // SDIR Dialect
