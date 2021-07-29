@@ -11,44 +11,26 @@ include "SDIR/SDIR_Types.td"
 class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mnemonic, traits>{}
 
 //===----------------------------------------------------------------------===//
-// FooOp
+// State Region
 //===----------------------------------------------------------------------===//
 
-def SDIR_FooOp : SDIR_Op<"foo", [SameOperandsAndResultType]> {
-    let summary = "Foo operation";
+def SDIR_StateOp : SDIR_Op<"state", [
+    SingleBlock,
+    NoTerminator
+]> {
+    let summary = "State region";
     let description = [{
-        Foo operation. For example:
+        Describes a state where the subgraphs are placed in the region. 
 
-        %0 = constant 2 : i32
-        %1 = sdir.foo %0 : i32
+        Example:
+        sdir.state @state_0{
+
+        } 
     }];
 
-    let arguments = (ins I32:$value);
-    let results = (outs I32:$res);
-
-    let assemblyFormat = [{
-        $value attr-dict `:` type($value)
-    }];
-}
-
-//===----------------------------------------------------------------------===//
-// StateOp
-//===----------------------------------------------------------------------===//
-
-def SDIR_StateOp : SDIR_Op<"state"> {
-    let summary = "State operation";
-    let description = [{
-        State operation. For example:
-
-        %0 = sdir.state() {label = "state_0"} : !sdir.state
-    }];
-
-    let arguments = (ins StrAttr:$label);
-    let results = (outs I32);
-
-    let assemblyFormat = [{
-         attr-dict `:` type(results)
-    }];
+    let arguments = (ins SymbolNameAttr:$name);
+    let regions = (region SizedRegion<1>:$region);
+    let assemblyFormat = [{attr-dict $name $region}];
 }
 
 #endif // SDIR_OPS

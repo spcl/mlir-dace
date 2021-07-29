@@ -4,7 +4,6 @@
 #include "mlir/IR/DialectImplementation.h"
 
 #include "mlir/IR/Types.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 #include "mlir/IR/Attributes.h"
