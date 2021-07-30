@@ -1,7 +1,7 @@
 \subsection{Identifiers, keywords and types}
 SDIR introduces only one additional identifier with the symbol \codeword{\$} (see Section \ref{section:symbol}).\\
 Every op and region specific to SDIR is prefixed by the keyword \codeword{sdir} followed by a dot to clearly mark the end of the prefix. Some examples are: \codeword{sdir.tasklet\{\}}, \codeword{sdir.return}, \codeword{sdir.alloc()}. \\
-SDIR contains only one additional type on top of the builtin types: \codeword{!sdir.memlet<>}. See Section \ref{section:memlet}. 
+SDIR contains only two additional types on top of the builtin types: \codeword{!sdir.memlet<>} (See Section \ref{section:memlet}) and \codeword{!sdir.stream<>} (See Section \ref{section:stream}).
 
 \subsubsection{Symbols} \label{section:symbol}
 The op \codeword{sdir.alloc_symbol} creates a new symbol, but does not return anything. In order to access symbols the identifier \codeword{\$()} can be used. See Figure \ref{fig:symbol}. One can describe arithmetic expressions inside the identifier. Example:\codeword{\$(2*N - 1)}. Parentheses can be omitted for a single symbol. \codeword{\$N} is the same as \codeword{\$(N)}.
@@ -16,7 +16,7 @@ In some cases an op might write to a location that contains the result of an oth
 \codeblock{wcr}{Write conflict resolution with custom function}
 
 \subsubsection{Multiple basic blocks and branching}
-Tasklets (see Section \ref{section:tasklet}) and \codeword{sdir.func} are the only regions that may have multiple basic blocks and branching. Every other region has only one basic block and therefore terminator operations can be omitted. SDFG regions (see Section \ref{section:multistate}) contain branches, but these are provided as attributes and therefore there is no need for branching with \codeword{sdir.br} or \codeword{sdir.cond_br}.
+Tasklets (see Section \ref{section:tasklet}) and \codeword{func} are the only regions that may have multiple basic blocks and branching. Every other region has only one basic block and therefore terminator operations can be omitted. SDFG regions (see Section \ref{section:multistate}) contain branches, but these are provided as attributes and therefore there is no need for branching with \codeword{br} or \codeword{cond_br}.
 
 \subsubsection{Unnamed outputs}
 Any output that is unnamed will be auto-generated with the prefix \codeword{__} (double underscore). Therefore explicitly naming any output with the same prefix is strictly forbidden for the user.
