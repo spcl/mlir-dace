@@ -5,8 +5,8 @@ sdir.func @empty(%A : !sdir.stream<i32>)
                                     -> i1
 {
     %l = sdir.stream_length %A : i32
-    %isZero = sdir.cmpi "eq", %l, %0 : i32
-    sdir.cond_br %isZero, ^zero, ^one
+    %isZero = cmpi "eq", %l, %0 : i32
+    cond_br %isZero, ^zero, ^one
     
     ^zero: sdir.return %1 : i1
     ^one: sdir.return %0 : i1

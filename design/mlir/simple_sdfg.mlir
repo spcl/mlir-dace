@@ -1,5 +1,5 @@
 sdir.tasklet @add(%a: i32, %b: i32) -> i32{
-    %c = sdir.addi %a, %b : i32
+    %c = addi %a, %b : i32
     sdir.return %c
 }
 
