@@ -11,6 +11,8 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/PatternMatch.h"
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include "SDIR/SDIR_OpsDialect.h.inc"
 
 #define GET_TYPEDEF_CLASSES
