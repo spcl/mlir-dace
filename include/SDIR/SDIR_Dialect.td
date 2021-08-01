@@ -16,4 +16,10 @@ def SDIR_Dialect : Dialect {
   let cppNamespace = "::mlir::sdir";
 }
 
+//===----------------------------------------------------------------------===//
+// SDIR Types
+//===----------------------------------------------------------------------===//
+
+class SDIR_Type<string name, list<Trait> traits = []> : TypeDef<SDIR_Dialect, name, traits>{}
+
 #endif // SDIR_Dialect

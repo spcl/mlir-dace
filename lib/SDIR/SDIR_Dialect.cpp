@@ -6,7 +6,7 @@ using namespace mlir::sdir;
 #include "SDIR/SDIR_OpsDialect.cpp.inc"
 
 //===----------------------------------------------------------------------===//
-// SDIR dialect
+// SDIR Dialect
 //===----------------------------------------------------------------------===//
 
 void SDIRDialect::initialize() {
@@ -19,4 +19,20 @@ void SDIRDialect::initialize() {
     #define GET_TYPEDEF_LIST
     #include "SDIR/SDIR_OpsTypes.cpp.inc"
   >();
+}
+
+
+//===----------------------------------------------------------------------===//
+// SDIR Types
+//===----------------------------------------------------------------------===//
+
+#define GET_TYPEDEF_CLASSES
+#include "SDIR/SDIR_OpsTypes.cpp.inc"
+
+::mlir::Type SDIRDialect::parseType(::mlir::DialectAsmParser &parser) const{
+
+}
+
+void SDIRDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter &os) const{
+
 }

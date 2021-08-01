@@ -2,7 +2,6 @@
 #define SDIR_OPS
 
 include "SDIR/SDIR_Dialect.td"
-include "SDIR/SDIR_Types.td"
 
 //===----------------------------------------------------------------------===//
 // Base class for all SDIR ops
