@@ -2,7 +2,8 @@
 #define SDIR_ReturnOp
 
 def SDIR_ReturnOp : SDIR_Op<"return", [
-    Terminator
+    Terminator,
+    HasParent<"TaskletOp">
 ]> {
   let summary = "return operation";
   let description = [{
