@@ -29,9 +29,17 @@ void SDIRDialect::initialize() {
 #include "SDIR/SDIR_OpsTypes.cpp.inc"
 
 ::mlir::Type SDIRDialect::parseType(::mlir::DialectAsmParser &parser) const{
+  ::mlir::Type value;
+  ::mlir::OptionalParseResult opr;
 
+  opr = generatedTypeParser(getContext(), parser, "memlet", value);
+  if(opr.hasValue() && opr.getValue().succeeded()) return value;
+
+  return ::mlir::Type();
 }
 
 void SDIRDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter &os) const{
-
+  ::mlir::LogicalResult logRes = generatedTypePrinter(type, os);
+  if(logRes.failed())
+    ::mlir::emitError(nullptr, "Failed to print dialect type");
 }
