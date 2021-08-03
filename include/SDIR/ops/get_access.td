@@ -2,7 +2,8 @@
 #define SDIR_GetAccessOp
 
 def SDIR_GetAccessOp : SDIR_Op<"get_access", [
-    HasParent<"StateOp">
+    HasParent<"StateOp">,
+    SameOperandsAndResultType
 ]> {
   let summary = "Array access operation";
   let description = [{
@@ -19,8 +20,8 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
   }];
 
     let arguments = (ins SDIR_MemletType:$arr);
-    let results = (outs SDIR_MemletType);
-    let assemblyFormat = [{attr-dict $arr `:` type($arr) `->` type(results)}];
+    let results = (outs SDIR_MemletType:$res);
+    let assemblyFormat = [{attr-dict $arr `:` type($arr)}];
 }
 
 #endif // SDIR_GetAccessOp

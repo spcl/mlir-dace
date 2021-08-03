@@ -31,12 +31,10 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
 
   let parameters = (ins "Type":$elementType);
 
-  // We define the printer inline.
   let printer = [{
     $_printer << "memlet<" << getImpl()->elementType << ">";
   }];
 
-  // The parser is defined here also.
   let parser = [{
     if ($_parser.parseKeyword("memlet"))
       return Type();

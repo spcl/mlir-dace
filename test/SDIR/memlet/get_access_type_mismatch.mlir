@@ -1,8 +1,9 @@
+// XFAIL: *
 // RUN: sdir-opt %s | sdir-opt | FileCheck %s
 
 // CHECK: module
-// CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc
-%A = sdir.alloc() : !sdir.memlet<i32>
+// CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc() : !sdir.memlet<i64>
+%A = sdir.alloc() : !sdir.memlet<i64>
 
 // CHECK: sdir.state
 // CHECK-SAME: @state_0
