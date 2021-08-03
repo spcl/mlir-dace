@@ -6,10 +6,8 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
 ]> {
   let summary = "Array access operation";
   let description = [{
-    The "return" operation represents a return operation within a function.
-    The operation takes an optional operand and produces no results.
-    The operand type must match the signature of the function that contains
-    the operation. For example:
+    Allows a state to access the specified array.
+    For example:
 
     ```mlir
     sdir.state @state_0 {
@@ -20,9 +18,9 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
     ```
   }];
 
-    let arguments = (ins);
+    let arguments = (ins SDIR_MemletType:$arr);
     let results = (outs SDIR_MemletType);
-    let assemblyFormat = [{attr-dict `:` type(results)}];
+    let assemblyFormat = [{attr-dict $arr `:` type($arr) `->` type(results)}];
 }
 
 #endif // SDIR_GetAccessOp
