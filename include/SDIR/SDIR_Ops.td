@@ -15,5 +15,8 @@ include "SDIR/ops/return.td"
 include "SDIR/ops/alloc.td"
 include "SDIR/ops/alloc_transient.td"
 include "SDIR/ops/get_access.td"
+include "SDIR/ops/load.td"
+include "SDIR/ops/store.td"
+include "SDIR/ops/copy.td"
 
 #endif // SDIR_OPS
