@@ -32,6 +32,9 @@ void SDIRDialect::initialize() {
   ::mlir::Type value;
   ::mlir::OptionalParseResult opr;
 
+  opr = generatedTypeParser(getContext(), parser, "stream", value);
+  if(opr.hasValue() && opr.getValue().succeeded()) return value;
+
   opr = generatedTypeParser(getContext(), parser, "memlet", value);
   if(opr.hasValue() && opr.getValue().succeeded()) return value;
 

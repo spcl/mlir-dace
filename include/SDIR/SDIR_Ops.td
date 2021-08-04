@@ -19,4 +19,6 @@ include "SDIR/ops/load.td"
 include "SDIR/ops/store.td"
 include "SDIR/ops/copy.td"
 
+include "SDIR/ops/alloc_stream.td"
+
 #endif // SDIR_OPS

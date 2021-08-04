@@ -49,4 +49,31 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
   }];
 }
 
+def SDIR_StreamType : SDIR_Type<"Stream"> {
+  let mnemonic = "stream";
+  let summary = "A stream type";
+  let description = [{
+    A type representing a stream.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "stream<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseKeyword("stream"))
+      return Type();
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
 #endif // SDIR_Dialect
