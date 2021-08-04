@@ -3,6 +3,9 @@
 
 def SDIR_LoadOp : SDIR_Op<"load", [
     HasParent<"StateOp">,
+    TypesMatchWith<"result type matches element type of 'memlet'",
+                     "arr", "res",
+                     "$_self.cast<MemletType>().getElementType()">
 ]> {
   let summary = "Memlet load operation";
   let description = [{
@@ -21,7 +24,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 
     let arguments = (ins SDIR_MemletType:$arr, I64Attr:$idx);
     let results = (outs AnyType:$res);
-    let assemblyFormat = [{attr-dict $arr `[` $idx `]` `:` type($arr) `->` type($res)}];
+    let assemblyFormat = [{attr-dict $arr `[` $idx `]` `:` type($arr)}];
 }
 
 #endif // SDIR_LoadOp
