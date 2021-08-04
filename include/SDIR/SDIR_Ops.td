@@ -20,5 +20,7 @@ include "SDIR/ops/store.td"
 include "SDIR/ops/copy.td"
 
 include "SDIR/ops/alloc_stream.td"
+include "SDIR/ops/stream_pop.td"
+include "SDIR/ops/stream_push.td"
 
 #endif // SDIR_OPS
