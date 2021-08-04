@@ -11,6 +11,6 @@ sdir.state @state_0 {
     // CHECK-SAME: !sdir.memlet<i32>
     %a = sdir.get_access %A : !sdir.memlet<i32>
     // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.load [[NAMEB]][0]
-    // CHECK-SAME: i32
+    // CHECK-SAME: !sdir.memlet<i32>
     %a_1 = sdir.load %a[0] : !sdir.memlet<i32>
 }
