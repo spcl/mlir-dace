@@ -9,11 +9,13 @@ def SDIR_StateOp : SDIR_Op<"state", [
     let summary = "State region";
     let description = [{
         Describes a state where the subgraphs are placed in the region. 
+        For example:
 
-        Example:
+        ```mlir
         sdir.state @state_0{
-
+            ...
         } 
+        ```
     }];
 
     let arguments = (ins SymbolNameAttr:$name);
