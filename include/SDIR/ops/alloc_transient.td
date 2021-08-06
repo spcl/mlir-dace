@@ -10,11 +10,11 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
     For example:
 
     ```mlir
-        %A = sdir.alloc_transient() : !sdir.memlet<i32>
+        %A = sdir.alloc_transient() : !sdir.array<i32>
     ```
   }];
 
-    let results = (outs SDIR_MemletType);
+    let results = (outs SDIR_ArrayType);
     let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
 }
 

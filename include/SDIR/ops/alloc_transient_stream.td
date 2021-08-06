@@ -10,11 +10,11 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
     For example:
 
     ```mlir
-        %A = sdir.alloc_transient_stream() : !sdir.stream<i32>
+        %A = sdir.alloc_transient_stream() : !sdir.stream_array<i32>
     ```
   }];
 
-    let results = (outs SDIR_StreamType);
+    let results = (outs SDIR_StreamArrayType);
     let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
 }
 
