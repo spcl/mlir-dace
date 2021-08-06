@@ -81,6 +81,35 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
 }
 
 //===----------------------------------------------------------------------===//
+// StreamArrayType
+//===----------------------------------------------------------------------===//
+
+def SDIR_StreamArrayType : SDIR_Type<"StreamArray"> {
+  let mnemonic = "stream_array";
+  let summary = "A stream array type";
+  let description = [{
+    A type representing a stream array.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "stream_array<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // StreamType
 //===----------------------------------------------------------------------===//
 

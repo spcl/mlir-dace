@@ -2,6 +2,7 @@
 
 // CHECK: module
 // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc()
+// CHECK-SAME: !sdir.array<i32>
 %A = sdir.alloc() : !sdir.array<i32>
 
 // CHECK: sdir.state

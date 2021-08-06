@@ -18,15 +18,27 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
     ```
   }];
 
-  let arguments = (ins SDIR_ArrayType:$arr);
-  let results = (outs SDIR_MemletType:$res);
+  let arguments = (ins AnyTypeOf<[SDIR_ArrayType, SDIR_StreamArrayType]>:$arr);
+  let results = (outs AnyTypeOf<[SDIR_MemletType, SDIR_StreamType]>:$res);
   let assemblyFormat = [{attr-dict $arr `:` type($arr) `->` type($res)}];
 
   let verifier = [{
-    ::mlir::sdir::ArrayType arr = GetAccessOp::arr().getType().cast<ArrayType>();
-    ::mlir::sdir::MemletType mem = GetAccessOp::res().getType().cast<MemletType>();
-    if( arr.getElementType() != mem.getElementType() )
-      return emitOpError("failed to verify that result element type matches element type of 'array'");
+    ::mlir::Type arr = GetAccessOp::arr().getType();
+    ::mlir::Type res = GetAccessOp::res().getType();
+
+    if( arr.isa<ArrayType>() && res.isa<MemletType>() )
+      if( arr.cast<ArrayType>().getElementType() != res.cast<MemletType>().getElementType() )
+        return emitOpError("failed to verify that result element type matches element type of 'array'");
+
+    if( arr.isa<StreamArrayType>() && res.isa<StreamType>() )
+      if( arr.cast<StreamArrayType>().getElementType() != res.cast<StreamType>().getElementType() )
+        return emitOpError("failed to verify that result element type matches element type of 'stream_array'");
+
+    if( arr.isa<ArrayType>() && res.isa<StreamType>() )
+      return emitOpError("failed to verify that result type matches derived type of 'array'");
+
+    if( arr.isa<StreamArrayType>() && res.isa<MemletType>() )
+      return emitOpError("failed to verify that result type matches derived type of 'stream_array'");
 
     return ::mlir::success();
   }];
