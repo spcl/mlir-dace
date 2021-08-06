@@ -13,6 +13,7 @@ class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mne
 // Region ops
 //===----------------------------------------------------------------------===//
 
+include "SDIR/ops/sdfg.td"
 include "SDIR/ops/state.td"
 
 //===----------------------------------------------------------------------===//

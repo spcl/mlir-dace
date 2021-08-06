@@ -2,6 +2,7 @@
 #define SDIR_StateOp
 
 def SDIR_StateOp : SDIR_Op<"state", [
+    HasParent<"SDFGOp">,
     SingleBlock,
     NoTerminator
 ]> {

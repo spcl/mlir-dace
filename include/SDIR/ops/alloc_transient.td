@@ -2,7 +2,7 @@
 #define SDIR_AllocTransientOp
 
 def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
-    HasParent<"StateOp">
+    ParentOneOf<["ModuleOp", "SDFGOp", "StateOp"]>
 ]> {
   let summary = "Transient array allocation operation";
   let description = [{

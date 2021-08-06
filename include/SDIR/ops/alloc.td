@@ -2,7 +2,7 @@
 #define SDIR_AllocOp
 
 def SDIR_AllocOp : SDIR_Op<"alloc", [
-    HasParent<"ModuleOp">
+    ParentOneOf<["ModuleOp", "SDFGOp", "StateOp"]>
 ]> {
   let summary = "Array allocation operation";
   let description = [{
