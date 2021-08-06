@@ -22,6 +22,39 @@ def SDIR_Dialect : Dialect {
 
 class SDIR_Type<string name, list<Trait> traits = []> : TypeDef<SDIR_Dialect, name, traits>{}
 
+//===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+def SDIR_ArrayType : SDIR_Type<"Array"> {
+  let mnemonic = "array";
+  let summary = "A array type";
+  let description = [{
+    A type representing a array.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "array<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// MemletType
+//===----------------------------------------------------------------------===//
+
 def SDIR_MemletType : SDIR_Type<"Memlet"> {
   let mnemonic = "memlet";
   let summary = "A memlet type";
@@ -46,6 +79,10 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
     return get($_ctxt, elementType);
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// StreamType
+//===----------------------------------------------------------------------===//
 
 def SDIR_StreamType : SDIR_Type<"Stream"> {
   let mnemonic = "stream";

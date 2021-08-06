@@ -2,8 +2,7 @@
 #define SDIR_GetAccessOp
 
 def SDIR_GetAccessOp : SDIR_Op<"get_access", [
-    HasParent<"StateOp">,
-    SameOperandsAndResultType
+    HasParent<"StateOp">
 ]> {
   let summary = "Array access operation";
   let description = [{
@@ -19,9 +18,18 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
     ```
   }];
 
-    let arguments = (ins SDIR_MemletType:$arr);
-    let results = (outs SDIR_MemletType:$res);
-    let assemblyFormat = [{attr-dict $arr `:` type($arr)}];
+  let arguments = (ins SDIR_ArrayType:$arr);
+  let results = (outs SDIR_MemletType:$res);
+  let assemblyFormat = [{attr-dict $arr `:` type($arr) `->` type($res)}];
+
+  let verifier = [{
+    ::mlir::sdir::ArrayType arr = GetAccessOp::arr().getType().cast<ArrayType>();
+    ::mlir::sdir::MemletType mem = GetAccessOp::res().getType().cast<MemletType>();
+    if( arr.getElementType() != mem.getElementType() )
+      return emitOpError("failed to verify that result element type matches element type of 'array'");
+
+    return ::mlir::success();
+  }];
 }
 
 #endif // SDIR_GetAccessOp

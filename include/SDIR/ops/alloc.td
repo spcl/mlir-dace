@@ -10,11 +10,11 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
     For example:
 
     ```mlir
-        %A = sdir.alloc() : !sdir.memlet<i32>
+        %A = sdir.alloc() : !sdir.array<i32>
     ```
   }];
 
-    let results = (outs SDIR_MemletType);
+    let results = (outs SDIR_ArrayType);
     let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
 }
 
