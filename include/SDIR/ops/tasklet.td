@@ -3,6 +3,7 @@
 
 
 def SDIR_TaskletOp : SDIR_Op<"tasklet", [
+    HasParent<"StateOp">,
     AffineScope, 
     AutomaticAllocationScope, 
     CallableOpInterface, 
