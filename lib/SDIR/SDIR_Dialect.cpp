@@ -29,14 +29,15 @@ void SDIRDialect::initialize() {
 #include "SDIR/SDIR_OpsTypes.cpp.inc"
 
 ::mlir::Type SDIRDialect::parseType(::mlir::DialectAsmParser &parser) const{
-  ::mlir::Type value;
-  ::mlir::OptionalParseResult opr;
+  ::llvm::StringRef mnemonic;
+  if (parser.parseKeyword(&mnemonic)) return Type();
+  
+  ::mlir::Type genType;
+  ::mlir::OptionalParseResult parseResult = generatedTypeParser(getContext(), parser, mnemonic, genType);
+  if (parseResult.hasValue()) return genType;
 
-  opr = generatedTypeParser(getContext(), parser, "stream", value);
-  if(opr.hasValue() && opr.getValue().succeeded()) return value;
-
-  opr = generatedTypeParser(getContext(), parser, "memlet", value);
-  if(opr.hasValue() && opr.getValue().succeeded()) return value;
+  ::llvm::SMLoc typeLoc = parser.getCurrentLocation();
+  parser.emitError(typeLoc, "unknown type in SDIR dialect");
 
   return ::mlir::Type();
 }

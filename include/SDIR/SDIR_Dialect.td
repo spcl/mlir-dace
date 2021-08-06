@@ -36,8 +36,6 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
   }];
 
   let parser = [{
-    if ($_parser.parseKeyword("memlet"))
-      return Type();
     if ($_parser.parseLess())
       return Type();
     Type elementType;
@@ -63,8 +61,6 @@ def SDIR_StreamType : SDIR_Type<"Stream"> {
   }];
 
   let parser = [{
-    if ($_parser.parseKeyword("stream"))
-      return Type();
     if ($_parser.parseLess())
       return Type();
     Type elementType;
