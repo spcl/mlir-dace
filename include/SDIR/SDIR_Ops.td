@@ -22,6 +22,7 @@ include "SDIR/ops/state.td"
 
 include "SDIR/ops/tasklet.td"
 include "SDIR/ops/return.td"
+include "SDIR/ops/libcall.td"
 
 //===----------------------------------------------------------------------===//
 // Memlet ops
