@@ -2,6 +2,7 @@
 #define SDIR_LibCallOp
 
 def SDIR_LibCallOp : SDIR_Op<"libcall", [
+    HasParent<"StateOp">,
     CallOpInterface
 ]> {
   let summary = "library call operation";

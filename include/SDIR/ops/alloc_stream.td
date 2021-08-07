@@ -2,7 +2,7 @@
 #define SDIR_AllocStreamOp
 
 def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
-    ParentOneOf<["ModuleOp", "SDFGOp", "StateOp"]>
+    ParentOneOf<["SDFGOp", "StateOp"]>
 ]> {
   let summary = "Stream allocation operation";
   let description = [{

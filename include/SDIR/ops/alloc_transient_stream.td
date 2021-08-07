@@ -2,7 +2,7 @@
 #define SDIR_AllocTransientStreamOp
 
 def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
-    ParentOneOf<["ModuleOp", "SDFGOp", "StateOp"]>
+    ParentOneOf<["SDFGOp", "StateOp"]>
 ]> {
   let summary = "Transient stream allocation operation";
   let description = [{
