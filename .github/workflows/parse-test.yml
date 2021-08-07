@@ -1,0 +1,57 @@
+name: Parse Test
+
+on:   
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sdir-opt:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install ninja-build
+
+    - name: Load MLIR cache
+      id: mlir-cache
+      uses: actions/cache@v2
+      with:
+        path: llvm-project
+        key: ${{ runner.os }}-mlir
+
+    - name: Check MLIR cache
+      if: steps.mlir-cache.outputs.cache-hit != 'true'
+      run: exit 1
+
+    - name: Build & Test
+      run: |
+        mkdir build
+        cd build
+        cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
+        cmake --build . 
+        cd ../test/SDIR
+        for filename in $(find * -name '*.mlir'); do
+            if grep -q XFAIL "$filename"; then
+                if ../../build/bin/sdir-opt $filename &> /dev/null; then
+                    echo "$filename Xpassed!"
+                    exit 1
+                fi
+            else
+                if ! ../../build/bin/sdir-opt $filename &> /dev/null; then
+                    echo "$filename failed!"
+                    exit 1
+                fi
+            fi
+        done
+        echo "All tests parsed successfully!"
+
+
+      
