@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdir.sdfg
-sdir.sdfg @sdfg_0 {
+sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {

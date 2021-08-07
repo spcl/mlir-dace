@@ -4,7 +4,9 @@
 def SDIR_SDFGOp : SDIR_Op<"sdfg", [
     SingleBlock,
     NoTerminator,
-    IsolatedFromAbove
+    IsolatedFromAbove,
+    SymbolTable,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
     let summary = "SDFG region";
     let description = [{
@@ -19,7 +21,7 @@ def SDIR_SDFGOp : SDIR_Op<"sdfg", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$name);
+    let arguments = (ins SymbolNameAttr:$name, FlatSymbolRefAttr:$entry);
     let regions = (region SizedRegion<1>:$region);
     let assemblyFormat = [{attr-dict $name $region}];
 }

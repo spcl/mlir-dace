@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdir.sdfg
-sdir.sdfg @sdfg_0 {
+sdir.sdfg{entry=@randomName} @sdfg_0 {
     // CHECK: sdir.state @randomName
     sdir.state @randomName{
 

@@ -5,7 +5,8 @@ def SDIR_StateOp : SDIR_Op<"state", [
     HasParent<"SDFGOp">,
     SingleBlock,
     NoTerminator,
-    SymbolTable
+    SymbolTable,
+    Symbol
 ]> {
     let summary = "State region";
     let description = [{
@@ -19,9 +20,9 @@ def SDIR_StateOp : SDIR_Op<"state", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$name);
+    let arguments = (ins SymbolNameAttr:$sym_name);
     let regions = (region SizedRegion<1>:$region);
-    let assemblyFormat = [{attr-dict $name $region}];
+    let assemblyFormat = [{attr-dict $sym_name $region}];
 }
 
 #endif // SDIR_StateOp

@@ -104,16 +104,16 @@ LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     // Check that the callee attribute was specified.
     auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
     if (!fnAttr)
-    return emitOpError("requires a 'callee' symbol reference attribute");
+        return emitOpError("requires a 'callee' symbol reference attribute");
     TaskletOp fn = symbolTable.lookupNearestSymbolFrom<TaskletOp>(*this, fnAttr);
     if (!fn)
-    return emitOpError() << "'" << fnAttr.getValue()
-                        << "' does not reference a valid tasklet";
+        return emitOpError() << "'" << fnAttr.getValue()
+                            << "' does not reference a valid tasklet";
 
     // Verify that the operand and result types match the callee.
     auto fnType = fn.getType();
     if (fnType.getNumInputs() != getNumOperands())
-    return emitOpError("incorrect number of operands for callee");
+        return emitOpError("incorrect number of operands for callee");
 
     for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
     if (getOperand(i).getType() != fnType.getInput(i))
@@ -122,7 +122,7 @@ LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
             << getOperand(i).getType() << " for operand number " << i;
 
     if (fnType.getNumResults() != getNumResults())
-    return emitOpError("incorrect number of results for callee");
+        return emitOpError("incorrect number of results for callee");
 
     for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
     if (getResult(i).getType() != fnType.getResult(i)) {
@@ -131,6 +131,48 @@ LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         diag.attachNote() << "function result types: " << fnType.getResults();
         return diag;
     }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// SDFGOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult sdir::SDFGOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the entry attribute is specified.
+    auto entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
+    if (!entryAttr)
+        return emitOpError("requires a 'src' symbol reference attribute");
+    StateOp entry = symbolTable.lookupNearestSymbolFrom<StateOp>(*this, entryAttr);
+    if (!entry)
+        return emitOpError() << "'" << entryAttr.getValue()
+                            << "' does not reference a valid state";
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// EdgeOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult sdir::EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the src/dest attributes are specified.
+    auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
+    if (!srcAttr)
+        return emitOpError("requires a 'src' symbol reference attribute");
+    StateOp src = symbolTable.lookupNearestSymbolFrom<StateOp>(*this, srcAttr);
+    if (!src)
+        return emitOpError() << "'" << srcAttr.getValue()
+                            << "' does not reference a valid state";
+    
+    auto destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
+    if (!destAttr)
+        return emitOpError("requires a 'dest' symbol reference attribute");
+    StateOp dest = symbolTable.lookupNearestSymbolFrom<StateOp>(*this, destAttr);
+    if (!dest)
+        return emitOpError() << "'" << destAttr.getValue()
+                            << "' does not reference a valid state";
 
     return success();
 }

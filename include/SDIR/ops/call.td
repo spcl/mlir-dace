@@ -41,7 +41,7 @@ def SDIR_CallOp : SDIR_Op<"call", [
       CArg<"ValueRange", "{}">:$operands), [{
       build($_builder, $_state, $_builder.getSymbolRefAttr(callee), results,
             operands);
-    }]>];
+  }]>];
 
   let extraClassDeclaration = [{
     StringRef getCallee() { return callee(); }
