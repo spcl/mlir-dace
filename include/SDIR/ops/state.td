@@ -4,7 +4,8 @@
 def SDIR_StateOp : SDIR_Op<"state", [
     HasParent<"SDFGOp">,
     SingleBlock,
-    NoTerminator
+    NoTerminator,
+    SymbolTable
 ]> {
     let summary = "State region";
     let description = [{

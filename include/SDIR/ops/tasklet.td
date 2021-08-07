@@ -66,6 +66,19 @@ def SDIR_TaskletOp : SDIR_Op<"tasklet", [
     >];
 
     let extraClassDeclaration = [{
+        static TaskletOp create(Location location, StringRef name, FunctionType type,
+                         ArrayRef<NamedAttribute> attrs = {});
+        static TaskletOp create(Location location, StringRef name, FunctionType type,
+                            Operation::dialect_attr_range attrs);
+        static TaskletOp create(Location location, StringRef name, FunctionType type,
+                            ArrayRef<NamedAttribute> attrs,
+                            ArrayRef<DictionaryAttr> argAttrs);
+
+        TaskletOp clone(BlockAndValueMapping &mapper);
+        TaskletOp clone();
+
+        void cloneInto(TaskletOp dest, BlockAndValueMapping &mapper);
+
         //===------------------------------------------------------------------===//
         // CallableOpInterface
         //===------------------------------------------------------------------===//
@@ -85,9 +98,9 @@ def SDIR_TaskletOp : SDIR_Op<"tasklet", [
 
         bool isDeclaration() { return isExternal(); }
 
-
+        private:
         // This trait needs access to the hooks defined below.
-        friend class OpTrait::FunctionLike<FuncOp>;
+        friend class OpTrait::FunctionLike<TaskletOp>;
 
         /// Returns the number of arguments. This is a hook for
         /// OpTrait::FunctionLike.
