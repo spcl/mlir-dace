@@ -11,7 +11,7 @@ def SDIR_LibCallOp : SDIR_Op<"libcall", [
     Example:
 
     ```mlir
-    %2 = sdir.libcall "dace.libraries.blas.nodes.Gemm" (%0, %1) : (f32, f32) -> f32
+    %2 = sdir.libcall "dace.libraries.blas.nodes.Dot" (%0, %1) : (f32, f32) -> f32
     ```
   }];
 
