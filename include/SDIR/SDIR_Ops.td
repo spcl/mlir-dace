@@ -30,20 +30,14 @@ include "SDIR/ops/libcall.td"
 // Memlet ops
 //===----------------------------------------------------------------------===//
 
-include "SDIR/ops/alloc.td"
-include "SDIR/ops/alloc_transient.td"
+include "SDIR/ops/memlet.td"
 include "SDIR/ops/get_access.td"
-include "SDIR/ops/load.td"
-include "SDIR/ops/store.td"
-include "SDIR/ops/copy.td"
+
 
 //===----------------------------------------------------------------------===//
 // Stream ops
 //===----------------------------------------------------------------------===//
 
-include "SDIR/ops/alloc_stream.td"
-include "SDIR/ops/alloc_transient_stream.td"
-include "SDIR/ops/stream_pop.td"
-include "SDIR/ops/stream_push.td"
+include "SDIR/ops/stream.td"
 
 #endif // SDIR_OPS
