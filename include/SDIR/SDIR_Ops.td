@@ -10,34 +10,21 @@ include "SDIR/SDIR_Dialect.td"
 class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mnemonic, traits>{}
 
 //===----------------------------------------------------------------------===//
-// Region ops
+// Nodes
 //===----------------------------------------------------------------------===//
 
-include "SDIR/ops/sdfg.td"
+include "SDIR/nodes/sdfg.td"
+include "SDIR/nodes/state.td"
+include "SDIR/nodes/tasklet.td"
+
+//===----------------------------------------------------------------------===//
+// Ops
+//===----------------------------------------------------------------------===//
+
 include "SDIR/ops/edge.td"
-include "SDIR/ops/state.td"
-
-//===----------------------------------------------------------------------===//
-// Tasklet ops
-//===----------------------------------------------------------------------===//
-
 include "SDIR/ops/tasklet.td"
-include "SDIR/ops/return.td"
-include "SDIR/ops/call.td"
-include "SDIR/ops/libcall.td"
-
-//===----------------------------------------------------------------------===//
-// Memlet ops
-//===----------------------------------------------------------------------===//
-
 include "SDIR/ops/memlet.td"
-include "SDIR/ops/get_access.td"
-
-
-//===----------------------------------------------------------------------===//
-// Stream ops
-//===----------------------------------------------------------------------===//
-
 include "SDIR/ops/stream.td"
+include "SDIR/ops/get_access.td"
 
 #endif // SDIR_OPS

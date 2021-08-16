@@ -6,32 +6,32 @@
 using namespace mlir;
 
 //===----------------------------------------------------------------------===//
-// TaskletOp
+// TaskletNode
 //===----------------------------------------------------------------------===//
 
-sdir::TaskletOp sdir::TaskletOp::create(Location location, StringRef name, FunctionType type, 
+sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         ArrayRef<NamedAttribute> attrs) {
     OpBuilder builder(location->getContext());
     OperationState state(location, getOperationName());
     build(builder, state, name, type, attrs);
-    return cast<TaskletOp>(Operation::create(state));
+    return cast<TaskletNode>(Operation::create(state));
 }
 
-sdir::TaskletOp sdir::TaskletOp::create(Location location, StringRef name, FunctionType type, 
+sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         Operation::dialect_attr_range attrs) {
     SmallVector<NamedAttribute, 8> attrRef(attrs);
     return create(location, name, type, llvm::makeArrayRef(attrRef));
 }
 
-sdir::TaskletOp sdir::TaskletOp::create(Location location, StringRef name, FunctionType type, 
+sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         ArrayRef<NamedAttribute> attrs, 
                                         ArrayRef<DictionaryAttr> argAttrs) {
-    TaskletOp func = create(location, name, type, attrs);
+    TaskletNode func = create(location, name, type, attrs);
     func.setAllArgAttrs(argAttrs);
     return func;
 }
 
-void sdir::TaskletOp::build(OpBuilder &builder, OperationState &state, StringRef name,
+void sdir::TaskletNode::build(OpBuilder &builder, OperationState &state, StringRef name,
                 FunctionType type, ArrayRef<NamedAttribute> attrs,
                 ArrayRef<DictionaryAttr> argAttrs) {
     state.addAttribute(SymbolTable::getSymbolAttrName(),
@@ -47,7 +47,7 @@ void sdir::TaskletOp::build(OpBuilder &builder, OperationState &state, StringRef
                                             /*resultAttrs=*/llvm::None);
 }
 
-void sdir::TaskletOp::cloneInto(TaskletOp dest, BlockAndValueMapping &mapper) {
+void sdir::TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
     llvm::MapVector<Identifier, Attribute> newAttrs;
     for (const auto &attr : dest->getAttrs())
         newAttrs.insert(attr);
@@ -58,8 +58,8 @@ void sdir::TaskletOp::cloneInto(TaskletOp dest, BlockAndValueMapping &mapper) {
     getBody().cloneInto(&dest.getBody(), mapper);
 }
 
-sdir::TaskletOp sdir::TaskletOp::clone(BlockAndValueMapping &mapper) {
-    TaskletOp newFunc = cast<TaskletOp>(getOperation()->cloneWithoutRegions());
+sdir::TaskletNode sdir::TaskletNode::clone(BlockAndValueMapping &mapper) {
+    TaskletNode newFunc = cast<TaskletNode>(getOperation()->cloneWithoutRegions());
     
     if (!isExternal()) {
         FunctionType oldType = getType();
@@ -91,7 +91,7 @@ sdir::TaskletOp sdir::TaskletOp::clone(BlockAndValueMapping &mapper) {
     return newFunc;
 }
 
-sdir::TaskletOp sdir::TaskletOp::clone() {
+sdir::TaskletNode sdir::TaskletNode::clone() {
     BlockAndValueMapping mapper;
     return clone(mapper);
 }
@@ -105,7 +105,7 @@ LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
     if (!fnAttr)
         return emitOpError("requires a 'callee' symbol reference attribute");
-    TaskletOp fn = symbolTable.lookupNearestSymbolFrom<TaskletOp>(*this, fnAttr);
+    TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
     if (!fn)
         return emitOpError() << "'" << fnAttr.getValue()
                             << "' does not reference a valid tasklet";
@@ -136,15 +136,15 @@ LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 }
 
 //===----------------------------------------------------------------------===//
-// SDFGOp
+// SDFGNode
 //===----------------------------------------------------------------------===//
 
-LogicalResult sdir::SDFGOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult sdir::SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the entry attribute is specified.
     auto entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
     if (!entryAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
-    StateOp entry = symbolTable.lookupNearestSymbolFrom<StateOp>(*this, entryAttr);
+    StateNode entry = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
     if (!entry)
         return emitOpError() << "'" << entryAttr.getValue()
                             << "' does not reference a valid state";
@@ -161,7 +161,7 @@ LogicalResult sdir::EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
     if (!srcAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
-    StateOp src = symbolTable.lookupNearestSymbolFrom<StateOp>(*this, srcAttr);
+    StateNode src = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
     if (!src)
         return emitOpError() << "'" << srcAttr.getValue()
                             << "' does not reference a valid state";
@@ -169,7 +169,7 @@ LogicalResult sdir::EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     auto destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
     if (!destAttr)
         return emitOpError("requires a 'dest' symbol reference attribute");
-    StateOp dest = symbolTable.lookupNearestSymbolFrom<StateOp>(*this, destAttr);
+    StateNode dest = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
     if (!dest)
         return emitOpError() << "'" << destAttr.getValue()
                             << "' does not reference a valid state";

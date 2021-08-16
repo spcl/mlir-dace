@@ -1,121 +1,134 @@
-#ifndef SDIR_TaskletOp
-#define SDIR_TaskletOp
+#ifndef SDIR_TaskletOps
+#define SDIR_TaskletOps
 
+//===----------------------------------------------------------------------===//
+// ReturnOp
+//===----------------------------------------------------------------------===//
 
-def SDIR_TaskletOp : SDIR_Op<"tasklet", [
-    HasParent<"StateOp">,
-    AffineScope, 
-    AutomaticAllocationScope, 
-    CallableOpInterface, 
-    FunctionLike,
-    IsolatedFromAbove, 
-    Symbol
+def SDIR_ReturnOp : SDIR_Op<"return", [
+    HasParent<"TaskletNode">,
+    Terminator
 ]> {
-    let summary = "Tasklet";
-    let description = [{
-        Describes a tasklet as a pure function. For example:
+  let summary = "return operation";
+  let description = [{
+    The "return" operation represents a return operation within a function.
+    The operation takes an optional operand and produces no results.
+    The operand type must match the signature of the function that contains
+    the operation. For example:
 
-        ```mlir
-        sdir.tasklet @add(%a: i32, %b: i32) -> i32{
-            %c = addi %a, %b, : i32
-            sdir.return %c
-        }
-        ```
-    }];
+    ```mlir
+    func @foo() -> tensor<2xf64> {
+        ...
+        sdir.return %0 : tensor<2xf64>
+    }
+    ```
+  }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, OptionalAttr<StrAttr>:$sym_visibility);
-    let regions = (region AnyRegion:$body);
- 
-    let parser = [{
-        auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
-                                function_like_impl::VariadicFlag, std::string &) {
-            return builder.getFunctionType(argTypes, results);
-        };
-
-        return function_like_impl::parseFunctionLikeOp(parser, result, /*allowVariadic=*/false, buildFuncType);
-    }];
-
-    let printer =[{
-        FunctionType fnType = getType();
-        function_like_impl::printFunctionLikeOp(p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
-    }];
-
-    let verifier = [{ 
-        if (isExternal())
-            return success();
-
-        // Verify that the argument list of the function and the arg list of the entry
-        // block line up.  The trait already verified that the number of arguments is
-        // the same between the signature and the block.
-        auto fnInputTypes = getType().getInputs();
-        Block &entryBlock = front();
-        for (unsigned i = 0, e = entryBlock.getNumArguments(); i != e; ++i)
-            if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-            return emitOpError("type of entry block argument #")
-                    << i << '(' << entryBlock.getArgument(i).getType()
-                    << ") must match the type of the corresponding argument in "
-                    << "function signature(" << fnInputTypes[i] << ')';
-
-        return success();
-    }];
-
-    let builders = [OpBuilder<(ins
-        "StringRef":$name, "FunctionType":$type,
-        CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-        CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)
-    >];
-
-    let extraClassDeclaration = [{
-        static TaskletOp create(Location location, StringRef name, FunctionType type,
-                         ArrayRef<NamedAttribute> attrs = {});
-        static TaskletOp create(Location location, StringRef name, FunctionType type,
-                            Operation::dialect_attr_range attrs);
-        static TaskletOp create(Location location, StringRef name, FunctionType type,
-                            ArrayRef<NamedAttribute> attrs,
-                            ArrayRef<DictionaryAttr> argAttrs);
-
-        TaskletOp clone(BlockAndValueMapping &mapper);
-        TaskletOp clone();
-
-        void cloneInto(TaskletOp dest, BlockAndValueMapping &mapper);
-
-        //===------------------------------------------------------------------===//
-        // CallableOpInterface
-        //===------------------------------------------------------------------===//
-
-        /// Returns the region on the current operation that is callable. This may
-        /// return null in the case of an external callable object, e.g. an external
-        /// function.
-        Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
-
-        /// Returns the results types that the callable region produces when
-        /// executed.
-        ArrayRef<Type> getCallableResults() { return getType().getResults(); }
-
-        //===------------------------------------------------------------------===//
-        // SymbolOpInterface Methods
-        //===------------------------------------------------------------------===//
-
-        bool isDeclaration() { return isExternal(); }
-
-        private:
-        // This trait needs access to the hooks defined below.
-        friend class OpTrait::FunctionLike<TaskletOp>;
-
-        /// Returns the number of arguments. This is a hook for
-        /// OpTrait::FunctionLike.
-        unsigned getNumFuncArguments() { return getType().getInputs().size(); }
-
-        /// Returns the number of results. This is a hook for OpTrait::FunctionLike.
-        unsigned getNumFuncResults() { return getType().getResults().size(); }
-
-        LogicalResult verifyType() {
-            auto type = getTypeAttr().getValue();
-            if (!type.isa<FunctionType>())
-                return emitOpError("requires '" + getTypeAttrName() + "' attribute of function type");
-            return success();
-        }
-    }];
+  let arguments = (ins Variadic<AnyType>:$input);
+  let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
 }
 
-#endif // SDIR_TaskletOp
+//===----------------------------------------------------------------------===//
+// CallOp
+//===----------------------------------------------------------------------===//
+
+def SDIR_CallOp : SDIR_Op<"call", [
+    HasParent<"StateNode">,
+    CallOpInterface, 
+    MemRefsNormalizable,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+]> {
+  let summary = "call operation";
+  let description = [{
+    The `call` operation represents a direct call to a tasklet function that is within
+    the same symbol scope as the call. The operands and result types of the
+    call must match the specified function type. 
+    Example:
+
+    ```mlir
+    %2 = sdir.call @add(%0, %1) : (f32, f32) -> f32
+    ```
+  }];
+
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$operands);
+  let results = (outs Variadic<AnyType>);
+  let assemblyFormat = [{ 
+    attr-dict $callee `(` $operands `)` `:` functional-type($operands, results) 
+  }];
+
+  let builders = [
+    OpBuilder<(ins "TaskletNode":$callee, CArg<"ValueRange", "{}">:$operands), [{
+      $_state.addOperands(operands);
+      $_state.addAttribute("callee",$_builder.getSymbolRefAttr(callee));
+      $_state.addTypes(callee.getType().getResults());
+    }]>,
+    OpBuilder<(ins "SymbolRefAttr":$callee, "TypeRange":$results,
+      CArg<"ValueRange", "{}">:$operands), [{
+      $_state.addOperands(operands);
+      $_state.addAttribute("callee", callee);
+      $_state.addTypes(results);
+    }]>,
+    OpBuilder<(ins "StringRef":$callee, "TypeRange":$results,
+      CArg<"ValueRange", "{}">:$operands), [{
+      build($_builder, $_state, $_builder.getSymbolRefAttr(callee), results,
+            operands);
+  }]>];
+
+  let extraClassDeclaration = [{
+    StringRef getCallee() { return callee(); }
+
+    FunctionType getCalleeType() {
+      return FunctionType::get(getContext(), getOperandTypes(), getResultTypes());
+    }
+
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// LibcallOp
+//===----------------------------------------------------------------------===//
+
+def SDIR_LibCallOp : SDIR_Op<"libcall", [
+    HasParent<"StateNode">,
+    CallOpInterface
+]> {
+  let summary = "library call operation";
+  let description = [{
+    The `libcall` operation represents a direct call to a library function. 
+    Example:
+
+    ```mlir
+    %2 = sdir.libcall "dace.libraries.blas.nodes.Dot" (%0, %1) : (f32, f32) -> f32
+    ```
+  }];
+
+  let arguments = (ins StrAttr:$callee, Variadic<AnyType>:$operands);
+  let results = (outs Variadic<AnyType>);
+  let assemblyFormat = [{ 
+    attr-dict $callee `(` $operands `)` `:` functional-type($operands, results) 
+  }];
+
+  let extraClassDeclaration = [{
+    operand_range getArgOperands() {
+      return {operand_begin(), operand_end()};
+    }
+
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+  }];
+}
+
+#endif // SDIR_TaskletOps

@@ -2,7 +2,7 @@
 #define SDIR_EdgeOp
 
 def SDIR_EdgeOp : SDIR_Op<"edge", [
-    HasParent<"SDFGOp">,
+    HasParent<"SDFGNode">,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
   let summary = "edge operation";

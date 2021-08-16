@@ -1,7 +1,7 @@
-#ifndef SDIR_SDFGOp
-#define SDIR_SDFGOp
+#ifndef SDIR_SDFGNode
+#define SDIR_SDFGNode
 
-def SDIR_SDFGOp : SDIR_Op<"sdfg", [
+def SDIR_SDFGNode : SDIR_Op<"sdfg", [
     SingleBlock,
     NoTerminator,
     IsolatedFromAbove,
@@ -26,4 +26,4 @@ def SDIR_SDFGOp : SDIR_Op<"sdfg", [
     let assemblyFormat = [{attr-dict $name $region}];
 }
 
-#endif // SDIR_SDFGOp
+#endif // SDIR_SDFGNode

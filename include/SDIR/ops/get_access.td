@@ -2,7 +2,7 @@
 #define SDIR_GetAccessOp
 
 def SDIR_GetAccessOp : SDIR_Op<"get_access", [
-    HasParent<"StateOp">
+    HasParent<"StateNode">
 ]> {
   let summary = "Array access operation";
   let description = [{

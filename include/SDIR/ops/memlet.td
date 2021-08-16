@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 def SDIR_AllocOp : SDIR_Op<"alloc", [
-    ParentOneOf<["SDFGOp", "StateOp"]>
+    ParentOneOf<["SDFGNode", "StateNode"]>
 ]> {
   let summary = "Array allocation operation";
   let description = [{
@@ -28,7 +28,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
-    ParentOneOf<["SDFGOp", "StateOp"]>
+    ParentOneOf<["SDFGNode", "StateNode"]>
 ]> {
   let summary = "Transient array allocation operation";
   let description = [{
@@ -49,7 +49,7 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_LoadOp : SDIR_Op<"load", [
-    HasParent<"StateOp">,
+    HasParent<"StateNode">,
     TypesMatchWith<"result type matches element type of 'memlet'",
                      "arr", "res",
                      "$_self.cast<MemletType>().getElementType()">
@@ -80,7 +80,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StoreOp : SDIR_Op<"store", [
-    HasParent<"StateOp">,
+    HasParent<"StateNode">,
     TypesMatchWith<"value type matches element type of 'memlet'",
                   "arr", "val",
                   "$_self.cast<MemletType>().getElementType()">
@@ -111,7 +111,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_CopyOp : SDIR_Op<"copy", [
-    HasParent<"StateOp">,
+    HasParent<"StateNode">,
     SameTypeOperands
 ]> {
   let summary = "Memlet copy operation";

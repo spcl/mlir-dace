@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
-    ParentOneOf<["SDFGOp", "StateOp"]>
+    ParentOneOf<["SDFGNode", "StateNode"]>
 ]> {
   let summary = "Stream allocation operation";
   let description = [{
@@ -27,7 +27,7 @@ def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
-    ParentOneOf<["SDFGOp", "StateOp"]>
+    ParentOneOf<["SDFGNode", "StateNode"]>
 ]> {
   let summary = "Transient stream allocation operation";
   let description = [{
@@ -48,7 +48,7 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
-    HasParent<"StateOp">,
+    HasParent<"StateNode">,
     TypesMatchWith<"result type matches element type of 'stream'",
                      "str", "res",
                      "$_self.cast<StreamType>().getElementType()">
@@ -77,7 +77,7 @@ def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
-    HasParent<"StateOp">,
+    HasParent<"StateNode">,
     TypesMatchWith<"value type matches element type of 'stream'",
                   "str", "val",
                   "$_self.cast<StreamType>().getElementType()">

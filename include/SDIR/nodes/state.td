@@ -1,8 +1,8 @@
-#ifndef SDIR_StateOp
-#define SDIR_StateOp
+#ifndef SDIR_StateNode
+#define SDIR_StateNode
 
-def SDIR_StateOp : SDIR_Op<"state", [
-    HasParent<"SDFGOp">,
+def SDIR_StateNode : SDIR_Op<"state", [
+    HasParent<"SDFGNode">,
     SingleBlock,
     NoTerminator,
     SymbolTable,
@@ -25,4 +25,4 @@ def SDIR_StateOp : SDIR_Op<"state", [
     let assemblyFormat = [{attr-dict $sym_name $region}];
 }
 
-#endif // SDIR_StateOp
+#endif // SDIR_StateNode
