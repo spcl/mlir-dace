@@ -15,7 +15,6 @@ def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
     ```mlir
     sdir.state @state_0 {
         ...
-        // returns an i32 (generally the element type of the stream)
         %a = sdir.stream_pop %A : !sdir.stream<i32> -> i32
         ...
     }
