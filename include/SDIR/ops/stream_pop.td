@@ -16,7 +16,7 @@ def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
     sdir.state @state_0 {
         ...
         // returns an i32 (generally the element type of the stream)
-        %a = sdir.stream_pop %A : !sdir.stream<i32>
+        %a = sdir.stream_pop %A : !sdir.stream<i32> -> i32
         ...
     }
     ```
@@ -24,7 +24,7 @@ def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
 
     let arguments = (ins SDIR_StreamType:$str);
     let results = (outs AnyType:$res);
-    let assemblyFormat = [{attr-dict $str `:` type($str)}];
+    let assemblyFormat = [{attr-dict $str `:` type($str) `->` type($res)}];
 }
 
 #endif // SDIR_StreamPopOp

@@ -13,7 +13,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-SAME: !sdir.array<i32> -> !sdir.memlet<i32>
         %a = sdir.get_access %A : !sdir.array<i32> -> !sdir.memlet<i32>
         // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.load [[NAMEB]][0]
-        // CHECK-SAME: !sdir.memlet<i32>
-        %a_1 = sdir.load %a[0] : !sdir.memlet<i32>
+        // CHECK-SAME: !sdir.memlet<i32> -> i32
+        %a_1 = sdir.load %a[0] : !sdir.memlet<i32> -> i32
     }
 }

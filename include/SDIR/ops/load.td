@@ -16,7 +16,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
     sdir.state @state_0 {
         ...
         %a = sdir.get_access %A : !sdir.memlet<i32>
-        %a_1 = sdir.load %a[0] : i32
+        %a_1 = sdir.load %a[0] : !sdir.memlet<i32> -> i32
         ...
     }
     ```
@@ -24,7 +24,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 
     let arguments = (ins SDIR_MemletType:$arr, I64Attr:$idx);
     let results = (outs AnyType:$res);
-    let assemblyFormat = [{attr-dict $arr `[` $idx `]` `:` type($arr)}];
+    let assemblyFormat = [{attr-dict $arr `[` $idx `]` `:` type($arr) `->` type($res)}];
 }
 
 #endif // SDIR_LoadOp
