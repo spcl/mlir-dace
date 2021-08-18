@@ -16,4 +16,126 @@ def SDIR_Dialect : Dialect {
   let cppNamespace = "::mlir::sdir";
 }
 
+//===----------------------------------------------------------------------===//
+// SDIR Types
+//===----------------------------------------------------------------------===//
+
+class SDIR_Type<string name, list<Trait> traits = []> : TypeDef<SDIR_Dialect, name, traits>{}
+
+//===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+def SDIR_ArrayType : SDIR_Type<"Array"> {
+  let mnemonic = "array";
+  let summary = "A array type";
+  let description = [{
+    A type representing a array.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "array<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// MemletType
+//===----------------------------------------------------------------------===//
+
+def SDIR_MemletType : SDIR_Type<"Memlet"> {
+  let mnemonic = "memlet";
+  let summary = "A memlet type";
+  let description = [{
+    A type representing a memlet.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "memlet<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// StreamArrayType
+//===----------------------------------------------------------------------===//
+
+def SDIR_StreamArrayType : SDIR_Type<"StreamArray"> {
+  let mnemonic = "stream_array";
+  let summary = "A stream array type";
+  let description = [{
+    A type representing a stream array.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "stream_array<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// StreamType
+//===----------------------------------------------------------------------===//
+
+def SDIR_StreamType : SDIR_Type<"Stream"> {
+  let mnemonic = "stream";
+  let summary = "A stream type";
+  let description = [{
+    A type representing a stream.
+  }];
+
+  let parameters = (ins "Type":$elementType);
+
+  let printer = [{
+    $_printer << "stream<" << getImpl()->elementType << ">";
+  }];
+
+  let parser = [{
+    if ($_parser.parseLess())
+      return Type();
+    Type elementType;
+    if ($_parser.parseType(elementType))
+      return Type();
+    if ($_parser.parseGreater())
+      return Type();
+    return get($_ctxt, elementType);
+  }];
+}
+
 #endif // SDIR_Dialect

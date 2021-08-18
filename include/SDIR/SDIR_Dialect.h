@@ -10,6 +10,10 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/MapVector.h"
 
 #include "SDIR/SDIR_OpsDialect.h.inc"
 
