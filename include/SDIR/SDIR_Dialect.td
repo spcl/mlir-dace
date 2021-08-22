@@ -33,21 +33,30 @@ def SDIR_ArrayType : SDIR_Type<"Array"> {
     A type representing a array.
   }];
 
-  let parameters = (ins "Type":$elementType);
+  let parameters = (ins
+    ArrayRefParameter<"int64_t">:$shape, 
+    "Type":$elementType
+  );
 
   let printer = [{
-    $_printer << "array<" << getImpl()->elementType << ">";
+    $_printer << "array<";
+    for(int i = 0; i < getImpl()->shape.size(); i++)
+      $_printer << getImpl()->shape[i] << "x" ;
+    $_printer << getImpl()->elementType << ">";
   }];
 
   let parser = [{
     if ($_parser.parseLess())
+      return Type();
+    ::llvm::SmallVector<int64_t> shape;
+    if($_parser.parseDimensionList(shape))
       return Type();
     Type elementType;
     if ($_parser.parseType(elementType))
       return Type();
     if ($_parser.parseGreater())
       return Type();
-    return get($_ctxt, elementType);
+    return get($_ctxt, shape, elementType);
   }];
 }
 
@@ -62,21 +71,30 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
     A type representing a memlet.
   }];
 
-  let parameters = (ins "Type":$elementType);
+  let parameters = (ins
+    ArrayRefParameter<"int64_t">:$shape, 
+    "Type":$elementType
+  );
 
   let printer = [{
-    $_printer << "memlet<" << getImpl()->elementType << ">";
+    $_printer << "memlet<";
+    for(int i = 0; i < getImpl()->shape.size(); i++)
+      $_printer << getImpl()->shape[i] << "x" ;
+    $_printer << getImpl()->elementType << ">";
   }];
 
   let parser = [{
     if ($_parser.parseLess())
+      return Type();
+    ::llvm::SmallVector<int64_t> shape;
+    if($_parser.parseDimensionList(shape))
       return Type();
     Type elementType;
     if ($_parser.parseType(elementType))
       return Type();
     if ($_parser.parseGreater())
       return Type();
-    return get($_ctxt, elementType);
+    return get($_ctxt, shape, elementType);
   }];
 }
 
@@ -91,21 +109,30 @@ def SDIR_StreamArrayType : SDIR_Type<"StreamArray"> {
     A type representing a stream array.
   }];
 
-  let parameters = (ins "Type":$elementType);
+  let parameters = (ins
+    ArrayRefParameter<"int64_t">:$shape, 
+    "Type":$elementType
+  );
 
   let printer = [{
-    $_printer << "stream_array<" << getImpl()->elementType << ">";
+    $_printer << "stream_array<";
+    for(int i = 0; i < getImpl()->shape.size(); i++)
+      $_printer << getImpl()->shape[i] << "x" ;
+    $_printer << getImpl()->elementType << ">";
   }];
 
   let parser = [{
     if ($_parser.parseLess())
+      return Type();
+    ::llvm::SmallVector<int64_t> shape;
+    if($_parser.parseDimensionList(shape))
       return Type();
     Type elementType;
     if ($_parser.parseType(elementType))
       return Type();
     if ($_parser.parseGreater())
       return Type();
-    return get($_ctxt, elementType);
+    return get($_ctxt, shape, elementType);
   }];
 }
 
@@ -120,21 +147,30 @@ def SDIR_StreamType : SDIR_Type<"Stream"> {
     A type representing a stream.
   }];
 
-  let parameters = (ins "Type":$elementType);
+  let parameters = (ins
+    ArrayRefParameter<"int64_t">:$shape, 
+    "Type":$elementType
+  );
 
   let printer = [{
-    $_printer << "stream<" << getImpl()->elementType << ">";
+    $_printer << "stream<";
+    for(int i = 0; i < getImpl()->shape.size(); i++)
+      $_printer << getImpl()->shape[i] << "x" ;
+    $_printer << getImpl()->elementType << ">";
   }];
 
   let parser = [{
     if ($_parser.parseLess())
+      return Type();
+    ::llvm::SmallVector<int64_t> shape;
+    if($_parser.parseDimensionList(shape))
       return Type();
     Type elementType;
     if ($_parser.parseType(elementType))
       return Type();
     if ($_parser.parseGreater())
       return Type();
-    return get($_ctxt, elementType);
+    return get($_ctxt, shape, elementType);
   }];
 }
 
