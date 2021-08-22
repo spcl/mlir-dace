@@ -96,6 +96,10 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
       return Type();
     return get($_ctxt, shape, elementType);
   }];
+
+  let extraClassDeclaration = [{
+    size_t getRank(){ return getShape().size(); }
+  }];
 }
 
 //===----------------------------------------------------------------------===//

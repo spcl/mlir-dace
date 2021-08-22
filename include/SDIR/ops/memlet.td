@@ -69,9 +69,17 @@ def SDIR_LoadOp : SDIR_Op<"load", [
     ```
   }];
 
-    let arguments = (ins SDIR_MemletType:$arr, I64Attr:$idx);
-    let results = (outs AnyType:$res);
-    let assemblyFormat = [{attr-dict $arr `[` $idx `]` `:` type($arr) `->` type($res)}];
+  let arguments = (ins SDIR_MemletType:$arr, Variadic<Index>:$indices);
+  let results = (outs AnyType:$res);
+  let assemblyFormat = [{attr-dict $arr `[` $indices `]` `:` type($arr) `->` type($res)}];
+
+  let verifier = [{
+    size_t idx_size = indices().size();
+    size_t mem_size = arr().getType().cast<MemletType>().getRank();
+    if (idx_size != mem_size)
+      return emitOpError("incorrect number of indices for load");
+    return success();
+  }];
 }
 
 
@@ -101,8 +109,16 @@ def SDIR_StoreOp : SDIR_Op<"store", [
     ```
   }];
 
-    let arguments = (ins SDIR_MemletType:$arr, I64Attr:$idx, AnyType:$val);
-    let assemblyFormat = [{attr-dict $val `,` $arr `[` $idx `]` `:` type($arr)}];
+  let arguments = (ins SDIR_MemletType:$arr, Variadic<Index>:$indices, AnyType:$val);
+  let assemblyFormat = [{attr-dict $val `,` $arr `[` $indices`]` `:` type($arr)}];
+
+  let verifier = [{
+    size_t idx_size = indices().size();
+    size_t mem_size = arr().getType().cast<MemletType>().getRank();
+    if (idx_size != mem_size)
+      return emitOpError("incorrect number of indices for load");
+    return success();
+  }];
 }
 
 
