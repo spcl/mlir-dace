@@ -18,7 +18,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         %a = sdir.get_access %A : !sdir.array<56x45xi32> -> !sdir.memlet<56x45xi32>
         // CHECK-NEXT: sdir.store [[NAMEC]], [[NAMEB]]
         // CHECK-SAME: [[NAME0]], [[NAME0]]
-        // CHECK-SAME: !sdir.memlet<56x45xi32>
-        sdir.store %1, %a[%0, %0] : !sdir.memlet<56x45xi32>
+        // CHECK-SAME: i32 -> !sdir.memlet<56x45xi32>
+        sdir.store %1, %a[%0, %0] : i32 -> !sdir.memlet<56x45xi32>
     }
 } 
