@@ -148,4 +148,38 @@ def SDIR_CopyOp : SDIR_Op<"copy", [
     let assemblyFormat = [{attr-dict $src `->` $dest `:` type($src)}];
 }
 
+//===----------------------------------------------------------------------===//
+// MemletCastOp
+//===----------------------------------------------------------------------===//
+
+def SDIR_MemletCastOp : SDIR_Op<"memlet_cast", [
+    HasParent<"StateNode">
+]> {
+  let summary = "memlet casting operation";
+  let description = [{
+    Casts a memlet from one view to another.
+    For example:
+
+    ```mlir
+    sdir.state {
+        ...
+        %B = sdir.memlet_cast %A : !sdir.memlet<2x16xi32> -> !sdir.memlet<32xi32>
+        ...
+    }
+    ```
+  }];
+
+  let arguments = (ins SDIR_MemletType:$src);
+  let results = (outs SDIR_MemletType:$res);
+  let assemblyFormat = [{attr-dict $src `:` type($src) `->` type(results)}];
+
+  let verifier = [{
+      size_t src_size = src().getType().cast<MemletType>().getRank();
+      size_t res_size = res().getType().cast<MemletType>().getRank();
+      if (src_size != res_size)
+          return emitOpError("incorrect rank for memlet_cast");
+      return success();
+  }];
+}
+
 #endif // SDIR_MemletOps
