@@ -30,7 +30,6 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
     p << ' ';
     p.printSymbolName(op.sym_name());
-    p << ' ';
     p.printRegion(op.region());
 }
 
@@ -74,7 +73,6 @@ static void print(OpAsmPrinter &p, StateNode op) {
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
     p << ' ';
     p.printSymbolName(op.sym_name());
-    p << ' ';
     p.printRegion(op.region());
 }
 
