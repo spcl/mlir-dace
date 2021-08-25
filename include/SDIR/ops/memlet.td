@@ -49,7 +49,7 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_LoadOp : SDIR_Op<"load", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     TypesMatchWith<"result type matches element type of 'memlet'",
                      "arr", "res",
                      "$_self.cast<MemletType>().getElementType()">
@@ -88,7 +88,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StoreOp : SDIR_Op<"store", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     TypesMatchWith<"value type matches element type of 'memlet'",
                   "arr", "val",
                   "$_self.cast<MemletType>().getElementType()">
@@ -127,7 +127,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_CopyOp : SDIR_Op<"copy", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     SameTypeOperands
 ]> {
   let summary = "Memlet copy operation";
@@ -153,7 +153,7 @@ def SDIR_CopyOp : SDIR_Op<"copy", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_MemletCastOp : SDIR_Op<"memlet_cast", [
-    HasParent<"StateNode">
+    ParentOneOf<["StateNode", "MapNode"]>
 ]> {
   let summary = "memlet casting operation";
   let description = [{
@@ -187,7 +187,7 @@ def SDIR_MemletCastOp : SDIR_Op<"memlet_cast", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_ViewCastOp : SDIR_Op<"view_cast", [
-    HasParent<"StateNode">
+    ParentOneOf<["StateNode", "MapNode"]>
 ]> {
   let summary = "view node operation";
   let description = [{

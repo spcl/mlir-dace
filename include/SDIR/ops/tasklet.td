@@ -33,7 +33,7 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_CallOp : SDIR_Op<"call", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     CallOpInterface, 
     MemRefsNormalizable,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
@@ -101,7 +101,7 @@ def SDIR_CallOp : SDIR_Op<"call", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_LibCallOp : SDIR_Op<"libcall", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     CallOpInterface
 ]> {
   let summary = "library call operation";

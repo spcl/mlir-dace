@@ -48,7 +48,7 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     TypesMatchWith<"result type matches element type of 'stream'",
                      "str", "res",
                      "$_self.cast<StreamType>().getElementType()">
@@ -77,7 +77,7 @@ def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     TypesMatchWith<"value type matches element type of 'stream'",
                   "str", "val",
                   "$_self.cast<StreamType>().getElementType()">

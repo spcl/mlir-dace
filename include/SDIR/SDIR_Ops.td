@@ -16,6 +16,7 @@ class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mne
 include "SDIR/nodes/sdfg.td"
 include "SDIR/nodes/state.td"
 include "SDIR/nodes/tasklet.td"
+include "SDIR/nodes/map.td"
 
 //===----------------------------------------------------------------------===//
 // Ops

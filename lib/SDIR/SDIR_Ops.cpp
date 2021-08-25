@@ -176,3 +176,141 @@ LogicalResult sdir::EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// MapNode
+//===----------------------------------------------------------------------===//
+
+ParseResult sdir::MapNode::parseMapOp(OpAsmParser &parser, OperationState &result) {
+    auto &builder = parser.getBuilder();
+    auto indexType = builder.getIndexType();
+
+    SmallVector<OpAsmParser::OperandType, 4> ivs;
+    if (parser.parseRegionArgumentList(ivs, OpAsmParser::Delimiter::Paren))
+        return failure();
+
+    if(parser.parseEqual()) return failure();
+
+    AffineMapAttr lbMapAttr;
+    NamedAttrList lbAttrs;
+    SmallVector<OpAsmParser::OperandType, 4> lbMapOperands;
+    if(parser.parseAffineMapOfSSAIds(lbMapOperands, lbMapAttr,
+                                      MapNode::getLBAttrName(),
+                                      lbAttrs,
+                                      OpAsmParser::Delimiter::Paren)) 
+        return failure();
+
+    SmallVector<int64_t, 4> lb;
+    auto lbMap = lbMapAttr.getValue();
+    for (const auto &result : lbMap.getResults()) {
+      auto constExpr = result.dyn_cast<AffineConstantExpr>();
+      if (!constExpr)
+        return parser.emitError(parser.getNameLoc(),
+                                "lower bound must be constant integers");
+      lb.push_back(constExpr.getValue());
+    }
+
+    result.addAttribute(MapNode::getLBAttrName(),
+                        builder.getI64ArrayAttr(lb));
+
+    if(parser.parseKeyword("to")) return failure();
+
+    AffineMapAttr ubMapAttr;
+    NamedAttrList ubAttrs;
+    SmallVector<OpAsmParser::OperandType, 4> ubMapOperands;
+    if(parser.parseAffineMapOfSSAIds(ubMapOperands, ubMapAttr,
+                                      MapNode::getUBAttrName(),
+                                      ubAttrs,
+                                      OpAsmParser::Delimiter::Paren)) 
+        return failure();
+
+    SmallVector<int64_t, 4> ub;
+    auto ubMap = ubMapAttr.getValue();
+    for (const auto &result : ubMap.getResults()) {
+      auto constExpr = result.dyn_cast<AffineConstantExpr>();
+      if (!constExpr)
+        return parser.emitError(parser.getNameLoc(),
+                                "upper bound must be constant integers");
+      ub.push_back(constExpr.getValue());
+    }
+
+    
+    result.addAttribute(MapNode::getUBAttrName(),
+                        builder.getI64ArrayAttr(ub));
+
+    if(parser.parseKeyword("step")) return failure();
+
+    AffineMapAttr stepsMapAttr;
+    NamedAttrList stepsAttrs;
+    SmallVector<OpAsmParser::OperandType, 4> stepsMapOperands;
+    if(parser.parseAffineMapOfSSAIds(stepsMapOperands, stepsMapAttr,
+                                      MapNode::getStepsAttrName(),
+                                      stepsAttrs,
+                                      OpAsmParser::Delimiter::Paren)) 
+        return failure();
+
+    SmallVector<int64_t, 4> steps;
+    auto stepsMap = stepsMapAttr.getValue();
+    for (const auto &result : stepsMap.getResults()) {
+      auto constExpr = result.dyn_cast<AffineConstantExpr>();
+      if (!constExpr)
+        return parser.emitError(parser.getNameLoc(),
+                                "steps must be constant integers");
+      steps.push_back(constExpr.getValue());
+    }
+
+    result.addAttribute(MapNode::getStepsAttrName(),
+                        builder.getI64ArrayAttr(steps));
+
+    // Now parse the body.
+    Region *body = result.addRegion();
+    SmallVector<Type, 4> types(ivs.size(), indexType);
+    if (parser.parseRegion(*body, ivs, types) ||
+            parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    return success();
+}
+
+void sdir::MapNode::printMapOp(OpAsmPrinter &p) {
+    p << getOperationName() << " (" << getBody()->getArguments() << ") = (";
+    
+    SmallVector<int64_t, 8> lbresult;
+    for (Attribute attr : lowerBoundsGroups()) {
+        lbresult.push_back(attr.cast<IntegerAttr>().getInt());
+    }
+    llvm::interleaveComma(lbresult, p);
+
+    p << ") to (";
+
+    SmallVector<int64_t, 8> ubresult;
+    for (Attribute attr : upperBoundsGroups()) {
+        ubresult.push_back(attr.cast<IntegerAttr>().getInt());
+    }
+    llvm::interleaveComma(ubresult, p);
+
+    p << ") step (";
+
+    SmallVector<int64_t, 8> stepresult;
+    for (Attribute attr : steps()) {
+        stepresult.push_back(attr.cast<IntegerAttr>().getInt());
+    }
+    llvm::interleaveComma(stepresult, p);
+
+    p << ")";
+
+    p.printRegion(region(), /*printEntryBlockArgs=*/false, 
+        /*printBlockTerminators=*/false);
+}
+
+bool sdir::MapNode::isDefinedOutsideOfLoop(Value value){
+    return !region().isAncestor(value.getParentRegion());
+}
+
+Region &sdir::MapNode::getLoopBody(){
+    return region();
+}
+
+LogicalResult sdir::MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
+    return failure();
+}

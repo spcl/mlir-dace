@@ -6,14 +6,29 @@
 
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/BuiltinAttributes.h"
+
+#include "mlir/IR/AffineMap.h"
 
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 
+#include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
+
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/ADT/MapVector.h"
+
+#include "mlir/IR/IntegerSet.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/Transforms/InliningUtils.h"
+
+
+#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/Debug.h"
 
 #include "SDIR/SDIR_OpsDialect.h.inc"
 
