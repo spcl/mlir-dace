@@ -16,15 +16,9 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-NEXT: func @empty
         func @empty(%x: !sdir.stream<2x6xi32>) -> i1{
             %0 = constant 0 : i32
-            %01 = constant 0 : i1
-            %11 = constant 1 : i1
-            
             %l = sdir.stream_length %x : !sdir.stream<2x6xi32> -> i32
             %isZero = cmpi "eq", %l, %0 : i32
-            cond_br %isZero, ^zero, ^one
-
-            ^zero: return %11 : i1
-            ^one: return %01 : i1
+            return %isZero : i1
         }
         // CHECK: sdir.consume
         sdir.consume{num_pes=5, condition=@full} %a : !sdir.stream<2x6xi32> {
