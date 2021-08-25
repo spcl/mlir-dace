@@ -1,15 +1,13 @@
 #include "SDIR/SDIR_Dialect.h"
 
-#define GET_OP_CLASSES
-#include "SDIR/SDIR_Ops.cpp.inc"
-
 using namespace mlir;
+using namespace mlir::sdir;
 
 //===----------------------------------------------------------------------===//
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
-sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, FunctionType type, 
+TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         ArrayRef<NamedAttribute> attrs) {
     OpBuilder builder(location->getContext());
     OperationState state(location, getOperationName());
@@ -17,13 +15,13 @@ sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, F
     return cast<TaskletNode>(Operation::create(state));
 }
 
-sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, FunctionType type, 
+TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         Operation::dialect_attr_range attrs) {
     SmallVector<NamedAttribute, 8> attrRef(attrs);
     return create(location, name, type, llvm::makeArrayRef(attrRef));
 }
 
-sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, FunctionType type, 
+TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         ArrayRef<NamedAttribute> attrs, 
                                         ArrayRef<DictionaryAttr> argAttrs) {
     TaskletNode func = create(location, name, type, attrs);
@@ -31,7 +29,7 @@ sdir::TaskletNode sdir::TaskletNode::create(Location location, StringRef name, F
     return func;
 }
 
-void sdir::TaskletNode::build(OpBuilder &builder, OperationState &state, StringRef name,
+void TaskletNode::build(OpBuilder &builder, OperationState &state, StringRef name,
                 FunctionType type, ArrayRef<NamedAttribute> attrs,
                 ArrayRef<DictionaryAttr> argAttrs) {
     state.addAttribute(SymbolTable::getSymbolAttrName(),
@@ -47,7 +45,7 @@ void sdir::TaskletNode::build(OpBuilder &builder, OperationState &state, StringR
                                             /*resultAttrs=*/llvm::None);
 }
 
-void sdir::TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
+void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
     llvm::MapVector<Identifier, Attribute> newAttrs;
     for (const auto &attr : dest->getAttrs())
         newAttrs.insert(attr);
@@ -58,7 +56,7 @@ void sdir::TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper
     getBody().cloneInto(&dest.getBody(), mapper);
 }
 
-sdir::TaskletNode sdir::TaskletNode::clone(BlockAndValueMapping &mapper) {
+TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
     TaskletNode newFunc = cast<TaskletNode>(getOperation()->cloneWithoutRegions());
     
     if (!isExternal()) {
@@ -91,7 +89,7 @@ sdir::TaskletNode sdir::TaskletNode::clone(BlockAndValueMapping &mapper) {
     return newFunc;
 }
 
-sdir::TaskletNode sdir::TaskletNode::clone() {
+TaskletNode TaskletNode::clone() {
     BlockAndValueMapping mapper;
     return clone(mapper);
 }
@@ -100,7 +98,7 @@ sdir::TaskletNode sdir::TaskletNode::clone() {
 // CallOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute was specified.
     auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
     if (!fnAttr)
@@ -139,7 +137,7 @@ LogicalResult sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-LogicalResult sdir::SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the entry attribute is specified.
     auto entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
     if (!entryAttr)
@@ -156,7 +154,7 @@ LogicalResult sdir::SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTabl
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult sdir::EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the src/dest attributes are specified.
     auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
     if (!srcAttr)
@@ -181,7 +179,7 @@ LogicalResult sdir::EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // MapNode
 //===----------------------------------------------------------------------===//
 
-ParseResult sdir::MapNode::parseMapOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     auto &builder = parser.getBuilder();
     auto indexType = builder.getIndexType();
 
@@ -272,11 +270,11 @@ ParseResult sdir::MapNode::parseMapOp(OpAsmParser &parser, OperationState &resul
     return success();
 }
 
-void sdir::MapNode::printMapOp(OpAsmPrinter &p) {
-    p << getOperationName() << " (" << getBody()->getArguments() << ") = (";
-    
+static void print(OpAsmPrinter &p, MapNode op) {
+    p << op.getOperationName() << " (" << op.getBody()->getArguments() << ") = (";
+
     SmallVector<int64_t, 8> lbresult;
-    for (Attribute attr : lowerBoundsGroups()) {
+    for (Attribute attr : op.lowerBounds()) {
         lbresult.push_back(attr.cast<IntegerAttr>().getInt());
     }
     llvm::interleaveComma(lbresult, p);
@@ -284,7 +282,7 @@ void sdir::MapNode::printMapOp(OpAsmPrinter &p) {
     p << ") to (";
 
     SmallVector<int64_t, 8> ubresult;
-    for (Attribute attr : upperBoundsGroups()) {
+    for (Attribute attr : op.upperBounds()) {
         ubresult.push_back(attr.cast<IntegerAttr>().getInt());
     }
     llvm::interleaveComma(ubresult, p);
@@ -292,25 +290,32 @@ void sdir::MapNode::printMapOp(OpAsmPrinter &p) {
     p << ") step (";
 
     SmallVector<int64_t, 8> stepresult;
-    for (Attribute attr : steps()) {
+    for (Attribute attr : op.steps()) {
         stepresult.push_back(attr.cast<IntegerAttr>().getInt());
     }
     llvm::interleaveComma(stepresult, p);
 
     p << ")";
 
-    p.printRegion(region(), /*printEntryBlockArgs=*/false, 
+    p.printRegion(op.region(), /*printEntryBlockArgs=*/false, 
         /*printBlockTerminators=*/false);
 }
 
-bool sdir::MapNode::isDefinedOutsideOfLoop(Value value){
+bool MapNode::isDefinedOutsideOfLoop(Value value){
     return !region().isAncestor(value.getParentRegion());
 }
 
-Region &sdir::MapNode::getLoopBody(){
+Region &MapNode::getLoopBody(){
     return region();
 }
 
-LogicalResult sdir::MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
+LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
     return failure();
 }
+
+//===----------------------------------------------------------------------===//
+// TableGen'd op method definitions
+//===----------------------------------------------------------------------===//
+
+#define GET_OP_CLASSES
+#include "SDIR/SDIR_Ops.cpp.inc"

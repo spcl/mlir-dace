@@ -22,24 +22,21 @@ def SDIR_MapNode : SDIR_Op<"map", [
     }];
 
     let arguments = (ins 
-        /*I32ElementsAttr:$lowerBoundsGroups,
-        I32ElementsAttr:$upperBoundsGroups,*/
-        I64ArrayAttr:$lowerBoundsGroups,
-        I64ArrayAttr:$upperBoundsGroups,
+        /*I32ElementsAttr:$lowerBounds,
+        I32ElementsAttr:$upperBounds,*/
+        I64ArrayAttr:$lowerBounds,
+        I64ArrayAttr:$upperBounds,
         I64ArrayAttr:$steps
     );
 
     let regions = (region SizedRegion<1>:$region);
 
-    let parser = [{ return parseMapOp(parser, result); }];
-    let printer = [{ return printMapOp(p); }];
+    let parser = [{ return ::parseMapNode(parser, result); }];
+    let printer = [{ return ::print(p, *this); }];
 
     let extraClassDeclaration = [{
-        static ParseResult parseMapOp(OpAsmParser &parser, OperationState &result);
-        void printMapOp(OpAsmPrinter &p);
-
-        static StringRef getLBAttrName() { return "lowerBoundsGroups"; }
-        static StringRef getUBAttrName() { return "upperBoundsGroups"; }
+        static StringRef getLBAttrName() { return "lowerBounds"; }
+        static StringRef getUBAttrName() { return "upperBounds"; }
         static StringRef getStepsAttrName() { return "steps"; }
     }];
 }
