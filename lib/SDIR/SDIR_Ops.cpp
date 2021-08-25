@@ -309,6 +309,35 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
 }
 
 //===----------------------------------------------------------------------===//
+// ConsumeNode
+//===----------------------------------------------------------------------===//
+
+LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the condition attributes are specified.
+    auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
+    if (!srcAttr)
+        return emitOpError("requires a 'condition' symbol reference attribute");
+    FuncOp src = symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, srcAttr);
+    if (!src)
+        return emitOpError() << "'" << srcAttr.getValue()
+                            << "' does not reference a valid func";
+    
+    return success();
+}
+
+bool ConsumeNode::isDefinedOutsideOfLoop(Value value){
+    return !region().isAncestor(value.getParentRegion());
+}
+
+Region &ConsumeNode::getLoopBody(){
+    return region();
+}
+
+LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops){
+    return failure();
+}
+
+//===----------------------------------------------------------------------===//
 // CallOp
 //===----------------------------------------------------------------------===//
 
@@ -371,7 +400,6 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
     return success();
 }
-
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions

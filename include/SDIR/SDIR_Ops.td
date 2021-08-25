@@ -17,6 +17,7 @@ include "SDIR/nodes/sdfg.td"
 include "SDIR/nodes/state.td"
 include "SDIR/nodes/tasklet.td"
 include "SDIR/nodes/map.td"
+include "SDIR/nodes/consume.td"
 
 //===----------------------------------------------------------------------===//
 // Ops

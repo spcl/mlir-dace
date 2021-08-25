@@ -97,8 +97,35 @@ def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
     ```
   }];
 
-    let arguments = (ins SDIR_StreamType:$str, AnyType:$val);
-    let assemblyFormat = [{attr-dict $val `,` $str `:` type($str)}];
+  let arguments = (ins SDIR_StreamType:$str, AnyType:$val);
+  let assemblyFormat = [{attr-dict $val `,` $str `:` type($str)}];
 }
+
+//===----------------------------------------------------------------------===//
+// StreamLengthOp
+//===----------------------------------------------------------------------===//
+
+def SDIR_StreamLengthOp : SDIR_Op<"stream_length", [
+    ParentOneOf<["StateNode", "MapNode", "FuncOp"]>
+]> {
+  let summary = "Stream length operation";
+  let description = [{
+    Returns the length of the stream.
+    For example:
+
+    ```mlir
+    sdir.state @state_0 {
+        ...
+        %l = sdir.stream_length %A : !sdir.stream<i32> -> i32
+        ...
+    }
+    ```
+  }];
+
+  let arguments = (ins SDIR_StreamType:$str);
+  let results = (outs I32);
+  let assemblyFormat = [{attr-dict $str `:` type($str) `->` type(results)}];
+}
+
 
 #endif // SDIR_StreamOps
