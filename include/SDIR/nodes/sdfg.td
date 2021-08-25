@@ -6,6 +6,7 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
     NoTerminator,
     IsolatedFromAbove,
     SymbolTable,
+    Symbol,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
     let summary = "SDFG region";
@@ -21,9 +22,11 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$name, FlatSymbolRefAttr:$entry);
+    let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry);
     let regions = (region SizedRegion<1>:$region);
-    let assemblyFormat = [{attr-dict $name $region}];
+
+    let parser = [{ return ::parseSDFGNode(parser, result); }];
+    let printer = [{ return ::print(p, *this); }];
 }
 
 #endif // SDIR_SDFGNode

@@ -36,6 +36,7 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     }];
 
     let printer =[{
+        p.printNewline();
         FunctionType fnType = getType();
         function_like_impl::printFunctionLikeOp(p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
     }];

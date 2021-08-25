@@ -4,6 +4,81 @@ using namespace mlir;
 using namespace mlir::sdir;
 
 //===----------------------------------------------------------------------===//
+// SDFGNode
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
+    if (parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    StringAttr sym_nameAttr;
+    if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
+        return failure();
+
+    Region *body = result.addRegion();
+    if (parser.parseRegion(*body))
+        return failure();
+
+    if(body->empty()) body->emplaceBlock();
+
+    return success();
+}
+
+static void print(OpAsmPrinter &p, SDFGNode op) {
+    p.printNewline();
+    p << op.getOperationName();
+    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
+    p << ' ';
+    p.printSymbolName(op.sym_name());
+    p << ' ';
+    p.printRegion(op.region());
+}
+
+LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the entry attribute is specified.
+    auto entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
+    if (!entryAttr)
+        return emitOpError("requires a 'src' symbol reference attribute");
+    StateNode entry = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
+    if (!entry)
+        return emitOpError() << "'" << entryAttr.getValue()
+                            << "' does not reference a valid state";
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// StateNode
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
+    if (parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    StringAttr sym_nameAttr;
+    if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
+        return failure();
+
+    Region *body = result.addRegion();
+    if (parser.parseRegion(*body))
+        return failure();
+
+    if(body->empty()) body->emplaceBlock();
+
+    return success();
+}
+
+static void print(OpAsmPrinter &p, StateNode op) {
+    p.printNewline();
+    p << op.getOperationName();
+    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
+    p << ' ';
+    p.printSymbolName(op.sym_name());
+    p << ' ';
+    p.printRegion(op.region());
+}
+
+//===----------------------------------------------------------------------===//
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
@@ -92,87 +167,6 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
 TaskletNode TaskletNode::clone() {
     BlockAndValueMapping mapper;
     return clone(mapper);
-}
-
-//===----------------------------------------------------------------------===//
-// CallOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-    // Check that the callee attribute was specified.
-    auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
-    if (!fnAttr)
-        return emitOpError("requires a 'callee' symbol reference attribute");
-    TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
-    if (!fn)
-        return emitOpError() << "'" << fnAttr.getValue()
-                            << "' does not reference a valid tasklet";
-
-    // Verify that the operand and result types match the callee.
-    auto fnType = fn.getType();
-    if (fnType.getNumInputs() != getNumOperands())
-        return emitOpError("incorrect number of operands for callee");
-
-    for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
-    if (getOperand(i).getType() != fnType.getInput(i))
-        return emitOpError("operand type mismatch: expected operand type ")
-            << fnType.getInput(i) << ", but provided "
-            << getOperand(i).getType() << " for operand number " << i;
-
-    if (fnType.getNumResults() != getNumResults())
-        return emitOpError("incorrect number of results for callee");
-
-    for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
-    if (getResult(i).getType() != fnType.getResult(i)) {
-        auto diag = emitOpError("result type mismatch at index ") << i;
-        diag.attachNote() << "      op result types: " << getResultTypes();
-        diag.attachNote() << "function result types: " << fnType.getResults();
-        return diag;
-    }
-
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// SDFGNode
-//===----------------------------------------------------------------------===//
-
-LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
-    // Check that the entry attribute is specified.
-    auto entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
-    if (!entryAttr)
-        return emitOpError("requires a 'src' symbol reference attribute");
-    StateNode entry = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
-    if (!entry)
-        return emitOpError() << "'" << entryAttr.getValue()
-                            << "' does not reference a valid state";
-
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
-// EdgeOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-    // Check that the src/dest attributes are specified.
-    auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
-    if (!srcAttr)
-        return emitOpError("requires a 'src' symbol reference attribute");
-    StateNode src = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
-    if (!src)
-        return emitOpError() << "'" << srcAttr.getValue()
-                            << "' does not reference a valid state";
-    
-    auto destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
-    if (!destAttr)
-        return emitOpError("requires a 'dest' symbol reference attribute");
-    StateNode dest = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
-    if (!dest)
-        return emitOpError() << "'" << destAttr.getValue()
-                            << "' does not reference a valid state";
-
-    return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -271,6 +265,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
 }
 
 static void print(OpAsmPrinter &p, MapNode op) {
+    p.printNewline();
     p << op.getOperationName() << " (" << op.getBody()->getArguments() << ") = (";
 
     SmallVector<int64_t, 8> lbresult;
@@ -312,6 +307,71 @@ Region &MapNode::getLoopBody(){
 LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
     return failure();
 }
+
+//===----------------------------------------------------------------------===//
+// CallOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the callee attribute was specified.
+    auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
+    if (!fnAttr)
+        return emitOpError("requires a 'callee' symbol reference attribute");
+    TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
+    if (!fn)
+        return emitOpError() << "'" << fnAttr.getValue()
+                            << "' does not reference a valid tasklet";
+
+    // Verify that the operand and result types match the callee.
+    auto fnType = fn.getType();
+    if (fnType.getNumInputs() != getNumOperands())
+        return emitOpError("incorrect number of operands for callee");
+
+    for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
+    if (getOperand(i).getType() != fnType.getInput(i))
+        return emitOpError("operand type mismatch: expected operand type ")
+            << fnType.getInput(i) << ", but provided "
+            << getOperand(i).getType() << " for operand number " << i;
+
+    if (fnType.getNumResults() != getNumResults())
+        return emitOpError("incorrect number of results for callee");
+
+    for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
+    if (getResult(i).getType() != fnType.getResult(i)) {
+        auto diag = emitOpError("result type mismatch at index ") << i;
+        diag.attachNote() << "      op result types: " << getResultTypes();
+        diag.attachNote() << "function result types: " << fnType.getResults();
+        return diag;
+    }
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// EdgeOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the src/dest attributes are specified.
+    auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
+    if (!srcAttr)
+        return emitOpError("requires a 'src' symbol reference attribute");
+    StateNode src = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
+    if (!src)
+        return emitOpError() << "'" << srcAttr.getValue()
+                            << "' does not reference a valid state";
+    
+    auto destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
+    if (!destAttr)
+        return emitOpError("requires a 'dest' symbol reference attribute");
+    StateNode dest = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
+    if (!dest)
+        return emitOpError() << "'" << destAttr.getValue()
+                            << "' does not reference a valid state";
+
+    return success();
+}
+
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions

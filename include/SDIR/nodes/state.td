@@ -22,7 +22,9 @@ def SDIR_StateNode : SDIR_Op<"state", [
 
     let arguments = (ins SymbolNameAttr:$sym_name);
     let regions = (region SizedRegion<1>:$region);
-    let assemblyFormat = [{attr-dict $sym_name $region}];
+
+    let parser = [{ return ::parseStateNode(parser, result); }];
+    let printer = [{ return ::print(p, *this); }];
 }
 
 #endif // SDIR_StateNode

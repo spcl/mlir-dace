@@ -24,7 +24,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-NEXT: [[NAMEc:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEC]] 
         // CHECK-SAME: !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
         %c = sdir.get_access %C : !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        // CHECK-NEXT: sdir.tasklet @add
+        // CHECK: sdir.tasklet @add
         sdir.tasklet @add(%x: i32, %y: i32) -> i32{
             %z = addi %x, %y : i32
             sdir.return %z : i32
