@@ -32,7 +32,7 @@ def SDIR_MapNode : SDIR_Op<"map", [
     let regions = (region SizedRegion<1>:$region);
     let parser = [{ return ::parseMapNode(parser, result); }];
     let printer = [{ return ::print(p, *this); }];
-    let verifier = [{ return :: verify(*this); }];
+    let verifier = [{ return ::verify(*this); }];
 }
 
 #endif // SDIR_MapNode

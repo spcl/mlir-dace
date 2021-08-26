@@ -32,7 +32,7 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
     let regions = (region SizedRegion<1>:$region);
     let parser = [{ return ::parseConsumeNode(parser, result); }];
     let printer = [{ return ::print(p, *this); }];
-    let verifier = [{ return :: verify(*this); }];
+    let verifier = [{ return ::verify(*this); }];
 }
 
 #endif // SDIR_ConsumeNode

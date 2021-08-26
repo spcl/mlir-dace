@@ -42,7 +42,10 @@ def SDIR_ArrayType : SDIR_Type<"Array"> {
   let printer = [{
     $_printer << "array<";
     for(int i = 0; i < getImpl()->shape.size(); i++)
-      $_printer << getImpl()->shape[i] << "x" ;
+      if(getImpl()->shape[i] == -1)
+        $_printer << "?x" ;
+      else
+        $_printer << getImpl()->shape[i] << "x" ;
     $_printer << getImpl()->elementType << ">";
   }];
 
@@ -58,6 +61,19 @@ def SDIR_ArrayType : SDIR_Type<"Array"> {
     if ($_parser.parseGreater())
       return Type();
     return get($_ctxt, shape, elementType);
+  }];
+
+  let extraClassDeclaration = [{
+    size_t getUndefRank(){ 
+      size_t undefSize = 0;
+      for(int64_t dim : getShape()) if(dim == -1) undefSize++;
+      return undefSize;
+    }
+
+    bool hasZeros(){
+      for(int64_t dim : getShape()) if(dim == 0) return true;
+      return false;
+    }
   }];
 }
 

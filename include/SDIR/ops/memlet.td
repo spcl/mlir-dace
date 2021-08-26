@@ -18,8 +18,12 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
     ```
   }];
 
-    let results = (outs SDIR_ArrayType);
-    let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
+  let arguments = (ins Variadic<AnyInteger>:$params);
+  let results = (outs SDIR_ArrayType:$res);
+
+  let parser = [{ return ::parseAllocOp(parser, result); }];
+  let printer = [{ return ::print(p, *this); }];
+  let verifier = [{ return ::verify(*this); }];
 }
 
 
@@ -40,8 +44,12 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
     ```
   }];
 
-    let results = (outs SDIR_ArrayType);
-    let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
+  let arguments = (ins Variadic<AnyInteger>:$params);
+  let results = (outs SDIR_ArrayType:$res);
+ 
+  let parser = [{ return ::parseAllocTransientOp(parser, result); }];
+  let printer = [{ return ::print(p, *this); }];
+  let verifier = [{ return ::verify(*this); }];
 }
 
 //===----------------------------------------------------------------------===//
