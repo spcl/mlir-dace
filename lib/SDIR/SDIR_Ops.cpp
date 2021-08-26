@@ -324,15 +324,78 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
+static ParseResult parseConsumeNode(OpAsmParser &parser, OperationState &result) {
+    if(parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    if(parser.parseLParen()) return failure();
+
+    OpAsmParser::OperandType stream;
+    Type streamType;
+    if(parser.parseOperand(stream) || parser.parseColonType(streamType)
+            || parser.resolveOperand(stream, streamType, result.operands)
+            || !streamType.isa<StreamType>())
+        return failure();
+
+    if(parser.parseRParen() || parser.parseArrow() || parser.parseLParen()) 
+        return failure();
+
+    SmallVector<OpAsmParser::OperandType, 4> ivs;
+    OpAsmParser::OperandType num_pes_op;
+    if(parser.parseKeyword("pesid") || parser.parseColon()
+            || parser.parseOperand(num_pes_op)) 
+        return failure();
+    ivs.push_back(num_pes_op);
+
+    if(parser.parseComma()) return failure();
+
+    OpAsmParser::OperandType elem_op;
+    if(parser.parseKeyword("elem") || parser.parseColon()
+            || parser.parseOperand(elem_op)) 
+        return failure();
+    ivs.push_back(elem_op);
+
+    if(parser.parseRParen())
+        return failure();
+
+    // Now parse the body.
+    Region *body = result.addRegion();
+    SmallVector<Type, 4> types;
+    types.push_back(parser.getBuilder().getIndexType());
+    types.push_back(streamType.cast<StreamType>().getElementType());
+    if (parser.parseRegion(*body, ivs, types))
+        return failure();
+
+    return success();
+}
+
+static void print(OpAsmPrinter &p, ConsumeNode op) {
+    p.printNewline();
+    p << op.getOperationName();
+    p.printOptionalAttrDict(op->getAttrs()); 
+    p << " (" << op.stream() << " : " << op.stream().getType() << ")";
+    p << " -> (pesid: " << op.getBody()->getArgument(0) << ", elem: " << op.getBody()->getArgument(1) << ")";
+    p.printRegion(op.region(), /*printEntryBlockArgs=*/false, 
+        /*printBlockTerminators=*/false);
+}
+
 LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the condition attributes are specified.
-    auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
-    if (!srcAttr)
+    auto condAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
+    if (!condAttr)
         return emitOpError("requires a 'condition' symbol reference attribute");
-    FuncOp src = symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, srcAttr);
-    if (!src)
-        return emitOpError() << "'" << srcAttr.getValue()
+    FuncOp cond = symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, condAttr);
+    if (!cond)
+        return emitOpError() << "'" << condAttr.getValue()
                             << "' does not reference a valid func";
+    
+    if(cond.getArguments().size() != 1)
+        return emitOpError() << "'" << condAttr.getValue()
+                            << "' references a func with invalid signature";
+
+    if(cond.getArgument(0).getType() != stream().getType())
+        return emitOpError() << "'" << condAttr.getValue()
+                            << "' references a func with invalid signature";
     
     return success();
 }

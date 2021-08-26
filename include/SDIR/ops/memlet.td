@@ -88,7 +88,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_StoreOp : SDIR_Op<"store", [
-    ParentOneOf<["StateNode", "MapNode"]>,
+    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"value type matches element type of 'memlet'",
                   "arr", "val",
                   "$_self.cast<MemletType>().getElementType()">

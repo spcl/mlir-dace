@@ -23,14 +23,15 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
         ```
     }];
 
-    let arguments = (ins 
+    let arguments = (ins
         APIntAttr:$num_pes, 
         FlatSymbolRefAttr:$condition,
         SDIR_StreamType:$stream
     );
 
     let regions = (region SizedRegion<1>:$region);
-    let assemblyFormat = [{attr-dict $stream `:` type($stream) $region}];
+    let parser = [{ return ::parseConsumeNode(parser, result); }];
+    let printer = [{ return ::print(p, *this); }];
 }
 
 #endif // SDIR_ConsumeNode
