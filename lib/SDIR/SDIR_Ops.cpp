@@ -175,6 +175,9 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     auto &builder = parser.getBuilder();
     auto indexType = builder.getIndexType();
 
+    if(parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
     SmallVector<OpAsmParser::OperandType, 4> ivs;
     if (parser.parseRegionArgumentList(ivs, OpAsmParser::Delimiter::Paren))
         return failure();
@@ -249,8 +252,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     // Now parse the body.
     Region *body = result.addRegion();
     SmallVector<Type, 4> types(ivs.size(), indexType);
-    if (parser.parseRegion(*body, ivs, types) ||
-            parser.parseOptionalAttrDict(result.attributes))
+    if (parser.parseRegion(*body, ivs, types))
         return failure();
 
     return success();
@@ -258,7 +260,10 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, MapNode op) {
     p.printNewline();
-    p << op.getOperationName() << " (" << op.getBody()->getArguments() << ") = (";
+    p << op.getOperationName();
+    p.printOptionalAttrDict(op->getAttrs(), 
+                /*elidedAttrs=*/{"lowerBounds", "upperBounds", "steps"}); 
+    p << " (" << op.getBody()->getArguments() << ") = (";
 
     SmallVector<int64_t, 8> lbresult;
     for (Attribute attr : op.lowerBounds()) {
