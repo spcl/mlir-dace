@@ -24,14 +24,15 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
     }];
 
     let arguments = (ins
-        APIntAttr:$num_pes, 
-        FlatSymbolRefAttr:$condition,
+        OptionalAttr<APIntAttr>:$num_pes, 
+        OptionalAttr<FlatSymbolRefAttr>:$condition,
         SDIR_StreamType:$stream
     );
 
     let regions = (region SizedRegion<1>:$region);
     let parser = [{ return ::parseConsumeNode(parser, result); }];
     let printer = [{ return ::print(p, *this); }];
+    let verifier = [{ return :: verify(*this); }];
 }
 
 #endif // SDIR_ConsumeNode

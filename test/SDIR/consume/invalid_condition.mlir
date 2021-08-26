@@ -21,7 +21,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
             return %isZero : i1
         }
         // CHECK: sdir.consume
-        sdir.consume{num_pes=5, condition=@full} (%a : !sdir.stream<2x6xi32>) -> (pesid: %p, elem: %e) {
+        sdir.consume{num_pes=5, condition=@full} (%a : !sdir.stream<2x6xi32>) -> (pe: %p, elem: %e) {
         }
     }
 }

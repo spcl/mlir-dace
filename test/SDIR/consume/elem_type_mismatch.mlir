@@ -37,9 +37,9 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-DAG: num_pes = 5
         // CHECK-DAG: condition = @empty
         // CHECK-SAME: [[NAMEa]] : !sdir.stream<i32>
-        // CHECK-SAME: pesid: [[NAMEp:%[a-zA-Z0-9_]*]]
+        // CHECK-SAME: pe: [[NAMEp:%[a-zA-Z0-9_]*]]
         // CHECK-SAME: elem: [[NAMEe:%[a-zA-Z0-9_]*]]
-        sdir.consume{num_pes=5, condition=@empty} (%a : !sdir.stream<i32>) -> (pesid: %p, elem: %e) {
+        sdir.consume{num_pes=5, condition=@empty} (%a : !sdir.stream<i32>) -> (pe: %p, elem: %e) {
             // CHECK-NEXT: [[NAMEres:%[a-zA-Z0-9_]*]] = sdir.call @add_one([[NAMEe]])
             %res = sdir.call @add_one(%e) : (i64) -> i64
             // CHECK-NEXT: sdir.store {wcr = "add"} [[NAMEres]], [[NAMEc]]

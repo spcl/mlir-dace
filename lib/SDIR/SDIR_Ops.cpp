@@ -342,7 +342,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser, OperationState &result)
 
     SmallVector<OpAsmParser::OperandType, 4> ivs;
     OpAsmParser::OperandType num_pes_op;
-    if(parser.parseKeyword("pesid") || parser.parseColon()
+    if(parser.parseKeyword("pe") || parser.parseColon()
             || parser.parseOperand(num_pes_op)) 
         return failure();
     ivs.push_back(num_pes_op);
@@ -374,16 +374,24 @@ static void print(OpAsmPrinter &p, ConsumeNode op) {
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs()); 
     p << " (" << op.stream() << " : " << op.stream().getType() << ")";
-    p << " -> (pesid: " << op.getBody()->getArgument(0) << ", elem: " << op.getBody()->getArgument(1) << ")";
+    p << " -> (pe: " << op.getBody()->getArgument(0) << ", elem: " << op.getBody()->getArgument(1) << ")";
     p.printRegion(op.region(), /*printEntryBlockArgs=*/false, 
         /*printBlockTerminators=*/false);
+}
+
+LogicalResult verify(ConsumeNode op){
+    if(op.num_pes().hasValue() && op.num_pes().getValue().isNonPositive())
+        return op.emitOpError("failed to verify that number of processing elements is at least one");
+
+    return success();
 }
 
 LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the condition attributes are specified.
     auto condAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
     if (!condAttr)
-        return emitOpError("requires a 'condition' symbol reference attribute");
+        return success();
+
     FuncOp cond = symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, condAttr);
     if (!cond)
         return emitOpError() << "'" << condAttr.getValue()

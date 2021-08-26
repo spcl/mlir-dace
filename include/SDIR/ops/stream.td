@@ -127,5 +127,4 @@ def SDIR_StreamLengthOp : SDIR_Op<"stream_length", [
   let assemblyFormat = [{attr-dict $str `:` type($str) `->` type(results)}];
 }
 
-
 #endif // SDIR_StreamOps

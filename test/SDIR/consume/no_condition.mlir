@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: sdir-opt %s | sdir-opt | FileCheck %s
 
 // CHECK: module
@@ -13,15 +12,8 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.get_access [[NAMEA]] 
         // CHECK-SAME: !sdir.stream_array<2x6xi32> -> !sdir.stream<2x6xi32>
         %a = sdir.get_access %A : !sdir.stream_array<2x6xi32> -> !sdir.stream<2x6xi32>
-        // CHECK-NEXT: func @empty
-        func @empty(%x: !sdir.stream<2x6xi32>) -> i1{
-            %0 = constant 0 : i32
-            %l = sdir.stream_length %x : !sdir.stream<2x6xi32> -> i32
-            %isZero = cmpi "eq", %l, %0 : i32
-            return %isZero : i1
-        }
         // CHECK: sdir.consume
-        sdir.consume{condition=@empty} (%a : !sdir.stream<2x6xi32>) -> (pesid: %p, elem: %e) {
+        sdir.consume{num_pes=5} (%a : !sdir.stream<2x6xi32>) -> (pe: %p, elem: %e) {
         }
     }
 }
