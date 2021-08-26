@@ -1,7 +1,6 @@
 #ifndef SDIR_TaskletNode
 #define SDIR_TaskletNode
 
-
 def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     HasParent<"StateNode">,
     AffineScope, 
