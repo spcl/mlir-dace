@@ -185,8 +185,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     NamedAttrList lbAttrs;
     SmallVector<OpAsmParser::OperandType, 4> lbMapOperands;
     if(parser.parseAffineMapOfSSAIds(lbMapOperands, lbMapAttr,
-                                      MapNode::getLBAttrName(),
-                                      lbAttrs,
+                                     "lowerBounds", lbAttrs,
                                       OpAsmParser::Delimiter::Paren)) 
         return failure();
 
@@ -200,8 +199,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
       lb.push_back(constExpr.getValue());
     }
 
-    result.addAttribute(MapNode::getLBAttrName(),
-                        builder.getI64ArrayAttr(lb));
+    result.addAttribute("lowerBounds", builder.getI64ArrayAttr(lb));
 
     if(parser.parseKeyword("to")) return failure();
 
@@ -209,8 +207,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     NamedAttrList ubAttrs;
     SmallVector<OpAsmParser::OperandType, 4> ubMapOperands;
     if(parser.parseAffineMapOfSSAIds(ubMapOperands, ubMapAttr,
-                                      MapNode::getUBAttrName(),
-                                      ubAttrs,
+                                      "upperBounds", ubAttrs,
                                       OpAsmParser::Delimiter::Paren)) 
         return failure();
 
@@ -225,8 +222,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     }
 
     
-    result.addAttribute(MapNode::getUBAttrName(),
-                        builder.getI64ArrayAttr(ub));
+    result.addAttribute("upperBounds", builder.getI64ArrayAttr(ub));
 
     if(parser.parseKeyword("step")) return failure();
 
@@ -234,8 +230,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     NamedAttrList stepsAttrs;
     SmallVector<OpAsmParser::OperandType, 4> stepsMapOperands;
     if(parser.parseAffineMapOfSSAIds(stepsMapOperands, stepsMapAttr,
-                                      MapNode::getStepsAttrName(),
-                                      stepsAttrs,
+                                      "steps", stepsAttrs,
                                       OpAsmParser::Delimiter::Paren)) 
         return failure();
 
@@ -249,8 +244,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
       steps.push_back(constExpr.getValue());
     }
 
-    result.addAttribute(MapNode::getStepsAttrName(),
-                        builder.getI64ArrayAttr(steps));
+    result.addAttribute("steps", builder.getI64ArrayAttr(steps));
 
     // Now parse the body.
     Region *body = result.addRegion();
@@ -292,6 +286,21 @@ static void print(OpAsmPrinter &p, MapNode op) {
 
     p.printRegion(op.region(), /*printEntryBlockArgs=*/false, 
         /*printBlockTerminators=*/false);
+}
+
+LogicalResult verify(MapNode op){
+    size_t var_count = op.getBody()->getArguments().size();
+
+    if(op.lowerBounds().size() != var_count)
+        return op.emitOpError("failed to verify that size of lower bounds matches size of arguments");
+    
+    if(op.upperBounds().size() != var_count)
+        return op.emitOpError("failed to verify that size of upper bounds matches size of arguments");
+    
+    if(op.steps().size() != var_count)
+        return op.emitOpError("failed to verify that size of steps matches size of arguments");
+
+    return success();
 }
 
 bool MapNode::isDefinedOutsideOfLoop(Value value){
