@@ -116,7 +116,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
     size_t idx_size = indices().size();
     size_t mem_size = arr().getType().cast<MemletType>().getRank();
     if (idx_size != mem_size)
-      return emitOpError("incorrect number of indices for load");
+      return emitOpError("incorrect number of indices for store");
     return success();
   }];
 }
