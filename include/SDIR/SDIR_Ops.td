@@ -23,10 +23,11 @@ include "SDIR/nodes/consume.td"
 // Ops
 //===----------------------------------------------------------------------===//
 
-include "SDIR/ops/edge.td"
 include "SDIR/ops/tasklet.td"
 include "SDIR/ops/memlet.td"
 include "SDIR/ops/stream.td"
+include "SDIR/ops/symbol.td"
+include "SDIR/ops/edge.td"
 include "SDIR/ops/get_access.td"
 
 #endif // SDIR_OPS

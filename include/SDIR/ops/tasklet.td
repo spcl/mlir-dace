@@ -6,15 +6,16 @@
 //===----------------------------------------------------------------------===//
 
 def SDIR_ReturnOp : SDIR_Op<"return", [
-    HasParent<"TaskletNode">,
-    Terminator
+  HasParent<"TaskletNode">,
+  Terminator
 ]> {
   let summary = "return operation";
   let description = [{
     The "return" operation represents a return operation within a function.
     The operation takes an optional operand and produces no results.
     The operand type must match the signature of the function that contains
-    the operation. For example:
+    the operation. 
+    For example:
 
     ```mlir
     func @foo() -> tensor<2xf64> {
@@ -25,7 +26,7 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
   }];
 
   let arguments = (ins Variadic<AnyType>:$input);
-  let assemblyFormat = "($input^ `:` type($input))? attr-dict ";
+  let assemblyFormat = "($input^ `:` type($input))? attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
@@ -33,17 +34,17 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_CallOp : SDIR_Op<"call", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
-    CallOpInterface, 
-    MemRefsNormalizable,
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+  ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
+  CallOpInterface, 
+  MemRefsNormalizable,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
   let summary = "call operation";
   let description = [{
     The `call` operation represents a direct call to a tasklet function that is within
     the same symbol scope as the call. The operands and result types of the
     call must match the specified function type. 
-    Example:
+    For example:
 
     ```mlir
     %2 = sdir.call @add(%0, %1) : (f32, f32) -> f32
@@ -101,13 +102,13 @@ def SDIR_CallOp : SDIR_Op<"call", [
 //===----------------------------------------------------------------------===//
 
 def SDIR_LibCallOp : SDIR_Op<"libcall", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
-    CallOpInterface
+  ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
+  CallOpInterface
 ]> {
   let summary = "library call operation";
   let description = [{
     The `libcall` operation represents a direct call to a library function. 
-    Example:
+    For example:
 
     ```mlir
     %2 = sdir.libcall "dace.libraries.blas.nodes.Dot" (%0, %1) : (f32, f32) -> f32

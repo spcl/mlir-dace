@@ -35,7 +35,7 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
 
 LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the entry attribute is specified.
-    auto entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
+    FlatSymbolRefAttr entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
     if (!entryAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
     StateNode entry = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
@@ -120,9 +120,9 @@ void TaskletNode::build(OpBuilder &builder, OperationState &state, StringRef nam
 
 void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
     llvm::MapVector<Identifier, Attribute> newAttrs;
-    for (const auto &attr : dest->getAttrs())
+    for (const NamedAttribute &attr : dest->getAttrs())
         newAttrs.insert(attr);
-    for (const auto &attr : (*this)->getAttrs())
+    for (const NamedAttribute &attr : (*this)->getAttrs())
         newAttrs.insert(attr);
     dest->setAttrs(DictionaryAttr::get(getContext(), newAttrs.takeVector()));
 
@@ -172,8 +172,8 @@ TaskletNode TaskletNode::clone() {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
-    auto &builder = parser.getBuilder();
-    auto indexType = builder.getIndexType();
+    Builder &builder = parser.getBuilder();
+    IndexType indexType = builder.getIndexType();
 
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
@@ -193,9 +193,9 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
         return failure();
 
     SmallVector<int64_t, 4> lb;
-    auto lbMap = lbMapAttr.getValue();
-    for (const auto &result : lbMap.getResults()) {
-      auto constExpr = result.dyn_cast<AffineConstantExpr>();
+    AffineMap lbMap = lbMapAttr.getValue();
+    for (const AffineExpr &result : lbMap.getResults()) {
+      AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
       if (!constExpr)
         return parser.emitError(parser.getNameLoc(),
                                 "lower bound must be constant integers");
@@ -215,9 +215,9 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
         return failure();
 
     SmallVector<int64_t, 4> ub;
-    auto ubMap = ubMapAttr.getValue();
-    for (const auto &result : ubMap.getResults()) {
-      auto constExpr = result.dyn_cast<AffineConstantExpr>();
+    AffineMap ubMap = ubMapAttr.getValue();
+    for (const AffineExpr &result : ubMap.getResults()) {
+      AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
       if (!constExpr)
         return parser.emitError(parser.getNameLoc(),
                                 "upper bound must be constant integers");
@@ -238,9 +238,9 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
         return failure();
 
     SmallVector<int64_t, 4> steps;
-    auto stepsMap = stepsMapAttr.getValue();
-    for (const auto &result : stepsMap.getResults()) {
-      auto constExpr = result.dyn_cast<AffineConstantExpr>();
+    AffineMap stepsMap = stepsMapAttr.getValue();
+    for (const AffineExpr &result : stepsMap.getResults()) {
+      AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
       if (!constExpr)
         return parser.emitError(parser.getNameLoc(),
                                 "steps must be constant integers");
@@ -388,7 +388,7 @@ LogicalResult verify(ConsumeNode op){
 
 LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the condition attributes are specified.
-    auto condAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
+    FlatSymbolRefAttr condAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
     if (!condAttr)
         return success();
 
@@ -426,7 +426,7 @@ LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops){
 
 LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute was specified.
-    auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
+    FlatSymbolRefAttr fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
     if (!fnAttr)
         return emitOpError("requires a 'callee' symbol reference attribute");
     TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
@@ -435,7 +435,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
                             << "' does not reference a valid tasklet";
 
     // Verify that the operand and result types match the callee.
-    auto fnType = fn.getType();
+    FunctionType fnType = fn.getType();
     if (fnType.getNumInputs() != getNumOperands())
         return emitOpError("incorrect number of operands for callee");
 
@@ -450,7 +450,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
     for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
     if (getResult(i).getType() != fnType.getResult(i)) {
-        auto diag = emitOpError("result type mismatch at index ") << i;
+        InFlightDiagnostic diag = emitOpError("result type mismatch at index ") << i;
         diag.attachNote() << "      op result types: " << getResultTypes();
         diag.attachNote() << "function result types: " << fnType.getResults();
         return diag;
@@ -465,7 +465,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
 LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the src/dest attributes are specified.
-    auto srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
+    FlatSymbolRefAttr srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
     if (!srcAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
     StateNode src = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
@@ -473,7 +473,7 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
         return emitOpError() << "'" << srcAttr.getValue()
                             << "' does not reference a valid state";
     
-    auto destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
+    FlatSymbolRefAttr destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
     if (!destAttr)
         return emitOpError("requires a 'dest' symbol reference attribute");
     StateNode dest = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
