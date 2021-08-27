@@ -18,8 +18,7 @@ def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
     ```
   }];
 
-    let results = (outs SDIR_StreamArrayType);
-    let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
+  let results = (outs SDIR_StreamArrayType);
 }
 
 //===----------------------------------------------------------------------===//
@@ -39,8 +38,7 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
     ```
   }];
 
-    let results = (outs SDIR_StreamArrayType);
-    let assemblyFormat = [{attr-dict `(` `)` `:` type(results)}];
+  let results = (outs SDIR_StreamArrayType);
 }
 
 //===----------------------------------------------------------------------===//
@@ -67,9 +65,8 @@ def SDIR_StreamPopOp : SDIR_Op<"stream_pop", [
     ```
   }];
 
-    let arguments = (ins SDIR_StreamType:$str);
-    let results = (outs AnyType:$res);
-    let assemblyFormat = [{attr-dict $str `:` type($str) `->` type($res)}];
+  let arguments = (ins SDIR_StreamType:$str);
+  let results = (outs AnyType:$res);
 }
 
 //===----------------------------------------------------------------------===//
@@ -98,7 +95,6 @@ def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
   }];
 
   let arguments = (ins SDIR_StreamType:$str, AnyType:$val);
-  let assemblyFormat = [{attr-dict $val `,` $str `:` type($str)}];
 }
 
 //===----------------------------------------------------------------------===//
@@ -124,7 +120,6 @@ def SDIR_StreamLengthOp : SDIR_Op<"stream_length", [
 
   let arguments = (ins SDIR_StreamType:$str);
   let results = (outs I32);
-  let assemblyFormat = [{attr-dict $str `:` type($str) `->` type(results)}];
 }
 
 #endif // SDIR_StreamOps

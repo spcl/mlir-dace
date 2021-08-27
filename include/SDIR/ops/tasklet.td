@@ -26,7 +26,6 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
   }];
 
   let arguments = (ins Variadic<AnyType>:$input);
-  let assemblyFormat = "($input^ `:` type($input))? attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
@@ -53,9 +52,6 @@ def SDIR_CallOp : SDIR_Op<"call", [
 
   let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$operands);
   let results = (outs Variadic<AnyType>);
-  let assemblyFormat = [{ 
-    attr-dict $callee `(` $operands `)` `:` functional-type($operands, results) 
-  }];
 
   let builders = [
     OpBuilder<(ins "TaskletNode":$callee, CArg<"ValueRange", "{}">:$operands), [{
@@ -98,7 +94,7 @@ def SDIR_CallOp : SDIR_Op<"call", [
 }
 
 //===----------------------------------------------------------------------===//
-// LibcallOp
+// LibCallOp
 //===----------------------------------------------------------------------===//
 
 def SDIR_LibCallOp : SDIR_Op<"libcall", [
@@ -117,9 +113,6 @@ def SDIR_LibCallOp : SDIR_Op<"libcall", [
 
   let arguments = (ins StrAttr:$callee, Variadic<AnyType>:$operands);
   let results = (outs Variadic<AnyType>);
-  let assemblyFormat = [{ 
-    attr-dict $callee `(` $operands `)` `:` functional-type($operands, results) 
-  }];
 
   let extraClassDeclaration = [{
     operand_range getArgOperands() {

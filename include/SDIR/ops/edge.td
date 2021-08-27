@@ -20,7 +20,6 @@ def SDIR_EdgeOp : SDIR_Op<"edge", [
   }];
 
     let arguments = (ins FlatSymbolRefAttr:$src, FlatSymbolRefAttr:$dest, OptionalAttr<TypedArrayAttrBase<StrAttr, "assignment array">>:$assign, OptionalAttr<StrAttr>:$condition);
-    let assemblyFormat = [{attr-dict $src `->` $dest}];
 }
 
 #endif // SDIR_EdgeOp

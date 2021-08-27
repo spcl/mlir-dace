@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 def SDIR_AllocSymbolOp : SDIR_Op<"alloc_symbol", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
+	ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
 ]> {
   let summary = "symbol creation operation";
   let description = [{
@@ -23,23 +23,29 @@ def SDIR_AllocSymbolOp : SDIR_Op<"alloc_symbol", [
   }];
 
   let arguments = (ins StrAttr:$sym);
-  let assemblyFormat = "attr-dict `(` $sym `)`";
-  let verifier = [{
-    if(sym().empty())
-      return emitOpError("failed to verify that input string is not empty");
-    
-    if(!isalpha(sym().front()))
-      return emitOpError("failed to verify that input string starts with an alphabetical character");
+}
 
-    for(auto c : sym()) 
-      if(!isalnum(c))
-        return emitOpError("failed to verify that input string only contains alphanumeric characters");
+//===----------------------------------------------------------------------===//
+// SymbolExprOp
+//===----------------------------------------------------------------------===//
 
-    return success();
+def SDIR_SymbolExprOp : SDIR_Op<"$", [
+]> {
+  let summary = "symbolic expression operation";
+  let description = [{
+    Describes an arithmetic symbolic expression.
+    For example:
+
+    ```mlir
+    sdir.state @state_0 {
+        ...
+        $("2*N+2")
+        ...
+    }
+    ```
   }];
 
-
-
+  let arguments = (ins StrAttr:$expr);
 }
 
 #endif // SDIR_SymbolOps

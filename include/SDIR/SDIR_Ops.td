@@ -7,7 +7,11 @@ include "SDIR/SDIR_Dialect.td"
 // Base class for all SDIR ops
 //===----------------------------------------------------------------------===//
 
-class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mnemonic, traits>{}
+class SDIR_Op<string mnemonic, list<OpTrait> traits = []> : Op<SDIR_Dialect, mnemonic, traits>{
+    let parser = [{ return ::parse$cppClass(parser, result); }];
+    let printer = [{ ::print(p, *this); }];
+    let verifier = [{ return ::verify(*this); }];
+}
 
 //===----------------------------------------------------------------------===//
 // Nodes

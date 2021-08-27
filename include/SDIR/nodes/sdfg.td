@@ -24,9 +24,6 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
 
     let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry);
     let regions = (region SizedRegion<1>:$region);
-
-    let parser = [{ return ::parseSDFGNode(parser, result); }];
-    let printer = [{ return ::print(p, *this); }];
 }
 
 #endif // SDIR_SDFGNode
