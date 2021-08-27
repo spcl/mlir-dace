@@ -463,97 +463,6 @@ LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops){
 }
 
 //===----------------------------------------------------------------------===//
-// CallOp
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
-    FlatSymbolRefAttr calleeAttr;
-    SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
-    llvm::SMLoc operandsOperandsLoc;
-    (void)operandsOperandsLoc;
-    ArrayRef<Type> operandsTypes;
-    ArrayRef<Type> allResultTypes;
-
-    if(parser.parseOptionalAttrDict(result.attributes))
-        return failure();
-
-    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getType<NoneType>(), "callee", result.attributes))
-        return failure();
-    if(parser.parseLParen())
-        return failure();
-
-    operandsOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperandList(operandsOperands))
-        return failure();
-    if(parser.parseRParen())
-        return failure();
-    if(parser.parseColon())
-        return failure();
-
-    FunctionType operands__allResult_functionType;
-    if(parser.parseType(operands__allResult_functionType))
-        return failure();
-
-    operandsTypes = operands__allResult_functionType.getInputs();
-    allResultTypes = operands__allResult_functionType.getResults();
-    result.addTypes(allResultTypes);
-
-    if(parser.resolveOperands(operandsOperands, operandsTypes, operandsOperandsLoc, result.operands))
-        return failure();
-
-    return success();
-}
-
-static void print(OpAsmPrinter &p, CallOp op) {
-    p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
-    p << ' ';
-    p.printAttributeWithoutType(op.calleeAttr());
-    p << "(" << op.operands() << ")";
-    p << " : ";
-    p.printFunctionalType(op.operands().getTypes(), op.getOperation()->getResultTypes());
-}
-
-LogicalResult verify(CallOp op){
-    return success();
-}
-
-LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-    // Check that the callee attribute was specified.
-    FlatSymbolRefAttr fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
-    if(!fnAttr)
-        return emitOpError("requires a 'callee' symbol reference attribute");
-    TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
-    if(!fn)
-        return emitOpError() << "'" << fnAttr.getValue()
-                            << "' does not reference a valid tasklet";
-
-    // Verify that the operand and result types match the callee.
-    FunctionType fnType = fn.getType();
-    if(fnType.getNumInputs() != getNumOperands())
-        return emitOpError("incorrect number of operands for callee");
-
-    for(unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
-        if(getOperand(i).getType() != fnType.getInput(i))
-            return emitOpError("operand type mismatch: expected operand type ")
-                << fnType.getInput(i) << ", but provided "
-                << getOperand(i).getType() << " for operand number " << i;
-
-    if(fnType.getNumResults() != getNumResults())
-        return emitOpError("incorrect number of results for callee");
-
-    for(unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
-        if(getResult(i).getType() != fnType.getResult(i)) {
-            InFlightDiagnostic diag = emitOpError("result type mismatch at index ") << i;
-            diag.attachNote() << "      op result types: " << getResultTypes();
-            diag.attachNote() << "function result types: " << fnType.getResults();
-            return diag;
-        }
-
-    return success();
-}
-
-//===----------------------------------------------------------------------===//
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
@@ -1364,6 +1273,97 @@ static void print(OpAsmPrinter &p, ReturnOp op) {
 }
 
 LogicalResult verify(ReturnOp op){
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CallOp
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
+    FlatSymbolRefAttr calleeAttr;
+    SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
+    llvm::SMLoc operandsOperandsLoc;
+    (void)operandsOperandsLoc;
+    ArrayRef<Type> operandsTypes;
+    ArrayRef<Type> allResultTypes;
+
+    if(parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getType<NoneType>(), "callee", result.attributes))
+        return failure();
+    if(parser.parseLParen())
+        return failure();
+
+    operandsOperandsLoc = parser.getCurrentLocation();
+    if(parser.parseOperandList(operandsOperands))
+        return failure();
+    if(parser.parseRParen())
+        return failure();
+    if(parser.parseColon())
+        return failure();
+
+    FunctionType operands__allResult_functionType;
+    if(parser.parseType(operands__allResult_functionType))
+        return failure();
+
+    operandsTypes = operands__allResult_functionType.getInputs();
+    allResultTypes = operands__allResult_functionType.getResults();
+    result.addTypes(allResultTypes);
+
+    if(parser.resolveOperands(operandsOperands, operandsTypes, operandsOperandsLoc, result.operands))
+        return failure();
+
+    return success();
+}
+
+static void print(OpAsmPrinter &p, CallOp op) {
+    p << op.getOperationName();
+    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
+    p << ' ';
+    p.printAttributeWithoutType(op.calleeAttr());
+    p << "(" << op.operands() << ")";
+    p << " : ";
+    p.printFunctionalType(op.operands().getTypes(), op.getOperation()->getResultTypes());
+}
+
+LogicalResult verify(CallOp op){
+    return success();
+}
+
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+    // Check that the callee attribute was specified.
+    FlatSymbolRefAttr fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
+    if(!fnAttr)
+        return emitOpError("requires a 'callee' symbol reference attribute");
+    TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
+    if(!fn)
+        return emitOpError() << "'" << fnAttr.getValue()
+                            << "' does not reference a valid tasklet";
+
+    // Verify that the operand and result types match the callee.
+    FunctionType fnType = fn.getType();
+    if(fnType.getNumInputs() != getNumOperands())
+        return emitOpError("incorrect number of operands for callee");
+
+    for(unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
+        if(getOperand(i).getType() != fnType.getInput(i))
+            return emitOpError("operand type mismatch: expected operand type ")
+                << fnType.getInput(i) << ", but provided "
+                << getOperand(i).getType() << " for operand number " << i;
+
+    if(fnType.getNumResults() != getNumResults())
+        return emitOpError("incorrect number of results for callee");
+
+    for(unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
+        if(getResult(i).getType() != fnType.getResult(i)) {
+            InFlightDiagnostic diag = emitOpError("result type mismatch at index ") << i;
+            diag.attachNote() << "      op result types: " << getResultTypes();
+            diag.attachNote() << "function result types: " << fnType.getResults();
+            return diag;
+        }
+
     return success();
 }
 
