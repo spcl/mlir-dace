@@ -112,9 +112,8 @@ LogicalResult verify(TaskletNode op){
     // the same between the signature and the block.
     ArrayRef<Type> fnInputTypes = op.getType().getInputs();
     Block &entryBlock = op.front();
-    int numArgs = entryBlock.getNumArguments();
 
-    for (int i = 0; i < numArgs; i++)
+    for (int i = 0; i < entryBlock.getNumArguments(); i++)
         if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
             return op.emitOpError("type of entry block argument #")
                     << i << '(' << entryBlock.getArgument(i).getType()
@@ -183,7 +182,7 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
         SmallVector<Type, 4> newInputs;
         newInputs.reserve(oldNumArgs);
 
-        for(unsigned i = 0; i != oldNumArgs; ++i)
+        for(int i = 0; i < oldNumArgs; i++)
             if(!mapper.contains(getArgument(i)))
                 newInputs.push_back(oldType.getInput(i));
 
@@ -194,7 +193,7 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
             if(ArrayAttr argAttrs = getAllArgAttrs()) {
                 SmallVector<Attribute> newArgAttrs;
                 newArgAttrs.reserve(newInputs.size());
-                for(unsigned i = 0; i != oldNumArgs; ++i)
+                for(int i = 0; i < oldNumArgs; i++)
                     if(!mapper.contains(getArgument(i)))
                         newArgAttrs.push_back(argAttrs[i]);
                 newFunc.setAllArgAttrs(newArgAttrs);
