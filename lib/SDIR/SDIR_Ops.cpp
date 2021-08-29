@@ -231,18 +231,18 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     NamedAttrList lbAttrs;
     SmallVector<OpAsmParser::OperandType, 4> lbMapOperands;
     if(parser.parseAffineMapOfSSAIds(lbMapOperands, lbMapAttr,
-                                     "lowerBounds", lbAttrs,
-                                      OpAsmParser::Delimiter::Paren)) 
+                                    "lowerBounds", lbAttrs,
+                                    OpAsmParser::Delimiter::Paren)) 
         return failure();
 
     SmallVector<int64_t, 4> lb;
     AffineMap lbMap = lbMapAttr.getValue();
     for(const AffineExpr &result : lbMap.getResults()) {
-      AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
-      if(!constExpr)
-        return parser.emitError(parser.getNameLoc(),
-                                "lower bound must be constant integers");
-      lb.push_back(constExpr.getValue());
+        AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
+        if(!constExpr)
+            return parser.emitError(parser.getNameLoc(),
+                                    "lower bound must be constant integers");
+        lb.push_back(constExpr.getValue());
     }
 
     result.addAttribute("lowerBounds", builder.getI64ArrayAttr(lb));
@@ -253,18 +253,18 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     NamedAttrList ubAttrs;
     SmallVector<OpAsmParser::OperandType, 4> ubMapOperands;
     if(parser.parseAffineMapOfSSAIds(ubMapOperands, ubMapAttr,
-                                      "upperBounds", ubAttrs,
-                                      OpAsmParser::Delimiter::Paren)) 
+                                    "upperBounds", ubAttrs,
+                                    OpAsmParser::Delimiter::Paren)) 
         return failure();
 
     SmallVector<int64_t, 4> ub;
     AffineMap ubMap = ubMapAttr.getValue();
     for(const AffineExpr &result : ubMap.getResults()) {
-      AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
-      if(!constExpr)
-        return parser.emitError(parser.getNameLoc(),
-                                "upper bound must be constant integers");
-      ub.push_back(constExpr.getValue());
+        AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
+        if(!constExpr)
+            return parser.emitError(parser.getNameLoc(),
+                                    "upper bound must be constant integers");
+        ub.push_back(constExpr.getValue());
     }
 
     
@@ -276,18 +276,18 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     NamedAttrList stepsAttrs;
     SmallVector<OpAsmParser::OperandType, 4> stepsMapOperands;
     if(parser.parseAffineMapOfSSAIds(stepsMapOperands, stepsMapAttr,
-                                      "steps", stepsAttrs,
-                                      OpAsmParser::Delimiter::Paren)) 
+                                    "steps", stepsAttrs,
+                                    OpAsmParser::Delimiter::Paren)) 
         return failure();
 
     SmallVector<int64_t, 4> steps;
     AffineMap stepsMap = stepsMapAttr.getValue();
     for(const AffineExpr &result : stepsMap.getResults()) {
-      AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
-      if (!constExpr)
-        return parser.emitError(parser.getNameLoc(),
-                                "steps must be constant integers");
-      steps.push_back(constExpr.getValue());
+        AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
+        if (!constExpr)
+            return parser.emitError(parser.getNameLoc(),
+                                    "steps must be constant integers");
+        steps.push_back(constExpr.getValue());
     }
 
     result.addAttribute("steps", builder.getI64ArrayAttr(steps));
