@@ -88,13 +88,13 @@ def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
     sdir.state @state_0 {
         ...
         %1 = constant 1 : i32
-        sdir.stream_push %1, %A : !sdir.stream<i32>
+        sdir.stream_push %1, %A : i32 -> !sdir.stream<i32>
         ...
     }
     ```
   }];
 
-  let arguments = (ins SDIR_StreamType:$str, AnyType:$val);
+  let arguments = (ins AnyType:$val, SDIR_StreamType:$str);
 }
 
 //===----------------------------------------------------------------------===//

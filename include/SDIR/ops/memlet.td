@@ -100,7 +100,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
     ```
   }];
 
-  let arguments = (ins SDIR_MemletType:$arr, Variadic<Index>:$indices, AnyType:$val);
+  let arguments = (ins AnyType:$val, SDIR_MemletType:$arr, Variadic<Index>:$indices);
 }
 
 //===----------------------------------------------------------------------===//

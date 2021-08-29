@@ -110,14 +110,16 @@ LogicalResult verify(TaskletNode op){
     // Verify that the argument list of the function and the arg list of the entry
     // block line up.  The trait already verified that the number of arguments is
     // the same between the signature and the block.
-    auto fnInputTypes = op.getType().getInputs();
+    ArrayRef<Type> fnInputTypes = op.getType().getInputs();
     Block &entryBlock = op.front();
-    for (unsigned i = 0, e = entryBlock.getNumArguments(); i != e; ++i)
+    int numArgs = entryBlock.getNumArguments();
+
+    for (int i = 0; i < numArgs; i++)
         if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-        return op.emitOpError("type of entry block argument #")
-                << i << '(' << entryBlock.getArgument(i).getType()
-                << ") must match the type of the corresponding argument in "
-                << "function signature(" << fnInputTypes[i] << ')';
+            return op.emitOpError("type of entry block argument #")
+                    << i << '(' << entryBlock.getArgument(i).getType()
+                    << ") must match the type of the corresponding argument in "
+                    << "function signature(" << fnInputTypes[i] << ')';
 
     return success();
 }
@@ -429,7 +431,7 @@ LogicalResult verify(ConsumeNode op){
 }
 
 LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
-    // Check that the condition attributes are specified.
+    // Check that the condition attribute is specified.
     FlatSymbolRefAttr condAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
     if(!condAttr)
         return success();
@@ -503,6 +505,7 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     FlatSymbolRefAttr srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
     if(!srcAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
+
     StateNode src = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
     if(!src)
         return emitOpError() << "'" << srcAttr.getValue()
@@ -511,6 +514,7 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     FlatSymbolRefAttr destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
     if(!destAttr)
         return emitOpError("requires a 'dest' symbol reference attribute");
+
     StateNode dest = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
     if(!dest)
         return emitOpError() << "'" << destAttr.getValue()
@@ -528,28 +532,24 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
         return failure();
 
     SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
- 
     if(parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
         return failure();
 
+    // IDEA: Try multiple integer types before failing
     if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
         return failure();
-        
-    if(parser.parseColon())
-        return failure();
 
-    SmallVector<Type, 1> allResultTypes;
-    if(parser.parseTypeList(allResultTypes))
+    Type resultType;
+    if(parser.parseColonType(resultType))
         return failure();
-
-    result.addTypes(allResultTypes);
+    result.addTypes(resultType);
 
     return success();
 }
 
 static void print(OpAsmPrinter &p, AllocOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << "(";
     p.printOperands(op.params());
     p << ") : ";
@@ -577,28 +577,24 @@ static ParseResult parseAllocTransientOp(OpAsmParser &parser, OperationState &re
         return failure();
 
     SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
- 
     if(parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
         return failure();
 
+    // IDEA: Try multiple integer types before failing
     if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
         return failure();
-        
-    if(parser.parseColon())
+    
+    Type resultType;
+    if(parser.parseColonType(resultType))
         return failure();
-
-    SmallVector<Type, 1> allResultTypes;
-    if(parser.parseTypeList(allResultTypes))
-        return failure();
-
-    result.addTypes(allResultTypes);
+    result.addTypes(resultType);
 
     return success();
 }
 
 static void print(OpAsmPrinter &p, AllocTransientOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << "(";
     p.printOperands(op.params());
     p << ") : ";
@@ -622,44 +618,34 @@ LogicalResult verify(AllocTransientOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseGetAccessOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType arrRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> arrOperands(arrRawOperands); llvm::SMLoc arrOperandsLoc;
-    (void)arrOperandsLoc;
-    Type arrRawTypes[1];
-    ArrayRef<Type> arrTypes(arrRawTypes);
-    Type resRawTypes[1];
-    ArrayRef<Type> resTypes(resRawTypes);
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    arrOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(arrRawOperands[0]))
+    OpAsmParser::OperandType arrStrOperand;
+    if(parser.parseOperand(arrStrOperand))
         return failure();
 
-    if(parser.parseColon())
-        return failure();
-
-    if(parser.parseType(arrRawTypes[0]))
+    Type srcType;
+    if(parser.parseColonType(srcType))
         return failure();
 
     if(parser.parseArrow())
         return failure();
 
-    if(parser.parseType(resRawTypes[0]))
+    Type destType;
+    if(parser.parseType(destType))
+        return failure();
+    result.addTypes(destType);
+
+    if(parser.resolveOperand(arrStrOperand, srcType, result.operands))
         return failure();
 
-    result.addTypes(resTypes);
-
-    if(parser.resolveOperands(arrOperands, arrTypes, arrOperandsLoc, result.operands))
-        return failure();
-
-  return success();
+    return success();
 }
 
 static void print(OpAsmPrinter &p, GetAccessOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.arr();
     p << " : ";
     p << ArrayRef<Type>(op.arr().getType());
@@ -693,47 +679,33 @@ LogicalResult verify(GetAccessOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType arrRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> arrOperands(arrRawOperands);  llvm::SMLoc arrOperandsLoc;
-    (void)arrOperandsLoc;
-    SmallVector<OpAsmParser::OperandType, 4> indicesOperands;
-    llvm::SMLoc indicesOperandsLoc;
-    (void)indicesOperandsLoc;
-    Type arrRawTypes[1];
-    ArrayRef<Type> arrTypes(arrRawTypes);
-    Type resRawTypes[1];
-    ArrayRef<Type> resTypes(resRawTypes);
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    arrOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(arrRawOperands[0]))
-        return failure();
-    if(parser.parseLSquare())
+    OpAsmParser::OperandType memletOperand;
+    if(parser.parseOperand(memletOperand))
         return failure();
 
-    indicesOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperandList(indicesOperands))
-        return failure();
-    if(parser.parseRSquare())
-        return failure();
-    if(parser.parseColon())
+    SmallVector<OpAsmParser::OperandType, 4> indicesOperands;
+    if(parser.parseOperandList(indicesOperands, OpAsmParser::Delimiter::Square))
         return failure();
 
-    if(parser.parseType(arrRawTypes[0]))
+    Type srcType;
+    if(parser.parseColonType(srcType))
         return failure();
+
     if(parser.parseArrow())
         return failure();
-    if(parser.parseType(resRawTypes[0]))
+
+    Type destType;
+    if(parser.parseType(destType))
+        return failure();
+    result.addTypes(destType);
+
+    if(parser.resolveOperand(memletOperand, srcType, result.operands))
         return failure();
 
-    Type odsBuildableType0 = parser.getBuilder().getIndexType();
-    result.addTypes(resTypes);
-
-    if(parser.resolveOperands(arrOperands, arrTypes, arrOperandsLoc, result.operands))
-        return failure();
-    if(parser.resolveOperands(indicesOperands, odsBuildableType0, result.operands))
+    if(parser.resolveOperands(indicesOperands, parser.getBuilder().getIndexType(), result.operands))
         return failure();
 
     return success();
@@ -741,7 +713,7 @@ static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, LoadOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.arr();
     p << "[" << op.indices() << "]";
     p << " : ";
@@ -764,66 +736,49 @@ LogicalResult verify(LoadOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType valRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> valOperands(valRawOperands);  llvm::SMLoc valOperandsLoc;
-    (void)valOperandsLoc;
-    OpAsmParser::OperandType arrRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> arrOperands(arrRawOperands);  llvm::SMLoc arrOperandsLoc;
-    (void)arrOperandsLoc;
-    SmallVector<OpAsmParser::OperandType, 4> indicesOperands;
-    llvm::SMLoc indicesOperandsLoc;
-    (void)indicesOperandsLoc;
-    Type valRawTypes[1];
-    ArrayRef<Type> valTypes(valRawTypes);
-    Type arrRawTypes[1];
-    ArrayRef<Type> arrTypes(arrRawTypes);
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
-
-    valOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(valRawOperands[0]))
+    
+    OpAsmParser::OperandType valOperand;
+    if(parser.parseOperand(valOperand))
         return failure();
     if(parser.parseComma())
         return failure();
 
-    arrOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(arrRawOperands[0]))
-        return failure();
-    if(parser.parseLSquare())
+    OpAsmParser::OperandType memletOperand;
+    if(parser.parseOperand(memletOperand))
         return failure();
 
-    indicesOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperandList(indicesOperands))
-        return failure();
-    if(parser.parseRSquare())
-        return failure();
-    if(parser.parseColon())
+    SmallVector<OpAsmParser::OperandType, 4> indicesOperands;
+    if(parser.parseOperandList(indicesOperands, OpAsmParser::Delimiter::Square))
         return failure();
 
-    if(parser.parseType(valRawTypes[0]))
+    Type valType;
+    if(parser.parseColonType(valType))
         return failure();
+
     if(parser.parseArrow())
         return failure();
 
-    if(parser.parseType(arrRawTypes[0]))
+    Type memletType;
+    if(parser.parseType(memletType))
         return failure();
-    
-    Type odsBuildableType0 = parser.getBuilder().getIndexType();
-    
-    if(parser.resolveOperands(arrOperands, arrTypes, arrOperandsLoc, result.operands))
+
+    if(parser.resolveOperand(valOperand, valType, result.operands))
         return failure();
-    if(parser.resolveOperands(indicesOperands, odsBuildableType0, result.operands))
+
+    if(parser.resolveOperand(memletOperand, memletType, result.operands))
         return failure();
-    if(parser.resolveOperands(valOperands, valTypes, valOperandsLoc, result.operands))
+
+    if(parser.resolveOperands(indicesOperands, parser.getBuilder().getIndexType(), result.operands))
         return failure();
-    
+
     return success();
 }
 
 static void print(OpAsmPrinter &p, StoreOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.val() << "," << ' ' << op.arr();
     p << "[" << op.indices() << "]";
     p << " : ";
@@ -846,35 +801,28 @@ LogicalResult verify(StoreOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType srcRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> srcOperands(srcRawOperands);  llvm::SMLoc srcOperandsLoc;
-    (void)srcOperandsLoc;
-    OpAsmParser::OperandType destRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> destOperands(destRawOperands);  llvm::SMLoc destOperandsLoc;
-    (void)destOperandsLoc;
-    Type srcRawTypes[1];
-    ArrayRef<Type> srcTypes(srcRawTypes);
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    srcOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(srcRawOperands[0]))
+    OpAsmParser::OperandType srcOperand;
+    if(parser.parseOperand(srcOperand))
         return failure();
+
     if(parser.parseArrow())
         return failure();
 
-    destOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(destRawOperands[0]))
-        return failure();
-    if(parser.parseColon())
+    OpAsmParser::OperandType destOperand;
+    if(parser.parseOperand(destOperand))
         return failure();
 
-    if(parser.parseType(srcRawTypes[0]))
+    Type opType;
+    if(parser.parseColonType(opType))
         return failure();
-    if(parser.resolveOperands(srcOperands, srcTypes, srcOperandsLoc, result.operands))
+
+    if(parser.resolveOperand(srcOperand, opType, result.operands))
         return failure();
-    if(parser.resolveOperands(destOperands, srcTypes[0], result.operands))
+
+    if(parser.resolveOperand(destOperand, opType, result.operands))
         return failure();
     
     return success();
@@ -882,7 +830,7 @@ static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, CopyOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src() << " -> " << op.dest();
     p << " : ";
     p << ArrayRef<Type>(op.src().getType());
@@ -897,32 +845,26 @@ LogicalResult verify(CopyOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseMemletCastOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType srcRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> srcOperands(srcRawOperands);  llvm::SMLoc srcOperandsLoc;
-    (void)srcOperandsLoc;
-    Type srcRawTypes[1];
-    ArrayRef<Type> srcTypes(srcRawTypes);
-    SmallVector<Type, 1> allResultTypes;
-  
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    srcOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(srcRawOperands[0]))
-        return failure();
-    if(parser.parseColon())
+    OpAsmParser::OperandType memletOperand;
+    if(parser.parseOperand(memletOperand))
         return failure();
 
-    if(parser.parseType(srcRawTypes[0]))
+    Type srcType;
+    if(parser.parseColonType(srcType))
         return failure();
+
     if(parser.parseArrow())
         return failure();
-    if(parser.parseTypeList(allResultTypes))
+
+    Type destType;
+    if(parser.parseType(destType))
         return failure();
-    
-    result.addTypes(allResultTypes);
+    result.addTypes(destType);
   
-    if(parser.resolveOperands(srcOperands, srcTypes, srcOperandsLoc, result.operands))
+    if(parser.resolveOperands(memletOperand, srcType, result.operands))
         return failure();
   
     return success();
@@ -930,7 +872,7 @@ static ParseResult parseMemletCastOp(OpAsmParser &parser, OperationState &result
 
 static void print(OpAsmPrinter &p, MemletCastOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src();
     p << " : ";
     p << ArrayRef<Type>(op.src().getType());
@@ -952,32 +894,26 @@ LogicalResult verify(MemletCastOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseViewCastOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType srcRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> srcOperands(srcRawOperands);  llvm::SMLoc srcOperandsLoc;
-    (void)srcOperandsLoc;
-    Type srcRawTypes[1];
-    ArrayRef<Type> srcTypes(srcRawTypes);
-    SmallVector<Type, 1> allResultTypes;
-  
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    srcOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(srcRawOperands[0]))
-        return failure();
-    if(parser.parseColon())
+    OpAsmParser::OperandType memletOperand;
+    if(parser.parseOperand(memletOperand))
         return failure();
 
-    if(parser.parseType(srcRawTypes[0]))
+    Type srcType;
+    if(parser.parseColonType(srcType))
         return failure();
+
     if(parser.parseArrow())
         return failure();
-    if(parser.parseTypeList(allResultTypes))
+
+    Type destType;
+    if(parser.parseType(destType))
         return failure();
-    
-    result.addTypes(allResultTypes);
-    
-    if(parser.resolveOperands(srcOperands, srcTypes, srcOperandsLoc, result.operands))
+    result.addTypes(destType);
+  
+    if(parser.resolveOperands(memletOperand, srcType, result.operands))
         return failure();
   
     return success();
@@ -985,7 +921,7 @@ static ParseResult parseViewCastOp(OpAsmParser &parser, OperationState &result) 
 
 static void print(OpAsmPrinter &p, ViewCastOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src();
     p << " : ";
     p << ArrayRef<Type>(op.src().getType());
@@ -1007,28 +943,28 @@ LogicalResult verify(ViewCastOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseAllocStreamOp(OpAsmParser &parser, OperationState &result) {
-    SmallVector<Type, 1> allResultTypes;
-  
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
-    if(parser.parseLParen())
-        return failure();
-    if(parser.parseRParen())
-        return failure();
-    if(parser.parseColon())
-        return failure();
 
-    if(parser.parseTypeList(allResultTypes))
+    SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
+    if(parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
         return failure();
     
-    result.addTypes(allResultTypes);
+    // IDEA: Try multiple integer types before failing
+    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
+        return failure();
+
+    Type resultType;
+    if(parser.parseColonType(resultType))
+        return failure();
+    result.addTypes(resultType);
     
     return success();
 }
 
 static void print(OpAsmPrinter &p, AllocStreamOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << "() : ";
     p << op.getOperation()->getResultTypes();
 }
@@ -1042,27 +978,28 @@ LogicalResult verify(AllocStreamOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser, OperationState &result) {
-    SmallVector<Type, 1> allResultTypes;
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
-    if(parser.parseLParen())
+
+    SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
+    if(parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
         return failure();
-    if(parser.parseRParen())
-        return failure();
-    if(parser.parseColon())
+    
+    // IDEA: Try multiple integer types before failing
+    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
         return failure();
 
-    if(parser.parseTypeList(allResultTypes))
+    Type resultType;
+    if(parser.parseColonType(resultType))
         return failure();
-
-    result.addTypes(allResultTypes);
-
+    result.addTypes(resultType);
+    
     return success();
 }
 
 static void print(OpAsmPrinter &p, AllocTransientStreamOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << "() : ";
     p << op.getOperation()->getResultTypes();
 }
@@ -1076,34 +1013,26 @@ LogicalResult verify(AllocTransientStreamOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseStreamPopOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType strRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> strOperands(strRawOperands);  llvm::SMLoc strOperandsLoc;
-    (void)strOperandsLoc;
-    Type strRawTypes[1];
-    ArrayRef<Type> strTypes(strRawTypes);
-    Type resRawTypes[1];
-    ArrayRef<Type> resTypes(resRawTypes);
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    strOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(strRawOperands[0]))
-        return failure();
-    if(parser.parseColon())
+    OpAsmParser::OperandType streamOperand;
+    if(parser.parseOperand(streamOperand))
         return failure();
 
-    if(parser.parseType(strRawTypes[0]))
+    Type streamType;
+    if(parser.parseColonType(streamType))
         return failure();
+
     if(parser.parseArrow())
         return failure();
 
-    if(parser.parseType(resRawTypes[0]))
+    Type resultType;
+    if(parser.parseType(resultType))
         return failure();
+    result.addTypes(resultType);
 
-    result.addTypes(resTypes);
-
-    if(parser.resolveOperands(strOperands, strTypes, strOperandsLoc, result.operands))
+    if(parser.resolveOperand(streamOperand, streamType, result.operands))
         return failure();
 
     return success();
@@ -1111,7 +1040,7 @@ static ParseResult parseStreamPopOp(OpAsmParser &parser, OperationState &result)
 
 static void print(OpAsmPrinter &p, StreamPopOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.str();
     p << " : ";
     p << ArrayRef<Type>(op.str().getType());
@@ -1128,42 +1057,34 @@ LogicalResult verify(StreamPopOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseStreamPushOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType valRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> valOperands(valRawOperands);  llvm::SMLoc valOperandsLoc;
-    (void)valOperandsLoc;
-    OpAsmParser::OperandType strRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> strOperands(strRawOperands);  llvm::SMLoc strOperandsLoc;
-    (void)strOperandsLoc;
-    Type strRawTypes[1];
-    ArrayRef<Type> strTypes(strRawTypes);
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    valOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(valRawOperands[0]))
+    OpAsmParser::OperandType valOperand;
+    if(parser.parseOperand(valOperand))
         return failure();
     if(parser.parseComma())
         return failure();
 
-    strOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(strRawOperands[0]))
-        return failure();
-    if(parser.parseColon())
+    OpAsmParser::OperandType streamOperand;
+    if(parser.parseOperand(streamOperand))
         return failure();
 
-    if(parser.parseType(strRawTypes[0]))
+    Type valType;
+    if(parser.parseColonType(valType))
+        return failure();
+    
+    if(parser.parseArrow())
+        return failure();
+    
+    Type streamType;
+    if(parser.parseType(streamType))
         return failure();
 
-    for(Type type : strTypes) {
-        (void)type;
-        if(!((type.isa<StreamType>()))) 
-            return parser.emitError(parser.getNameLoc()) << "'str' must be A stream type, but got " << type;
-    }
-
-    if(parser.resolveOperands(strOperands, strTypes, strOperandsLoc, result.operands))
+    if(parser.resolveOperand(valOperand, valType, result.operands))
         return failure();
-    if(parser.resolveOperands(valOperands, strTypes[0].cast<StreamType>().getElementType(), valOperandsLoc, result.operands))
+
+    if(parser.resolveOperand(streamOperand, streamType, result.operands))
         return failure();
 
     return success();
@@ -1171,13 +1092,18 @@ static ParseResult parseStreamPushOp(OpAsmParser &parser, OperationState &result
 
 static void print(OpAsmPrinter &p, StreamPushOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.val() << ", " << op.str();
     p << " : ";
+    p << ArrayRef<Type>(op.val().getType());
+    p << " -> ";
     p << ArrayRef<Type>(op.str().getType());
 }
 
 LogicalResult verify(StreamPushOp op){
+    if(op.val().getType() != op.str().getType().cast<StreamType>().getElementType())
+        op.emitOpError("failed to verify that value type matches element type of 'stream'");
+
     return success();
 }
 
@@ -1186,33 +1112,26 @@ LogicalResult verify(StreamPushOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseStreamLengthOp(OpAsmParser &parser, OperationState &result) {
-    OpAsmParser::OperandType strRawOperands[1];
-    ArrayRef<OpAsmParser::OperandType> strOperands(strRawOperands);  llvm::SMLoc strOperandsLoc;
-    (void)strOperandsLoc;
-    Type strRawTypes[1];
-    ArrayRef<Type> strTypes(strRawTypes);
-    SmallVector<Type, 1> allResultTypes;
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    strOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperand(strRawOperands[0]))
-        return failure();
-    if(parser.parseColon())
+    OpAsmParser::OperandType streamOperand;
+    if(parser.parseOperand(streamOperand))
         return failure();
 
-    if(parser.parseType(strRawTypes[0]))
+    Type streamType;
+    if(parser.parseColonType(streamType))
         return failure();
+
     if(parser.parseArrow())
         return failure();
 
-    if(parser.parseTypeList(allResultTypes))
+    Type resultType;
+    if(parser.parseType(resultType))
         return failure();
+    result.addTypes(resultType);
 
-    result.addTypes(allResultTypes);
-
-    if(parser.resolveOperands(strOperands, strTypes, strOperandsLoc, result.operands))
+    if(parser.resolveOperands(streamOperand, streamType, result.operands))
         return failure();
 
     return success();
@@ -1220,7 +1139,7 @@ static ParseResult parseStreamLengthOp(OpAsmParser &parser, OperationState &resu
 
 static void print(OpAsmPrinter &p, StreamLengthOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.str();
     p << " : ";
     p << ArrayRef<Type>(op.str().getType());
@@ -1237,34 +1156,31 @@ LogicalResult verify(StreamLengthOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
-    SmallVector<OpAsmParser::OperandType, 4> inputOperands;
-    llvm::SMLoc inputOperandsLoc;
-    (void)inputOperandsLoc;
-    SmallVector<Type, 1> inputTypes;
-
-    inputOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperandList(inputOperands))
+    if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    if(!inputOperands.empty()) {
+    SmallVector<OpAsmParser::OperandType, 4> returnOperands;
+    if(parser.parseOperandList(returnOperands))
+        return failure();
+
+    if(!returnOperands.empty()) {
         if(parser.parseColon())
             return failure();
 
-        if(parser.parseTypeList(inputTypes))
+        SmallVector<Type, 1> returnTypes;
+        if(parser.parseTypeList(returnTypes))
+            return failure();
+        
+        if(parser.resolveOperands(returnOperands, returnTypes, parser.getCurrentLocation() , result.operands))
             return failure();
     }
-
-    if(parser.parseOptionalAttrDict(result.attributes))
-        return failure();
-    if(parser.resolveOperands(inputOperands, inputTypes, inputOperandsLoc, result.operands))
-        return failure();
-        
+   
     return success();
 }
 
 static void print(OpAsmPrinter &p, ReturnOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{});
+    p.printOptionalAttrDict(op->getAttrs());
     if(!op.input().empty()) {
         p << ' ' << op.input();
         p << " : ";
@@ -1281,38 +1197,26 @@ LogicalResult verify(ReturnOp op){
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
-    FlatSymbolRefAttr calleeAttr;
-    SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
-    llvm::SMLoc operandsOperandsLoc;
-    (void)operandsOperandsLoc;
-    ArrayRef<Type> operandsTypes;
-    ArrayRef<Type> allResultTypes;
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getType<NoneType>(), "callee", result.attributes))
-        return failure();
-    if(parser.parseLParen())
-        return failure();
-
-    operandsOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperandList(operandsOperands))
-        return failure();
-    if(parser.parseRParen())
-        return failure();
-    if(parser.parseColon())
+    Attribute calleeAttr;
+    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(), "callee", result.attributes))
         return failure();
 
-    FunctionType operands__allResult_functionType;
-    if(parser.parseType(operands__allResult_functionType))
+    SmallVector<OpAsmParser::OperandType, 4> operands;
+    if(parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren))
+        return failure();
+  
+    FunctionType func;
+    if(parser.parseColonType(func))
         return failure();
 
-    operandsTypes = operands__allResult_functionType.getInputs();
-    allResultTypes = operands__allResult_functionType.getResults();
-    result.addTypes(allResultTypes);
+    ArrayRef<Type> operandsTypes = func.getInputs();
+    ArrayRef<Type> resultTypes = func.getResults();
+    result.addTypes(resultTypes);
 
-    if(parser.resolveOperands(operandsOperands, operandsTypes, operandsOperandsLoc, result.operands))
+    if(parser.resolveOperands(operands, operandsTypes, parser.getCurrentLocation(), result.operands))
         return failure();
 
     return success();
@@ -1337,6 +1241,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     FlatSymbolRefAttr fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
     if(!fnAttr)
         return emitOpError("requires a 'callee' symbol reference attribute");
+
     TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
     if(!fn)
         return emitOpError() << "'" << fnAttr.getValue()
@@ -1347,7 +1252,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if(fnType.getNumInputs() != getNumOperands())
         return emitOpError("incorrect number of operands for callee");
 
-    for(unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i)
+    for(int i = 0; i < fnType.getNumInputs(); i++)
         if(getOperand(i).getType() != fnType.getInput(i))
             return emitOpError("operand type mismatch: expected operand type ")
                 << fnType.getInput(i) << ", but provided "
@@ -1356,7 +1261,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if(fnType.getNumResults() != getNumResults())
         return emitOpError("incorrect number of results for callee");
 
-    for(unsigned i = 0, e = fnType.getNumResults(); i != e; ++i)
+    for(int i = 0; i < fnType.getNumResults(); i++)
         if(getResult(i).getType() != fnType.getResult(i)) {
             InFlightDiagnostic diag = emitOpError("result type mismatch at index ") << i;
             diag.attachNote() << "      op result types: " << getResultTypes();
@@ -1372,38 +1277,26 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result) {
-    StringAttr calleeAttr;
-    SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
-    llvm::SMLoc operandsOperandsLoc;
-    (void)operandsOperandsLoc;
-    ArrayRef<Type> operandsTypes;
-    ArrayRef<Type> allResultTypes;
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
-    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getType<NoneType>(), "callee", result.attributes))
-        return failure();
-    if(parser.parseLParen())
-        return failure();
-
-    operandsOperandsLoc = parser.getCurrentLocation();
-    if(parser.parseOperandList(operandsOperands))
-        return failure();
-    if(parser.parseRParen())
-        return failure();
-    if(parser.parseColon())
+    Attribute calleeAttr;
+    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(), "callee", result.attributes))
         return failure();
 
-    FunctionType operands__allResult_functionType;
-    if(parser.parseType(operands__allResult_functionType))
+    SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
+    if(parser.parseOperandList(operandsOperands, OpAsmParser::Delimiter::Paren))
         return failure();
 
-    operandsTypes = operands__allResult_functionType.getInputs();
-    allResultTypes = operands__allResult_functionType.getResults();
+    FunctionType func;
+    if(parser.parseColonType(func))
+        return failure();
+
+    ArrayRef<Type> operandsTypes = func.getInputs();
+    ArrayRef<Type> allResultTypes = func.getResults();
     result.addTypes(allResultTypes);
 
-    if(parser.resolveOperands(operandsOperands, operandsTypes, operandsOperandsLoc, result.operands))
+    if(parser.resolveOperands(operandsOperands, operandsTypes, parser.getCurrentLocation(), result.operands))
         return failure();
 
     return success();
@@ -1429,13 +1322,12 @@ LogicalResult verify(LibCallOp op){
 
 static ParseResult parseAllocSymbolOp(OpAsmParser &parser, OperationState &result) {
     StringAttr symAttr;
-
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
+
     if(parser.parseLParen())
         return failure();
-
-    if(parser.parseAttribute(symAttr, parser.getBuilder().getType<NoneType>(), "sym", result.attributes))
+    if(parser.parseAttribute(symAttr, parser.getBuilder().getNoneType(), "sym", result.attributes))
         return failure();
     if(parser.parseRParen())
         return failure();
