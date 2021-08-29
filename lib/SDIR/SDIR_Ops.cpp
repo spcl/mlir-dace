@@ -113,7 +113,7 @@ LogicalResult verify(TaskletNode op){
     ArrayRef<Type> fnInputTypes = op.getType().getInputs();
     Block &entryBlock = op.front();
 
-    for (int i = 0; i < entryBlock.getNumArguments(); i++)
+    for (unsigned i = 0; i < entryBlock.getNumArguments(); i++)
         if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
             return op.emitOpError("type of entry block argument #")
                     << i << '(' << entryBlock.getArgument(i).getType()
@@ -182,7 +182,7 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
         SmallVector<Type, 4> newInputs;
         newInputs.reserve(oldNumArgs);
 
-        for(int i = 0; i < oldNumArgs; i++)
+        for(unsigned i = 0; i < oldNumArgs; i++)
             if(!mapper.contains(getArgument(i)))
                 newInputs.push_back(oldType.getInput(i));
 
@@ -193,7 +193,7 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
             if(ArrayAttr argAttrs = getAllArgAttrs()) {
                 SmallVector<Attribute> newArgAttrs;
                 newArgAttrs.reserve(newInputs.size());
-                for(int i = 0; i < oldNumArgs; i++)
+                for(unsigned i = 0; i < oldNumArgs; i++)
                     if(!mapper.contains(getArgument(i)))
                         newArgAttrs.push_back(argAttrs[i]);
                 newFunc.setAllArgAttrs(newArgAttrs);
@@ -1251,7 +1251,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if(fnType.getNumInputs() != getNumOperands())
         return emitOpError("incorrect number of operands for callee");
 
-    for(int i = 0; i < fnType.getNumInputs(); i++)
+    for(unsigned i = 0; i < fnType.getNumInputs(); i++)
         if(getOperand(i).getType() != fnType.getInput(i))
             return emitOpError("operand type mismatch: expected operand type ")
                 << fnType.getInput(i) << ", but provided "
@@ -1260,7 +1260,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if(fnType.getNumResults() != getNumResults())
         return emitOpError("incorrect number of results for callee");
 
-    for(int i = 0; i < fnType.getNumResults(); i++)
+    for(unsigned i = 0; i < fnType.getNumResults(); i++)
         if(getResult(i).getType() != fnType.getResult(i)) {
             InFlightDiagnostic diag = emitOpError("result type mismatch at index ") << i;
             diag.attachNote() << "      op result types: " << getResultTypes();
