@@ -39,13 +39,14 @@ def SDIR_SymbolExprOp : SDIR_Op<"$", [
     ```mlir
     sdir.state @state_0 {
         ...
-        $("2*N+2")
+        %res = sdir.$("3*N+2") : i32
         ...
     }
     ```
   }];
 
   let arguments = (ins StrAttr:$expr);
+  let results = (outs AnyInteger:$res);
 }
 
 #endif // SDIR_SymbolOps

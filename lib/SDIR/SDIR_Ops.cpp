@@ -1357,6 +1357,40 @@ LogicalResult verify(AllocSymbolOp op){
 }
 
 //===----------------------------------------------------------------------===//
+// SymbolExprOp
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseSymbolExprOp(OpAsmParser &parser, OperationState &result) {
+    if(parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    StringAttr exprAttr;
+    if(parser.parseLParen()
+            || parser.parseAttribute(exprAttr, "expr", result.attributes) 
+            || parser.parseRParen())
+        return failure();
+
+    Type resType;
+    if(parser.parseColonType(resType))
+        return failure();
+    result.addTypes(resType);
+
+    return success();
+}
+
+static void print(OpAsmPrinter &p, SymbolExprOp op) {
+    p << op.getOperationName();
+    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"expr"});
+    p << "(";
+    p.printAttributeWithoutType(op.exprAttr());
+    p << ") : " << op->getResultTypes();
+}
+
+LogicalResult verify(SymbolExprOp op){
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
 
