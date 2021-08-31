@@ -15,11 +15,40 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
     if(parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
         return failure();
 
+    SmallVector<OpAsmParser::OperandType, 4> entryArgs;
+    SmallVector<NamedAttrList, 4> argAttrs;
+    SmallVector<NamedAttrList, 4> resultAttrs;
+    SmallVector<Type, 4> argTypes;
+    SmallVector<Type, 4> resultTypes;
+
     Region *body = result.addRegion();
-    if(parser.parseRegion(*body))
+    OptionalParseResult opr = parser.parseOptionalRegion(*body);
+    if(opr.hasValue() && opr.getValue().succeeded()){
+        if(body->empty()) body->emplaceBlock();
+
+        Type type = parser.getBuilder().getFunctionType(argTypes, resultTypes);
+        if (!type) return failure();
+        result.addAttribute(SDFGNode::getTypeAttrName(), TypeAttr::get(type));
+
+        return success();
+    }
+
+    bool isVariadic = false;
+    if(function_like_impl::parseFunctionSignature(parser, /*allowVariadic=*/false, entryArgs,
+                                                argTypes, argAttrs, isVariadic, 
+                                                resultTypes, resultAttrs))
         return failure();
 
-    if(body->empty()) body->emplaceBlock();
+    Type type = parser.getBuilder().getFunctionType(argTypes, resultTypes);
+    if (!type) return failure();
+    result.addAttribute(SDFGNode::getTypeAttrName(), TypeAttr::get(type));
+
+    if(parser.parseRegion(*body, entryArgs, entryArgs.empty() ? ArrayRef<Type>() : argTypes, 
+            /*enableNameShadowing=*/false))
+        return failure();
+
+    if (body->empty())
+        return parser.emitError(parser.getCurrentLocation(), "expected non-empty function body");
 
     return success();
 }
@@ -27,13 +56,33 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
 static void print(OpAsmPrinter &p, SDFGNode op) {
     p.printNewline();
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
+    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name", "type"});
     p << ' ';
     p.printSymbolName(op.sym_name());
-    p.printRegion(op.region());
+
+    if(!op.getType().getInputs().empty() || !op.getType().getResults().empty())
+        function_like_impl::printFunctionSignature(p, op, op.getType().getInputs(), /*isVariadic=*/false, op.getType().getResults());
+
+    p.printRegion(op.region(), /*printEntryBlockArgs=*/false, /*printBlockTerminators=*/false, /*printEmptyBlock=*/true);
 }
 
 LogicalResult verify(SDFGNode op){
+    if (op.isExternal())
+        return success();
+
+    // Verify that the argument list of the function and the arg list of the entry
+    // block line up.  The trait already verified that the number of arguments is
+    // the same between the signature and the block.
+    ArrayRef<Type> fnInputTypes = op.getType().getInputs();
+    Block &entryBlock = op.front();
+
+    for (unsigned i = 0; i < entryBlock.getNumArguments(); i++)
+        if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
+            return op.emitOpError("type of entry block argument #")
+                    << i << '(' << entryBlock.getArgument(i).getType()
+                    << ") must match the type of the corresponding argument in "
+                    << "function signature(" << fnInputTypes[i] << ')';
+
     return success();
 }
 
@@ -1241,13 +1290,15 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if(!fnAttr)
         return emitOpError("requires a 'callee' symbol reference attribute");
 
-    TaskletNode fn = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
-    if(!fn)
-        return emitOpError() << "'" << fnAttr.getValue()
-                            << "' does not reference a valid tasklet";
+    TaskletNode fnT = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
+    SDFGNode fnS = symbolTable.lookupNearestSymbolFrom<SDFGNode>(*this, fnAttr);
 
+    if(!fnT && !fnS){
+        return emitOpError() << "'" << fnAttr.getValue()
+                            << "' does not reference a valid tasklet or SDFG";
+    }
     // Verify that the operand and result types match the callee.
-    FunctionType fnType = fn.getType();
+    FunctionType fnType = !fnT ? fnS.getType() : fnT.getType();
     if(fnType.getNumInputs() != getNumOperands())
         return emitOpError("incorrect number of operands for callee");
 

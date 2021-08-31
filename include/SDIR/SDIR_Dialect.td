@@ -41,7 +41,7 @@ def SDIR_ArrayType : SDIR_Type<"Array"> {
 
   let printer = [{
     $_printer << "array<";
-    for(int i = 0; i < getImpl()->shape.size(); i++)
+    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
       if(getImpl()->shape[i] == -1)
         $_printer << "?x" ;
       else
@@ -95,7 +95,7 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
 
   let printer = [{
     $_printer << "memlet<";
-    for(int i = 0; i < getImpl()->shape.size(); i++)
+    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
       $_printer << getImpl()->shape[i] << "x" ;
     $_printer << getImpl()->elementType << ">";
   }];
@@ -137,7 +137,7 @@ def SDIR_StreamArrayType : SDIR_Type<"StreamArray"> {
 
   let printer = [{
     $_printer << "stream_array<";
-    for(int i = 0; i < getImpl()->shape.size(); i++)
+    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
       $_printer << getImpl()->shape[i] << "x" ;
     $_printer << getImpl()->elementType << ">";
   }];
@@ -175,7 +175,7 @@ def SDIR_StreamType : SDIR_Type<"Stream"> {
 
   let printer = [{
     $_printer << "stream<";
-    for(int i = 0; i < getImpl()->shape.size(); i++)
+    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
       $_printer << getImpl()->shape[i] << "x" ;
     $_printer << getImpl()->elementType << ">";
   }];
