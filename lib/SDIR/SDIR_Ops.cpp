@@ -4,6 +4,103 @@ using namespace mlir;
 using namespace mlir::sdir;
 
 //===----------------------------------------------------------------------===//
+// InlineSymbol
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result, StringRef attrName){
+    SmallVector<OpAsmParser::OperandType> opList;
+    SmallVector<Attribute> attrList;
+    SmallVector<Attribute> numList;
+    int opIdx = result.operands.size();
+    
+    do{
+        if(parser.parseOptionalKeyword("sym").succeeded()){
+            StringAttr stringAttr;
+            if(parser.parseLParen()
+                    || parser.parseAttribute(stringAttr, parser.getBuilder().getNoneType()) 
+                    || parser.parseRParen())
+                return failure();
+
+            attrList.push_back(stringAttr);
+            numList.push_back(parser.getBuilder().getI32IntegerAttr(-1));
+            continue;
+        }
+
+        int32_t num;
+        OptionalParseResult intOPR = parser.parseOptionalInteger(num);
+        if(intOPR.hasValue() && intOPR.getValue().succeeded()){
+            Attribute intAttr = parser.getBuilder().getI32IntegerAttr(num);
+            attrList.push_back(intAttr);
+            numList.push_back(parser.getBuilder().getI32IntegerAttr(-1));
+            continue;
+        }
+
+        OpAsmParser::OperandType op;
+        OptionalParseResult opOPR = parser.parseOptionalOperand(op);
+        if(opOPR.hasValue() && opOPR.getValue().succeeded()){
+            opList.push_back(op);
+            numList.push_back(parser.getBuilder().getUI32IntegerAttr(opIdx++));
+            continue;
+        }
+
+        return failure();
+    } while(parser.parseOptionalComma().succeeded());
+
+    ArrayAttr attrArr = parser.getBuilder().getArrayAttr(attrList);
+    result.addAttribute(attrName, attrArr);
+    
+    SmallVector<Value> valList;
+    parser.resolveOperands(opList, parser.getBuilder().getI32Type(), valList);
+    result.addOperands(valList);
+
+    ArrayAttr numArr = parser.getBuilder().getArrayAttr(numList);
+    result.addAttribute(attrName.str() + "_numList", numArr);
+    
+    return success();
+}
+
+static void printNumberList(OpAsmPrinter &p, Operation* op, StringRef attrName) {
+    ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
+    ArrayAttr numList = op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
+
+    for(unsigned i = 0, attri = 0; i < numList.size(); i++){
+        Attribute numAttr = numList[i];
+        IntegerAttr num = numAttr.cast<IntegerAttr>();
+        if(i > 0) p << ", ";
+
+        if(num.getValue().isNegative()){
+            Attribute attr = attrList[attri++];
+ 
+            if(attr.isa<StringAttr>()){
+                p << "sym(" << attr << ")";
+            } else
+                p.printAttributeWithoutType(attr);
+
+        } else {
+            unsigned idx = num.getUInt();
+            Value val = op->getOperand(idx);
+            p.printOperand(val);
+        }
+    }
+}
+
+static void printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
+                                            ArrayRef<StringRef> elidedAttrs = {}) {
+    SmallVector<StringRef> numListAttrs(elidedAttrs.begin(), elidedAttrs.end());
+    
+    for(NamedAttribute na : attrs)
+        if(na.first.strref().endswith("numList"))
+            numListAttrs.push_back(na.first.strref());
+    
+    p.printOptionalAttrDict(attrs, /*elidedAttrs=*/numListAttrs);
+}
+
+static size_t getNumListSize(Operation* op, StringRef attrName){
+    ArrayAttr numList = op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
+    return numList.size();
+}
+
+//===----------------------------------------------------------------------===//
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
@@ -276,70 +373,24 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
 
     if(parser.parseEqual()) return failure();
 
-    AffineMapAttr lbMapAttr;
-    NamedAttrList lbAttrs;
-    SmallVector<OpAsmParser::OperandType, 4> lbMapOperands;
-    if(parser.parseAffineMapOfSSAIds(lbMapOperands, lbMapAttr,
-                                    "lowerBounds", lbAttrs,
-                                    OpAsmParser::Delimiter::Paren)) 
+    if(parser.parseLParen()
+            || parseNumberList(parser, result, "lowerBounds")
+            || parser.parseRParen())
         return failure();
-
-    SmallVector<int64_t, 4> lb;
-    AffineMap lbMap = lbMapAttr.getValue();
-    for(const AffineExpr &result : lbMap.getResults()) {
-        AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
-        if(!constExpr)
-            return parser.emitError(parser.getNameLoc(),
-                                    "lower bound must be constant integers");
-        lb.push_back(constExpr.getValue());
-    }
-
-    result.addAttribute("lowerBounds", builder.getI64ArrayAttr(lb));
 
     if(parser.parseKeyword("to")) return failure();
 
-    AffineMapAttr ubMapAttr;
-    NamedAttrList ubAttrs;
-    SmallVector<OpAsmParser::OperandType, 4> ubMapOperands;
-    if(parser.parseAffineMapOfSSAIds(ubMapOperands, ubMapAttr,
-                                    "upperBounds", ubAttrs,
-                                    OpAsmParser::Delimiter::Paren)) 
+    if(parser.parseLParen()
+            || parseNumberList(parser, result, "upperBounds")
+            || parser.parseRParen())
         return failure();
-
-    SmallVector<int64_t, 4> ub;
-    AffineMap ubMap = ubMapAttr.getValue();
-    for(const AffineExpr &result : ubMap.getResults()) {
-        AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
-        if(!constExpr)
-            return parser.emitError(parser.getNameLoc(),
-                                    "upper bound must be constant integers");
-        ub.push_back(constExpr.getValue());
-    }
-
-    
-    result.addAttribute("upperBounds", builder.getI64ArrayAttr(ub));
 
     if(parser.parseKeyword("step")) return failure();
 
-    AffineMapAttr stepsMapAttr;
-    NamedAttrList stepsAttrs;
-    SmallVector<OpAsmParser::OperandType, 4> stepsMapOperands;
-    if(parser.parseAffineMapOfSSAIds(stepsMapOperands, stepsMapAttr,
-                                    "steps", stepsAttrs,
-                                    OpAsmParser::Delimiter::Paren)) 
+    if(parser.parseLParen()
+            || parseNumberList(parser, result, "steps")
+            || parser.parseRParen())
         return failure();
-
-    SmallVector<int64_t, 4> steps;
-    AffineMap stepsMap = stepsMapAttr.getValue();
-    for(const AffineExpr &result : stepsMap.getResults()) {
-        AffineConstantExpr constExpr = result.dyn_cast<AffineConstantExpr>();
-        if (!constExpr)
-            return parser.emitError(parser.getNameLoc(),
-                                    "steps must be constant integers");
-        steps.push_back(constExpr.getValue());
-    }
-
-    result.addAttribute("steps", builder.getI64ArrayAttr(steps));
 
     // Now parse the body.
     Region *body = result.addRegion();
@@ -353,31 +404,20 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
 static void print(OpAsmPrinter &p, MapNode op) {
     p.printNewline();
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), 
-                /*elidedAttrs=*/{"lowerBounds", "upperBounds", "steps"}); 
+    printOptionalAttrDictNoNumList(p, op->getAttrs(),
+                            {"lowerBounds", "upperBounds", "steps"});
+
     p << " (" << op.getBody()->getArguments() << ") = (";
 
-    SmallVector<int64_t, 8> lbresult;
-    for(Attribute attr : op.lowerBounds()) {
-        lbresult.push_back(attr.cast<IntegerAttr>().getInt());
-    }
-    llvm::interleaveComma(lbresult, p);
+    printNumberList(p, op.getOperation(), "lowerBounds");
 
     p << ") to (";
 
-    SmallVector<int64_t, 8> ubresult;
-    for(Attribute attr : op.upperBounds()) {
-        ubresult.push_back(attr.cast<IntegerAttr>().getInt());
-    }
-    llvm::interleaveComma(ubresult, p);
+    printNumberList(p, op.getOperation(), "upperBounds");
 
     p << ") step (";
 
-    SmallVector<int64_t, 8> stepresult;
-    for(Attribute attr : op.steps()) {
-        stepresult.push_back(attr.cast<IntegerAttr>().getInt());
-    }
-    llvm::interleaveComma(stepresult, p);
+    printNumberList(p, op.getOperation(), "steps");
 
     p << ")";
 
@@ -388,13 +428,13 @@ static void print(OpAsmPrinter &p, MapNode op) {
 LogicalResult verify(MapNode op){
     size_t var_count = op.getBody()->getArguments().size();
 
-    if(op.lowerBounds().size() != var_count)
+    if(getNumListSize(op, "lowerBounds") != var_count)
         return op.emitOpError("failed to verify that size of lower bounds matches size of arguments");
     
-    if(op.upperBounds().size() != var_count)
+    if(getNumListSize(op, "upperBounds") != var_count)
         return op.emitOpError("failed to verify that size of upper bounds matches size of arguments");
     
-    if(op.steps().size() != var_count)
+    if(getNumListSize(op, "steps") != var_count)
         return op.emitOpError("failed to verify that size of steps matches size of arguments");
 
     return success();

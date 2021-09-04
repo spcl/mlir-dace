@@ -22,11 +22,10 @@ def SDIR_MapNode : SDIR_Op<"map", [
     }];
 
     let arguments = (ins 
-        /*I32ElementsAttr:$lowerBounds,
-        I32ElementsAttr:$upperBounds,*/
-        I64ArrayAttr:$lowerBounds,
-        I64ArrayAttr:$upperBounds,
-        I64ArrayAttr:$steps
+        Variadic<AnyInteger>:$ranges,
+        ArrayAttr:$lowerBounds,
+        ArrayAttr:$upperBounds,
+        ArrayAttr:$steps
     );
 
     let regions = (region SizedRegion<1>:$region);
