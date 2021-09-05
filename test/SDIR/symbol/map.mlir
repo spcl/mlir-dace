@@ -12,9 +12,9 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-NEXT: sdir.alloc_symbol("N")
         sdir.alloc_symbol("N")
         // CHECK-NEXT: [[NAME0:%[a-zA-Z0-9_]*]] = constant
-        %0 = constant 0 : i32
+        %0 = constant 0 : index
         // CHECK-NEXT: [[NAME1:%[a-zA-Z0-9_]*]] = constant
-        %1 = constant 1 : i32
+        %1 = constant 1 : index
         // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.get_access [[NAMEA]] 
         // CHECK-SAME: !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
         %a = sdir.get_access %A : !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>

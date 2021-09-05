@@ -43,14 +43,16 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result, 
             continue;
         }
 
-        return failure();
+        if(parser.parseOptionalComma().succeeded())
+            return failure();
+
     } while(parser.parseOptionalComma().succeeded());
 
     ArrayAttr attrArr = parser.getBuilder().getArrayAttr(attrList);
     result.addAttribute(attrName, attrArr);
     
     SmallVector<Value> valList;
-    parser.resolveOperands(opList, parser.getBuilder().getI32Type(), valList);
+    parser.resolveOperands(opList, parser.getBuilder().getIndexType(), valList);
     result.addOperands(valList);
 
     ArrayAttr numArr = parser.getBuilder().getArrayAttr(numList);
@@ -774,9 +776,9 @@ static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
     if(parser.parseOperand(memletOperand))
         return failure();
 
-    SmallVector<OpAsmParser::OperandType, 4> indicesOperands;
-    if(parser.parseOperandList(indicesOperands, OpAsmParser::Delimiter::Square))
-        return failure();
+    if(parser.parseLSquare()) return failure();
+    parseNumberList(parser, result, "indices");
+    if(parser.parseRSquare()) return failure();
 
     Type srcType;
     if(parser.parseColonType(srcType))
@@ -793,17 +795,16 @@ static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
     if(parser.resolveOperand(memletOperand, srcType, result.operands))
         return failure();
 
-    if(parser.resolveOperands(indicesOperands, parser.getBuilder().getIndexType(), result.operands))
-        return failure();
-
     return success();
 }
 
 static void print(OpAsmPrinter &p, LoadOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs());
+    printOptionalAttrDictNoNumList(p, op->getAttrs(), /*elidedAttrs*/{"indices"});
     p << ' ' << op.arr();
-    p << "[" << op.indices() << "]";
+    p << "[";
+    printNumberList(p, op.getOperation(), "indices"); 
+    p << "]";
     p << " : ";
     p << ArrayRef<Type>(op.arr().getType());
     p << " -> ";
@@ -811,7 +812,7 @@ static void print(OpAsmPrinter &p, LoadOp op) {
 }
 
 LogicalResult verify(LoadOp op){
-    size_t idx_size = op.indices().size();
+    size_t idx_size = getNumListSize(op.getOperation(), "indices");
     size_t mem_size = op.arr().getType().cast<MemletType>().getRank();
     if(idx_size != mem_size)
       return op.emitOpError("incorrect number of indices for load");
@@ -837,9 +838,9 @@ static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
     if(parser.parseOperand(memletOperand))
         return failure();
 
-    SmallVector<OpAsmParser::OperandType, 4> indicesOperands;
-    if(parser.parseOperandList(indicesOperands, OpAsmParser::Delimiter::Square))
-        return failure();
+    if(parser.parseLSquare()) return failure();
+    parseNumberList(parser, result, "indices");
+    if(parser.parseRSquare()) return failure();
 
     Type valType;
     if(parser.parseColonType(valType))
@@ -858,17 +859,16 @@ static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
     if(parser.resolveOperand(memletOperand, memletType, result.operands))
         return failure();
 
-    if(parser.resolveOperands(indicesOperands, parser.getBuilder().getIndexType(), result.operands))
-        return failure();
-
     return success();
 }
 
 static void print(OpAsmPrinter &p, StoreOp op) {
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs());
+    printOptionalAttrDictNoNumList(p, op->getAttrs(), /*elidedAttrs=*/{"indices"});
     p << ' ' << op.val() << "," << ' ' << op.arr();
-    p << "[" << op.indices() << "]";
+    p << "[";
+    printNumberList(p, op.getOperation(), "indices");
+    p << "]";
     p << " : ";
     p << ArrayRef<Type>(op.val().getType());
     p << " -> ";
@@ -876,7 +876,7 @@ static void print(OpAsmPrinter &p, StoreOp op) {
 }
 
 LogicalResult verify(StoreOp op){
-    size_t idx_size = op.indices().size();
+    size_t idx_size = getNumListSize(op.getOperation(), "indices");
     size_t mem_size = op.arr().getType().cast<MemletType>().getRank();
     if(idx_size != mem_size)
       return op.emitOpError("incorrect number of indices for store");

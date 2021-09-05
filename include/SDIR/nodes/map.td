@@ -22,7 +22,7 @@ def SDIR_MapNode : SDIR_Op<"map", [
     }];
 
     let arguments = (ins 
-        Variadic<AnyInteger>:$ranges,
+        Variadic<Index>:$ranges,
         ArrayAttr:$lowerBounds,
         ArrayAttr:$upperBounds,
         ArrayAttr:$steps

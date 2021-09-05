@@ -69,7 +69,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
     ```
   }];
 
-  let arguments = (ins SDIR_MemletType:$arr, Variadic<Index>:$indices);
+  let arguments = (ins Variadic<Index>:$indices, SDIR_MemletType:$arr);
   let results = (outs AnyType:$res);
 }
 
@@ -100,7 +100,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
     ```
   }];
 
-  let arguments = (ins AnyType:$val, SDIR_MemletType:$arr, Variadic<Index>:$indices);
+  let arguments = (ins Variadic<Index>:$indices, AnyType:$val, SDIR_MemletType:$arr);
 }
 
 //===----------------------------------------------------------------------===//
