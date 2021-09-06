@@ -35,43 +35,38 @@ def SDIR_ArrayType : SDIR_Type<"Array"> {
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"int64_t">:$shape, 
-    "Type":$elementType
+    "Type":$elementType,
+    ArrayRefParameter<"StringAttr">:$symbols,
+    ArrayRefParameter<"int64_t">:$integers, 
+    ArrayRefParameter<"bool">:$shape 
   );
 
   let printer = [{
-    $_printer << "array<";
-    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
-      if(getImpl()->shape[i] == -1)
-        $_printer << "?x" ;
-      else
-        $_printer << getImpl()->shape[i] << "x" ;
-    $_printer << getImpl()->elementType << ">";
+    $_printer << "array";
+    printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols, 
+                      getImpl()->integers, getImpl()->shape);
   }];
 
   let parser = [{
-    if ($_parser.parseLess())
-      return Type();
-    ::llvm::SmallVector<int64_t> shape;
-    if($_parser.parseDimensionList(shape))
-      return Type();
     Type elementType;
-    if ($_parser.parseType(elementType))
+    SmallVector<StringAttr> symbols;
+    SmallVector<int64_t> integers;
+    SmallVector<bool> shape;
+    if(parseDimensionList($_parser, elementType, symbols, integers, shape))
       return Type();
-    if ($_parser.parseGreater())
-      return Type();
-    return get($_ctxt, shape, elementType);
+    
+    return get($_ctxt, elementType, symbols, integers, shape);
   }];
 
   let extraClassDeclaration = [{
     size_t getUndefRank(){ 
       size_t undefSize = 0;
-      for(int64_t dim : getShape()) if(dim == -1) undefSize++;
+      for(int64_t dim : getIntegers()) if(dim == -1) undefSize++;
       return undefSize;
     }
 
     bool hasZeros(){
-      for(int64_t dim : getShape()) if(dim == 0) return true;
+      for(int64_t dim : getIntegers()) if(dim == 0) return true;
       return false;
     }
   }];
@@ -89,29 +84,27 @@ def SDIR_MemletType : SDIR_Type<"Memlet"> {
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"int64_t">:$shape, 
-    "Type":$elementType
+    "Type":$elementType,
+    ArrayRefParameter<"StringAttr">:$symbols,
+    ArrayRefParameter<"int64_t">:$integers, 
+    ArrayRefParameter<"bool">:$shape 
   );
 
   let printer = [{
-    $_printer << "memlet<";
-    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
-      $_printer << getImpl()->shape[i] << "x" ;
-    $_printer << getImpl()->elementType << ">";
+    $_printer << "memlet";
+    printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols, 
+                      getImpl()->integers, getImpl()->shape);
   }];
 
   let parser = [{
-    if ($_parser.parseLess())
-      return Type();
-    ::llvm::SmallVector<int64_t> shape;
-    if($_parser.parseDimensionList(shape))
-      return Type();
     Type elementType;
-    if ($_parser.parseType(elementType))
+    SmallVector<StringAttr> symbols;
+    SmallVector<int64_t> integers;
+    SmallVector<bool> shape;
+    if(parseDimensionList($_parser, elementType, symbols, integers, shape))
       return Type();
-    if ($_parser.parseGreater())
-      return Type();
-    return get($_ctxt, shape, elementType);
+    
+    return get($_ctxt, elementType, symbols, integers, shape);
   }];
 
   let extraClassDeclaration = [{
@@ -131,29 +124,27 @@ def SDIR_StreamArrayType : SDIR_Type<"StreamArray"> {
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"int64_t">:$shape, 
-    "Type":$elementType
+    "Type":$elementType,
+    ArrayRefParameter<"StringAttr">:$symbols,
+    ArrayRefParameter<"int64_t">:$integers, 
+    ArrayRefParameter<"bool">:$shape 
   );
 
   let printer = [{
-    $_printer << "stream_array<";
-    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
-      $_printer << getImpl()->shape[i] << "x" ;
-    $_printer << getImpl()->elementType << ">";
+    $_printer << "stream_array";
+    printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols, 
+                      getImpl()->integers, getImpl()->shape);
   }];
 
   let parser = [{
-    if ($_parser.parseLess())
-      return Type();
-    ::llvm::SmallVector<int64_t> shape;
-    if($_parser.parseDimensionList(shape))
-      return Type();
     Type elementType;
-    if ($_parser.parseType(elementType))
+    SmallVector<StringAttr> symbols;
+    SmallVector<int64_t> integers;
+    SmallVector<bool> shape;
+    if(parseDimensionList($_parser, elementType, symbols, integers, shape))
       return Type();
-    if ($_parser.parseGreater())
-      return Type();
-    return get($_ctxt, shape, elementType);
+    
+    return get($_ctxt, elementType, symbols, integers, shape);
   }];
 }
 
@@ -169,29 +160,27 @@ def SDIR_StreamType : SDIR_Type<"Stream"> {
   }];
 
   let parameters = (ins
-    ArrayRefParameter<"int64_t">:$shape, 
-    "Type":$elementType
+    "Type":$elementType,
+    ArrayRefParameter<"StringAttr">:$symbols,
+    ArrayRefParameter<"int64_t">:$integers, 
+    ArrayRefParameter<"bool">:$shape 
   );
 
   let printer = [{
-    $_printer << "stream<";
-    for(unsigned i = 0; i < getImpl()->shape.size(); i++)
-      $_printer << getImpl()->shape[i] << "x" ;
-    $_printer << getImpl()->elementType << ">";
+    $_printer << "stream";
+    printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols, 
+                      getImpl()->integers, getImpl()->shape);
   }];
 
   let parser = [{
-    if ($_parser.parseLess())
-      return Type();
-    ::llvm::SmallVector<int64_t> shape;
-    if($_parser.parseDimensionList(shape))
-      return Type();
     Type elementType;
-    if ($_parser.parseType(elementType))
+    SmallVector<StringAttr> symbols;
+    SmallVector<int64_t> integers;
+    SmallVector<bool> shape;
+    if(parseDimensionList($_parser, elementType, symbols, integers, shape))
       return Type();
-    if ($_parser.parseGreater())
-      return Type();
-    return get($_ctxt, shape, elementType);
+    
+    return get($_ctxt, elementType, symbols, integers, shape);
   }];
 }
 
