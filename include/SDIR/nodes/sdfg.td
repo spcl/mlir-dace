@@ -24,7 +24,8 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry, TypeAttr:$type);
+    let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry, 
+                        TypeAttr:$type);
     let regions = (region SizedRegion<1>:$region);
 
     let extraClassDeclaration = [{
@@ -35,11 +36,11 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         /// Returns the region on the current operation that is callable. This may
         /// return null in the case of an external callable object, e.g. an external
         /// function.
-        Region *getCallableRegion() { return isExternal() ? nullptr : &getRegion(); }
+        Region *getCallableRegion(){ return isExternal() ? nullptr : &getRegion(); }
 
         /// Returns the results types that the callable region produces when
         /// executed.
-        ArrayRef<Type> getCallableResults() { return getType().getResults(); }
+        ArrayRef<Type> getCallableResults(){ return getType().getResults(); }
 
         //===------------------------------------------------------------------===//
         // SymbolOpInterface Methods
@@ -61,7 +62,8 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         LogicalResult verifyType() {
             auto type = getTypeAttr().getValue();
             if (!type.isa<FunctionType>())
-                return emitOpError("requires '" + getTypeAttrName() + "' attribute of function type");
+                return emitOpError("requires '" + getTypeAttrName() 
+                                    + "' attribute of function type");
             return success();
         }
     }];

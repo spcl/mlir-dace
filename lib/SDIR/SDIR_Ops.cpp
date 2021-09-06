@@ -7,7 +7,8 @@ using namespace mlir::sdir;
 // InlineSymbol
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result, StringRef attrName){
+static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result, 
+                                    StringRef attrName){
     SmallVector<OpAsmParser::OperandType> opList;
     SmallVector<Attribute> attrList;
     SmallVector<Attribute> numList;
@@ -17,7 +18,8 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result, 
         if(parser.parseOptionalKeyword("sym").succeeded()){
             StringAttr stringAttr;
             if(parser.parseLParen()
-                    || parser.parseAttribute(stringAttr, parser.getBuilder().getNoneType()) 
+                    || parser.parseAttribute(stringAttr, 
+                                            parser.getBuilder().getNoneType()) 
                     || parser.parseRParen())
                 return failure();
 
@@ -61,9 +63,10 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result, 
     return success();
 }
 
-static void printNumberList(OpAsmPrinter &p, Operation* op, StringRef attrName) {
+static void printNumberList(OpAsmPrinter &p, Operation* op, StringRef attrName){
     ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
-    ArrayAttr numList = op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
+    ArrayAttr numList = op->getAttr(attrName.str() + "_numList")
+                                                            .cast<ArrayAttr>();
 
     for(unsigned i = 0, attri = 0; i < numList.size(); i++){
         Attribute numAttr = numList[i];
@@ -86,8 +89,9 @@ static void printNumberList(OpAsmPrinter &p, Operation* op, StringRef attrName) 
     }
 }
 
-static void printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
-                                            ArrayRef<StringRef> elidedAttrs = {}) {
+static void printOptionalAttrDictNoNumList(OpAsmPrinter &p, 
+                                        ArrayRef<NamedAttribute> attrs,
+                                        ArrayRef<StringRef> elidedAttrs = {}){
     SmallVector<StringRef> numListAttrs(elidedAttrs.begin(), elidedAttrs.end());
     
     for(NamedAttribute na : attrs)
@@ -98,7 +102,8 @@ static void printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttrib
 }
 
 static size_t getNumListSize(Operation* op, StringRef attrName){
-    ArrayAttr numList = op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
+    ArrayAttr numList = op->getAttr(attrName.str() + "_numList")
+                                                            .cast<ArrayAttr>();
     return numList.size();
 }
 
@@ -106,7 +111,7 @@ static size_t getNumListSize(Operation* op, StringRef attrName){
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -133,45 +138,53 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
     }
 
     bool isVariadic = false;
-    if(function_like_impl::parseFunctionSignature(parser, /*allowVariadic=*/false, entryArgs,
-                                                argTypes, argAttrs, isVariadic, 
-                                                resultTypes, resultAttrs))
+    if(function_like_impl::parseFunctionSignature(parser, 
+                                                /*allowVariadic=*/false, 
+                                                entryArgs, argTypes, argAttrs, 
+                                                isVariadic, resultTypes, 
+                                                resultAttrs))
         return failure();
 
     Type type = parser.getBuilder().getFunctionType(argTypes, resultTypes);
     if (!type) return failure();
     result.addAttribute(SDFGNode::getTypeAttrName(), TypeAttr::get(type));
 
-    if(parser.parseRegion(*body, entryArgs, entryArgs.empty() ? ArrayRef<Type>() : argTypes, 
+    if(parser.parseRegion(*body, entryArgs, 
+            entryArgs.empty() ? ArrayRef<Type>() : argTypes, 
             /*enableNameShadowing=*/false))
         return failure();
 
     if (body->empty())
-        return parser.emitError(parser.getCurrentLocation(), "expected non-empty function body");
+        return parser.emitError(parser.getCurrentLocation(), 
+                                "expected non-empty function body");
 
     return success();
 }
 
-static void print(OpAsmPrinter &p, SDFGNode op) {
+static void print(OpAsmPrinter &p, SDFGNode op){
     p.printNewline();
     p << op.getOperationName();
-    p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name", "type"});
+    p.printOptionalAttrDict(op->getAttrs(), 
+                            /*elidedAttrs=*/{"sym_name", "type"});
     p << ' ';
     p.printSymbolName(op.sym_name());
 
     if(!op.getType().getInputs().empty() || !op.getType().getResults().empty())
-        function_like_impl::printFunctionSignature(p, op, op.getType().getInputs(), /*isVariadic=*/false, op.getType().getResults());
+        function_like_impl::printFunctionSignature(p, op, 
+                                op.getType().getInputs(), /*isVariadic=*/false, 
+                                op.getType().getResults());
 
-    p.printRegion(op.region(), /*printEntryBlockArgs=*/false, /*printBlockTerminators=*/false, /*printEmptyBlock=*/true);
+    p.printRegion(op.region(), /*printEntryBlockArgs=*/false, 
+                /*printBlockTerminators=*/false, /*printEmptyBlock=*/true);
 }
 
 LogicalResult verify(SDFGNode op){
     if (op.isExternal())
         return success();
 
-    // Verify that the argument list of the function and the arg list of the entry
-    // block line up.  The trait already verified that the number of arguments is
-    // the same between the signature and the block.
+    // Verify that the argument list of the function and the arg list of the 
+    // entry block line up. The trait already verified that the number of 
+    // arguments is the same between the signature and the block.
     ArrayRef<Type> fnInputTypes = op.getType().getInputs();
     Block &entryBlock = op.front();
 
@@ -185,12 +198,14 @@ LogicalResult verify(SDFGNode op){
     return success();
 }
 
-LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable){
     // Check that the entry attribute is specified.
-    FlatSymbolRefAttr entryAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
+    FlatSymbolRefAttr entryAttr = 
+                            (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
     if(!entryAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
-    StateNode entry = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
+    StateNode entry = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, 
+                                                                    entryAttr);
     if(!entry)
         return emitOpError() << "'" << entryAttr.getValue()
                             << "' does not reference a valid state";
@@ -202,7 +217,7 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 // StateNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -219,7 +234,7 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, StateNode op) {
+static void print(OpAsmPrinter &p, StateNode op){
     p.printNewline();
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
@@ -236,28 +251,32 @@ LogicalResult verify(StateNode op){
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseTaskletNode(OpAsmParser &parser, OperationState &result) {
-    auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
-                            function_like_impl::VariadicFlag, std::string &) {
+static ParseResult parseTaskletNode(OpAsmParser &parser, 
+                                    OperationState &result){
+    auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, 
+                            ArrayRef<Type> results,
+                            function_like_impl::VariadicFlag, std::string &){
         return builder.getFunctionType(argTypes, results);
     };
 
-    return function_like_impl::parseFunctionLikeOp(parser, result, /*allowVariadic=*/false, buildFuncType);
+    return function_like_impl::parseFunctionLikeOp(parser, result, 
+                                        /*allowVariadic=*/false, buildFuncType);
 }
 
-static void print(OpAsmPrinter &p, TaskletNode op) {
+static void print(OpAsmPrinter &p, TaskletNode op){
     p.printNewline();
     FunctionType fnType = op.getType();
-    function_like_impl::printFunctionLikeOp(p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+    function_like_impl::printFunctionLikeOp(p, op, fnType.getInputs(), 
+                                    /*isVariadic=*/false, fnType.getResults());
 }
 
 LogicalResult verify(TaskletNode op){
     if (op.isExternal())
         return success();
 
-    // Verify that the argument list of the function and the arg list of the entry
-    // block line up.  The trait already verified that the number of arguments is
-    // the same between the signature and the block.
+    // Verify that the argument list of the function and the arg list of the 
+    // entry block line up. The trait already verified that the number of 
+    // arguments is the same between the signature and the block.
     ArrayRef<Type> fnInputTypes = op.getType().getInputs();
     Block &entryBlock = op.front();
 
@@ -271,8 +290,9 @@ LogicalResult verify(TaskletNode op){
     return success();
 }
 
-TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
-                                        ArrayRef<NamedAttribute> attrs) {
+TaskletNode TaskletNode::create(Location location, StringRef name, 
+                                FunctionType type, 
+                                ArrayRef<NamedAttribute> attrs){
     OpBuilder builder(location->getContext());
     OperationState state(location, getOperationName());
     build(builder, state, name, type, attrs);
@@ -280,22 +300,24 @@ TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType 
 }
 
 TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
-                                        Operation::dialect_attr_range attrs) {
+                                        Operation::dialect_attr_range attrs){
     SmallVector<NamedAttribute, 8> attrRef(attrs);
     return create(location, name, type, llvm::makeArrayRef(attrRef));
 }
 
-TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
-                                        ArrayRef<NamedAttribute> attrs, 
-                                        ArrayRef<DictionaryAttr> argAttrs) {
+TaskletNode TaskletNode::create(Location location, StringRef name, 
+                                FunctionType type, 
+                                ArrayRef<NamedAttribute> attrs, 
+                                ArrayRef<DictionaryAttr> argAttrs){
     TaskletNode func = create(location, name, type, attrs);
     func.setAllArgAttrs(argAttrs);
     return func;
 }
 
-void TaskletNode::build(OpBuilder &builder, OperationState &state, StringRef name,
-                FunctionType type, ArrayRef<NamedAttribute> attrs,
-                ArrayRef<DictionaryAttr> argAttrs) {
+void TaskletNode::build(OpBuilder &builder, OperationState &state, 
+                        StringRef name,
+                        FunctionType type, ArrayRef<NamedAttribute> attrs,
+                        ArrayRef<DictionaryAttr> argAttrs){
     state.addAttribute(SymbolTable::getSymbolAttrName(),
                         builder.getStringAttr(name));
     state.addAttribute(getTypeAttrName(), TypeAttr::get(type));
@@ -309,7 +331,7 @@ void TaskletNode::build(OpBuilder &builder, OperationState &state, StringRef nam
                                             /*resultAttrs=*/llvm::None);
 }
 
-void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
+void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper){
     llvm::MapVector<Identifier, Attribute> newAttrs;
     for(const NamedAttribute &attr : dest->getAttrs())
         newAttrs.insert(attr);
@@ -320,10 +342,11 @@ void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
     getBody().cloneInto(&dest.getBody(), mapper);
 }
 
-TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
-    TaskletNode newFunc = cast<TaskletNode>(getOperation()->cloneWithoutRegions());
+TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper){
+    TaskletNode newFunc = 
+                    cast<TaskletNode>(getOperation()->cloneWithoutRegions());
     
-    if(!isExternal()) {
+    if(!isExternal()){
         FunctionType oldType = getType();
 
         unsigned oldNumArgs = oldType.getNumInputs();
@@ -334,11 +357,11 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
             if(!mapper.contains(getArgument(i)))
                 newInputs.push_back(oldType.getInput(i));
 
-        if(newInputs.size() != oldNumArgs) {
+        if(newInputs.size() != oldNumArgs){
             newFunc.setType(FunctionType::get(oldType.getContext(), newInputs,
                                             oldType.getResults()));
 
-            if(ArrayAttr argAttrs = getAllArgAttrs()) {
+            if(ArrayAttr argAttrs = getAllArgAttrs()){
                 SmallVector<Attribute> newArgAttrs;
                 newArgAttrs.reserve(newInputs.size());
                 for(unsigned i = 0; i < oldNumArgs; i++)
@@ -353,7 +376,7 @@ TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
     return newFunc;
 }
 
-TaskletNode TaskletNode::clone() {
+TaskletNode TaskletNode::clone(){
     BlockAndValueMapping mapper;
     return clone(mapper);
 }
@@ -362,7 +385,7 @@ TaskletNode TaskletNode::clone() {
 // MapNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result){
     Builder &builder = parser.getBuilder();
     IndexType indexType = builder.getIndexType();
 
@@ -403,7 +426,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, MapNode op) {
+static void print(OpAsmPrinter &p, MapNode op){
     p.printNewline();
     p << op.getOperationName();
     printOptionalAttrDictNoNumList(p, op->getAttrs(),
@@ -431,13 +454,16 @@ LogicalResult verify(MapNode op){
     size_t var_count = op.getBody()->getArguments().size();
 
     if(getNumListSize(op, "lowerBounds") != var_count)
-        return op.emitOpError("failed to verify that size of lower bounds matches size of arguments");
+        return op.emitOpError("failed to verify that size of " 
+                            "lower bounds matches size of arguments");
     
     if(getNumListSize(op, "upperBounds") != var_count)
-        return op.emitOpError("failed to verify that size of upper bounds matches size of arguments");
+        return op.emitOpError("failed to verify that size of "
+                            "upper bounds matches size of arguments");
     
     if(getNumListSize(op, "steps") != var_count)
-        return op.emitOpError("failed to verify that size of steps matches size of arguments");
+        return op.emitOpError("failed to verify that size of "
+                            "steps matches size of arguments");
 
     return success();
 }
@@ -458,7 +484,8 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops){
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseConsumeNode(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseConsumeNode(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -503,26 +530,29 @@ static ParseResult parseConsumeNode(OpAsmParser &parser, OperationState &result)
     return success();
 }
 
-static void print(OpAsmPrinter &p, ConsumeNode op) {
+static void print(OpAsmPrinter &p, ConsumeNode op){
     p.printNewline();
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs()); 
     p << " (" << op.stream() << " : " << op.stream().getType() << ")";
-    p << " -> (pe: " << op.getBody()->getArgument(0) << ", elem: " << op.getBody()->getArgument(1) << ")";
+    p << " -> (pe: " << op.getBody()->getArgument(0);
+    p << ", elem: " << op.getBody()->getArgument(1) << ")";
     p.printRegion(op.region(), /*printEntryBlockArgs=*/false, 
         /*printBlockTerminators=*/false);
 }
 
 LogicalResult verify(ConsumeNode op){
     if(op.num_pes().hasValue() && op.num_pes().getValue().isNonPositive())
-        return op.emitOpError("failed to verify that number of processing elements is at least one");
+        return op.emitOpError("failed to verify that number of "
+                            "processing elements is at least one");
 
     return success();
 }
 
-LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable){
     // Check that the condition attribute is specified.
-    FlatSymbolRefAttr condAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
+    FlatSymbolRefAttr condAttr = 
+                        (*this)->getAttrOfType<FlatSymbolRefAttr>("condition");
     if(!condAttr)
         return success();
 
@@ -558,7 +588,7 @@ LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops){
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result){
     FlatSymbolRefAttr srcAttr;
     FlatSymbolRefAttr destAttr;
 
@@ -577,7 +607,7 @@ static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, EdgeOp op) {
+static void print(OpAsmPrinter &p, EdgeOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
     p << ' ';
@@ -590,22 +620,26 @@ LogicalResult verify(EdgeOp op){
     return success();
 }
 
-LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable){
     // Check that the src/dest attributes are specified.
-    FlatSymbolRefAttr srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
+    FlatSymbolRefAttr srcAttr = 
+                            (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
     if(!srcAttr)
         return emitOpError("requires a 'src' symbol reference attribute");
 
-    StateNode src = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
+    StateNode src = 
+                symbolTable.lookupNearestSymbolFrom<StateNode>(*this, srcAttr);
     if(!src)
         return emitOpError() << "'" << srcAttr.getValue()
                             << "' does not reference a valid state";
     
-    FlatSymbolRefAttr destAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
+    FlatSymbolRefAttr destAttr = 
+                            (*this)->getAttrOfType<FlatSymbolRefAttr>("dest");
     if(!destAttr)
         return emitOpError("requires a 'dest' symbol reference attribute");
 
-    StateNode dest = symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
+    StateNode dest = 
+                symbolTable.lookupNearestSymbolFrom<StateNode>(*this, destAttr);
     if(!dest)
         return emitOpError() << "'" << destAttr.getValue()
                             << "' does not reference a valid state";
@@ -617,7 +651,7 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 // AllocOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -626,7 +660,8 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
         return failure();
 
     // IDEA: Try multiple integer types before failing
-    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
+    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), 
+                            result.operands))
         return failure();
 
     Type resultType;
@@ -637,7 +672,7 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, AllocOp op) {
+static void print(OpAsmPrinter &p, AllocOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "(";
@@ -650,10 +685,12 @@ LogicalResult verify(AllocOp op){
     ArrayType res = op.res().getType().cast<ArrayType>();
 
     if(res.getUndefRank() != op.params().size())
-        return op.emitOpError("failed to verify that parameter size matches undefined dimensions size");
+        return op.emitOpError("failed to verify that parameter size "
+                            "matches undefined dimensions size");
 
     if(res.hasZeros())
-        return op.emitOpError("failed to verify that return type doesn't contain dimensions of size zero");
+        return op.emitOpError("failed to verify that return type "
+                            "doesn't contain dimensions of size zero");
 
     return success();
 }
@@ -662,7 +699,8 @@ LogicalResult verify(AllocOp op){
 // AllocTransientOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseAllocTransientOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseAllocTransientOp(OpAsmParser &parser, 
+                                        OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -671,7 +709,8 @@ static ParseResult parseAllocTransientOp(OpAsmParser &parser, OperationState &re
         return failure();
 
     // IDEA: Try multiple integer types before failing
-    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
+    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), 
+                            result.operands))
         return failure();
     
     Type resultType;
@@ -682,7 +721,7 @@ static ParseResult parseAllocTransientOp(OpAsmParser &parser, OperationState &re
     return success();
 }
 
-static void print(OpAsmPrinter &p, AllocTransientOp op) {
+static void print(OpAsmPrinter &p, AllocTransientOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "(";
@@ -695,10 +734,12 @@ LogicalResult verify(AllocTransientOp op){
     ArrayType res = op.res().getType().cast<ArrayType>();
 
     if(res.getUndefRank() != op.params().size())
-        return op.emitOpError("failed to verify that parameter size matches undefined dimensions size");
+        return op.emitOpError("failed to verify that parameter size matches "
+                            "undefined dimensions size");
 
     if(res.hasZeros())
-        return op.emitOpError("failed to verify that return type doesn't contain dimensions of size zero");
+        return op.emitOpError("failed to verify that return type doesn't "
+                            "contain dimensions of size zero");
 
     return success();
 }
@@ -707,7 +748,8 @@ LogicalResult verify(AllocTransientOp op){
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseGetAccessOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseGetAccessOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -733,7 +775,7 @@ static ParseResult parseGetAccessOp(OpAsmParser &parser, OperationState &result)
     return success();
 }
 
-static void print(OpAsmPrinter &p, GetAccessOp op) {
+static void print(OpAsmPrinter &p, GetAccessOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.arr();
@@ -748,18 +790,24 @@ LogicalResult verify(GetAccessOp op){
     Type res = op.res().getType();
 
     if(arr.isa<ArrayType>() && res.isa<MemletType>())
-        if(arr.cast<ArrayType>().getElementType() != res.cast<MemletType>().getElementType())
-            return op.emitOpError("failed to verify that result element type matches element type of 'array'");
+        if(arr.cast<ArrayType>().getElementType() 
+                != res.cast<MemletType>().getElementType())
+            return op.emitOpError("failed to verify that result element type "
+                                "matches element type of 'array'");
 
     if(arr.isa<StreamArrayType>() && res.isa<StreamType>())
-        if(arr.cast<StreamArrayType>().getElementType() != res.cast<StreamType>().getElementType())
-            return op.emitOpError("failed to verify that result element type matches element type of 'stream_array'");
+        if(arr.cast<StreamArrayType>().getElementType()  
+                != res.cast<StreamType>().getElementType())
+            return op.emitOpError("failed to verify that result element type "
+                                "matches element type of 'stream_array'");
 
     if(arr.isa<ArrayType>() && res.isa<StreamType>())
-        return op.emitOpError("failed to verify that result type matches derived type of 'array'");
+        return op.emitOpError("failed to verify that result type matches "
+                            "derived type of 'array'");
 
     if(arr.isa<StreamArrayType>() && res.isa<MemletType>())
-        return op.emitOpError("failed to verify that result type matches derived type of 'stream_array'");
+        return op.emitOpError("failed to verify that result type matches "
+                            "derived type of 'stream_array'");
 
     return success();
 }
@@ -768,7 +816,7 @@ LogicalResult verify(GetAccessOp op){
 // LoadOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -798,9 +846,10 @@ static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, LoadOp op) {
+static void print(OpAsmPrinter &p, LoadOp op){
     p << op.getOperationName();
-    printOptionalAttrDictNoNumList(p, op->getAttrs(), /*elidedAttrs*/{"indices"});
+    printOptionalAttrDictNoNumList(p, op->getAttrs(), 
+                                /*elidedAttrs*/{"indices"});
     p << ' ' << op.arr();
     p << "[";
     printNumberList(p, op.getOperation(), "indices"); 
@@ -824,7 +873,7 @@ LogicalResult verify(LoadOp op){
 // StoreOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
     
@@ -862,9 +911,10 @@ static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, StoreOp op) {
+static void print(OpAsmPrinter &p, StoreOp op){
     p << op.getOperationName();
-    printOptionalAttrDictNoNumList(p, op->getAttrs(), /*elidedAttrs=*/{"indices"});
+    printOptionalAttrDictNoNumList(p, op->getAttrs(), 
+                                /*elidedAttrs=*/{"indices"});
     p << ' ' << op.val() << "," << ' ' << op.arr();
     p << "[";
     printNumberList(p, op.getOperation(), "indices");
@@ -888,7 +938,7 @@ LogicalResult verify(StoreOp op){
 // CopyOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -916,7 +966,7 @@ static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result) {
     return success();
 }
 
-static void print(OpAsmPrinter &p, CopyOp op) {
+static void print(OpAsmPrinter &p, CopyOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src() << " -> " << op.dest();
@@ -932,7 +982,8 @@ LogicalResult verify(CopyOp op){
 // MemletCastOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseMemletCastOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseMemletCastOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -958,7 +1009,7 @@ static ParseResult parseMemletCastOp(OpAsmParser &parser, OperationState &result
     return success();
 }
 
-static void print(OpAsmPrinter &p, MemletCastOp op) {
+static void print(OpAsmPrinter &p, MemletCastOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src();
@@ -981,7 +1032,7 @@ LogicalResult verify(MemletCastOp op){
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseViewCastOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseViewCastOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1007,7 +1058,7 @@ static ParseResult parseViewCastOp(OpAsmParser &parser, OperationState &result) 
     return success();
 }
 
-static void print(OpAsmPrinter &p, ViewCastOp op) {
+static void print(OpAsmPrinter &p, ViewCastOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src();
@@ -1030,7 +1081,8 @@ LogicalResult verify(ViewCastOp op){
 // AllocStreamOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseAllocStreamOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseAllocStreamOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1039,7 +1091,8 @@ static ParseResult parseAllocStreamOp(OpAsmParser &parser, OperationState &resul
         return failure();
     
     // IDEA: Try multiple integer types before failing
-    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
+    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), 
+                            result.operands))
         return failure();
 
     Type resultType;
@@ -1050,7 +1103,7 @@ static ParseResult parseAllocStreamOp(OpAsmParser &parser, OperationState &resul
     return success();
 }
 
-static void print(OpAsmPrinter &p, AllocStreamOp op) {
+static void print(OpAsmPrinter &p, AllocStreamOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "() : ";
@@ -1065,7 +1118,8 @@ LogicalResult verify(AllocStreamOp op){
 // AllocTransientStreamOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser, 
+                                            OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1074,7 +1128,8 @@ static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser, OperationSta
         return failure();
     
     // IDEA: Try multiple integer types before failing
-    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), result.operands))
+    if(parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(), 
+                            result.operands))
         return failure();
 
     Type resultType;
@@ -1085,7 +1140,7 @@ static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser, OperationSta
     return success();
 }
 
-static void print(OpAsmPrinter &p, AllocTransientStreamOp op) {
+static void print(OpAsmPrinter &p, AllocTransientStreamOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "() : ";
@@ -1100,7 +1155,8 @@ LogicalResult verify(AllocTransientStreamOp op){
 // StreamPopOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStreamPopOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseStreamPopOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1126,7 +1182,7 @@ static ParseResult parseStreamPopOp(OpAsmParser &parser, OperationState &result)
     return success();
 }
 
-static void print(OpAsmPrinter &p, StreamPopOp op) {
+static void print(OpAsmPrinter &p, StreamPopOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.str();
@@ -1144,7 +1200,8 @@ LogicalResult verify(StreamPopOp op){
 // StreamPushOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStreamPushOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseStreamPushOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1178,7 +1235,7 @@ static ParseResult parseStreamPushOp(OpAsmParser &parser, OperationState &result
     return success();
 }
 
-static void print(OpAsmPrinter &p, StreamPushOp op) {
+static void print(OpAsmPrinter &p, StreamPushOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.val() << ", " << op.str();
@@ -1189,8 +1246,10 @@ static void print(OpAsmPrinter &p, StreamPushOp op) {
 }
 
 LogicalResult verify(StreamPushOp op){
-    if(op.val().getType() != op.str().getType().cast<StreamType>().getElementType())
-        op.emitOpError("failed to verify that value type matches element type of 'stream'");
+    if(op.val().getType() 
+            != op.str().getType().cast<StreamType>().getElementType())
+        op.emitOpError("failed to verify that value type "
+                    "matches element type of 'stream'");
 
     return success();
 }
@@ -1199,7 +1258,8 @@ LogicalResult verify(StreamPushOp op){
 // StreamLengthOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStreamLengthOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseStreamLengthOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1225,7 +1285,7 @@ static ParseResult parseStreamLengthOp(OpAsmParser &parser, OperationState &resu
     return success();
 }
 
-static void print(OpAsmPrinter &p, StreamLengthOp op) {
+static void print(OpAsmPrinter &p, StreamLengthOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.str();
@@ -1243,7 +1303,7 @@ LogicalResult verify(StreamLengthOp op){
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1251,7 +1311,7 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
     if(parser.parseOperandList(returnOperands))
         return failure();
 
-    if(!returnOperands.empty()) {
+    if(!returnOperands.empty()){
         if(parser.parseColon())
             return failure();
 
@@ -1259,17 +1319,18 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
         if(parser.parseTypeList(returnTypes))
             return failure();
         
-        if(parser.resolveOperands(returnOperands, returnTypes, parser.getCurrentLocation() , result.operands))
+        if(parser.resolveOperands(returnOperands, returnTypes, 
+                                parser.getCurrentLocation(), result.operands))
             return failure();
     }
    
     return success();
 }
 
-static void print(OpAsmPrinter &p, ReturnOp op) {
+static void print(OpAsmPrinter &p, ReturnOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
-    if(!op.input().empty()) {
+    if(!op.input().empty()){
         p << ' ' << op.input();
         p << " : ";
         p << op.input().getTypes();
@@ -1284,12 +1345,13 @@ LogicalResult verify(ReturnOp op){
 // CallOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
     Attribute calleeAttr;
-    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(), "callee", result.attributes))
+    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(), 
+                            "callee", result.attributes))
         return failure();
 
     SmallVector<OpAsmParser::OperandType, 4> operands;
@@ -1304,33 +1366,37 @@ static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
     ArrayRef<Type> resultTypes = func.getResults();
     result.addTypes(resultTypes);
 
-    if(parser.resolveOperands(operands, operandsTypes, parser.getCurrentLocation(), result.operands))
+    if(parser.resolveOperands(operands, operandsTypes, 
+                            parser.getCurrentLocation(), result.operands))
         return failure();
 
     return success();
 }
 
-static void print(OpAsmPrinter &p, CallOp op) {
+static void print(OpAsmPrinter &p, CallOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
     p << ' ';
     p.printAttributeWithoutType(op.calleeAttr());
     p << "(" << op.operands() << ")";
     p << " : ";
-    p.printFunctionalType(op.operands().getTypes(), op.getOperation()->getResultTypes());
+    p.printFunctionalType(op.operands().getTypes(), 
+                        op.getOperation()->getResultTypes());
 }
 
 LogicalResult verify(CallOp op){
     return success();
 }
 
-LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable){
     // Check that the callee attribute was specified.
-    FlatSymbolRefAttr fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
+    FlatSymbolRefAttr fnAttr = 
+                            (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
     if(!fnAttr)
         return emitOpError("requires a 'callee' symbol reference attribute");
 
-    TaskletNode fnT = symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
+    TaskletNode fnT = 
+                symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
     SDFGNode fnS = symbolTable.lookupNearestSymbolFrom<SDFGNode>(*this, fnAttr);
 
     if(!fnT && !fnS){
@@ -1352,10 +1418,12 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
         return emitOpError("incorrect number of results for callee");
 
     for(unsigned i = 0; i < fnType.getNumResults(); i++)
-        if(getResult(i).getType() != fnType.getResult(i)) {
-            InFlightDiagnostic diag = emitOpError("result type mismatch at index ") << i;
+        if(getResult(i).getType() != fnType.getResult(i)){
+            InFlightDiagnostic diag = 
+                            emitOpError("result type mismatch at index ") << i;
             diag.attachNote() << "      op result types: " << getResultTypes();
-            diag.attachNote() << "function result types: " << fnType.getResults();
+            diag.attachNote() << "function result types: " 
+                            << fnType.getResults();
             return diag;
         }
 
@@ -1366,12 +1434,13 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
     Attribute calleeAttr;
-    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(), "callee", result.attributes))
+    if(parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(), 
+                            "callee", result.attributes))
         return failure();
 
     SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
@@ -1386,20 +1455,22 @@ static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result) {
     ArrayRef<Type> allResultTypes = func.getResults();
     result.addTypes(allResultTypes);
 
-    if(parser.resolveOperands(operandsOperands, operandsTypes, parser.getCurrentLocation(), result.operands))
+    if(parser.resolveOperands(operandsOperands, operandsTypes, 
+                            parser.getCurrentLocation(), result.operands))
         return failure();
 
     return success();
 }
 
-static void print(OpAsmPrinter &p, LibCallOp op) {
+static void print(OpAsmPrinter &p, LibCallOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
     p << ' ';
     p.printAttributeWithoutType(op.calleeAttr());
     p << "(" << op.operands() << ")";
     p << " : ";
-    p.printFunctionalType(op.operands().getTypes(), op.getOperation()->getResultTypes());
+    p.printFunctionalType(op.operands().getTypes(), 
+                        op.getOperation()->getResultTypes());
 }
 
 LogicalResult verify(LibCallOp op){
@@ -1410,14 +1481,16 @@ LogicalResult verify(LibCallOp op){
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseAllocSymbolOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseAllocSymbolOp(OpAsmParser &parser, 
+                                    OperationState &result){
     StringAttr symAttr;
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
     if(parser.parseLParen())
         return failure();
-    if(parser.parseAttribute(symAttr, parser.getBuilder().getNoneType(), "sym", result.attributes))
+    if(parser.parseAttribute(symAttr, parser.getBuilder().getNoneType(), 
+                            "sym", result.attributes))
         return failure();
     if(parser.parseRParen())
         return failure();
@@ -1425,7 +1498,7 @@ static ParseResult parseAllocSymbolOp(OpAsmParser &parser, OperationState &resul
     return success();
 }
 
-static void print(OpAsmPrinter &p, AllocSymbolOp op) {
+static void print(OpAsmPrinter &p, AllocSymbolOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym"});
     p << "(";
@@ -1438,11 +1511,13 @@ LogicalResult verify(AllocSymbolOp op){
       return op.emitOpError("failed to verify that input string is not empty");
     
     if(!isalpha(op.sym().front()))
-      return op.emitOpError("failed to verify that input string starts with an alphabetical character");
+      return op.emitOpError("failed to verify that input string starts with "
+                            "an alphabetical character");
 
     for(auto c : op.sym()) 
       if(!isalnum(c))
-        return op.emitOpError("failed to verify that input string only contains alphanumeric characters");
+        return op.emitOpError("failed to verify that input string only "
+                            "contains alphanumeric characters");
 
     return success();
 }
@@ -1451,7 +1526,8 @@ LogicalResult verify(AllocSymbolOp op){
 // SymbolExprOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseSymbolExprOp(OpAsmParser &parser, OperationState &result) {
+static ParseResult parseSymbolExprOp(OpAsmParser &parser, 
+                                    OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
 
@@ -1469,7 +1545,7 @@ static ParseResult parseSymbolExprOp(OpAsmParser &parser, OperationState &result
     return success();
 }
 
-static void print(OpAsmPrinter &p, SymbolExprOp op) {
+static void print(OpAsmPrinter &p, SymbolExprOp op){
     p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"expr"});
     p << "(";

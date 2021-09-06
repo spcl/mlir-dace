@@ -22,7 +22,8 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, OptionalAttr<StrAttr>:$sym_visibility);
+    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, 
+                        OptionalAttr<StrAttr>:$sym_visibility);
     let regions = (region AnyRegion:$body);
 
     let builders = [OpBuilder<(ins
@@ -32,13 +33,16 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     >];
 
     let extraClassDeclaration = [{
-        static TaskletNode create(Location location, StringRef name, FunctionType type,
-                         ArrayRef<NamedAttribute> attrs = {});
-        static TaskletNode create(Location location, StringRef name, FunctionType type,
-                            Operation::dialect_attr_range attrs);
-        static TaskletNode create(Location location, StringRef name, FunctionType type,
-                            ArrayRef<NamedAttribute> attrs,
-                            ArrayRef<DictionaryAttr> argAttrs);
+        static TaskletNode create(Location location, StringRef name,
+                                FunctionType type, 
+                                ArrayRef<NamedAttribute> attrs = {});
+        static TaskletNode create(Location location, StringRef name, 
+                                FunctionType type, 
+                                Operation::dialect_attr_range attrs);
+        static TaskletNode create(Location location, StringRef name, 
+                                FunctionType type,
+                                ArrayRef<NamedAttribute> attrs,
+                                ArrayRef<DictionaryAttr> argAttrs);
 
         TaskletNode clone(BlockAndValueMapping &mapper);
         TaskletNode clone();
@@ -78,7 +82,8 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         LogicalResult verifyType() {
             auto type = getTypeAttr().getValue();
             if (!type.isa<FunctionType>())
-                return emitOpError("requires '" + getTypeAttrName() + "' attribute of function type");
+                return emitOpError("requires '" + getTypeAttrName() 
+                                    + "' attribute of function type");
             return success();
         }
     }];

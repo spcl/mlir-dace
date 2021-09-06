@@ -13,9 +13,9 @@ def SDIR_MapNode : SDIR_Op<"map", [
         For example:
 
         ```mlir
-        sdir.map ($i, $j) = (0, 0) to (2, 2) step (1, 1) {
+        sdir.map (%i, %j) = (0, 0) to (2, 2) step (1, 1) {
             ...
-            %a = sdir.load %A[$i, $j] : !sdir.memlet<12x34xi32>
+            %a = sdir.load %A[%i, %j] : !sdir.memlet<12x34xi32>
             ...
         } 
         ```

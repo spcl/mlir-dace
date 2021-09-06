@@ -10,12 +10,12 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
 ]> {
     let summary = "Consume scope";
     let description = [{
-        Describes a consume scope where the region has access to the popped element as well as the .
+        Describes a consume scope where the region has access to the popped 
+        element as well as the processing element.
         For example:
 
         ```mlir
-        sdir.consume{num_pes=$P, condition=@empty} %A : !sdir.stream<i32> {
-            ^bb0(%p: i32, %a: i32)
+        sdir.consume{num_pes=5} (%a : !sdir.stream<i32>) -> (pe: %p, elem: %e) {
                 %c = sdir.call @add_one(%a) : i32 -> i32
                 sdir.store(wcr="add") %c, %C[] : i32 -> !sdir.memlet<i32>
             ...
