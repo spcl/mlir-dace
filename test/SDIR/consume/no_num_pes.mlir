@@ -12,8 +12,8 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.get_access [[NAMEA]] 
         // CHECK-SAME: !sdir.stream_array<2x6xi32> -> !sdir.stream<2x6xi32>
         %a = sdir.get_access %A : !sdir.stream_array<2x6xi32> -> !sdir.stream<2x6xi32>
-        // CHECK: func @empty
-        func @empty(%x: !sdir.stream<2x6xi32>) -> i1{
+        // CHECK: builtin.func @empty
+        builtin.func @empty(%x: !sdir.stream<2x6xi32>) -> i1{
             %0 = constant 0 : i32
             %length = sdir.stream_length %x : !sdir.stream<2x6xi32> -> i32
             %isZero = cmpi "eq", %length, %0 : i32

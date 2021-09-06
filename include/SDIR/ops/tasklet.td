@@ -54,26 +54,6 @@ def SDIR_CallOp : SDIR_Op<"call", [
                         Variadic<AnyType>:$operands);
     let results = (outs Variadic<AnyType>);
 
-    let builders = [
-        OpBuilder<(ins "TaskletNode":$callee, 
-                        CArg<"ValueRange", "{}">:$operands), [{
-            $_state.addOperands(operands);
-            $_state.addAttribute("callee",$_builder.getSymbolRefAttr(callee));
-            $_state.addTypes(callee.getType().getResults());
-        }]>,
-        OpBuilder<(ins "SymbolRefAttr":$callee, "TypeRange":$results,
-                        CArg<"ValueRange", "{}">:$operands), [{
-            $_state.addOperands(operands);
-            $_state.addAttribute("callee", callee);
-            $_state.addTypes(results);
-        }]>,
-        OpBuilder<(ins "StringRef":$callee, "TypeRange":$results,
-                        CArg<"ValueRange", "{}">:$operands), [{
-            build($_builder, $_state, $_builder.getSymbolRefAttr(callee), 
-                results, operands);
-        }]>
-    ];
-
     let extraClassDeclaration = [{
         StringRef getCallee() { return callee(); }
 

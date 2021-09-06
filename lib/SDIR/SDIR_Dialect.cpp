@@ -33,14 +33,15 @@ static ParseResult parseDimensionList(DialectAsmParser &parser, Type &elemType,
 
     do{
         OptionalParseResult typeOPR = parser.parseOptionalType(elemType);
-        if(typeOPR.hasValue())
-        if(typeOPR.getValue().succeeded()){
-            if(parser.parseGreater()) return failure();
-            return success();
-        } else return failure();
+        if(typeOPR.hasValue()){
+            if(typeOPR.getValue().succeeded()){
+                if(parser.parseGreater()) return failure();
+                return success();
+            } else return failure();
+        }
 
         if(parser.parseOptionalKeyword("sym").succeeded()){
-        StringRef symEx;
+        std::string symEx;
 
         if(parser.parseLParen() || parser.parseString(&symEx)
                 || parser.parseRParen()) 
@@ -53,12 +54,13 @@ static ParseResult parseDimensionList(DialectAsmParser &parser, Type &elemType,
 
         int64_t num;
         OptionalParseResult intOPR = parser.parseOptionalInteger(num);
-        if(intOPR.hasValue())
-        if(intOPR.getValue().succeeded()){
-            integers.push_back(num);
-            shape.push_back(true);
-            continue;
-        } else return failure();
+        if(intOPR.hasValue()){
+            if(intOPR.getValue().succeeded()){
+                integers.push_back(num);
+                shape.push_back(true);
+                continue;
+            } else return failure();
+        }
 
         if(parser.parseOptionalQuestion().succeeded()){
             integers.push_back(-1);

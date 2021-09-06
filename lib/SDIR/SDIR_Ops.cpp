@@ -162,8 +162,6 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, SDFGNode op){
-    p.printNewline();
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), 
                             /*elidedAttrs=*/{"sym_name", "type"});
     p << ' ';
@@ -235,8 +233,6 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, StateNode op){
-    p.printNewline();
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
     p << ' ';
     p.printSymbolName(op.sym_name());
@@ -264,7 +260,6 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, TaskletNode op){
-    p.printNewline();
     FunctionType fnType = op.getType();
     function_like_impl::printFunctionLikeOp(p, op, fnType.getInputs(), 
                                     /*isVariadic=*/false, fnType.getResults());
@@ -427,8 +422,6 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, MapNode op){
-    p.printNewline();
-    p << op.getOperationName();
     printOptionalAttrDictNoNumList(p, op->getAttrs(),
                             {"lowerBounds", "upperBounds", "steps"});
 
@@ -531,8 +524,6 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, ConsumeNode op){
-    p.printNewline();
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs()); 
     p << " (" << op.stream() << " : " << op.stream().getType() << ")";
     p << " -> (pe: " << op.getBody()->getArgument(0);
@@ -608,7 +599,6 @@ static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, EdgeOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
     p << ' ';
     p.printAttributeWithoutType(op.srcAttr());
@@ -673,7 +663,6 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, AllocOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "(";
     p.printOperands(op.params());
@@ -722,7 +711,6 @@ static ParseResult parseAllocTransientOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, AllocTransientOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "(";
     p.printOperands(op.params());
@@ -776,7 +764,6 @@ static ParseResult parseGetAccessOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, GetAccessOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.arr();
     p << " : ";
@@ -847,7 +834,6 @@ static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, LoadOp op){
-    p << op.getOperationName();
     printOptionalAttrDictNoNumList(p, op->getAttrs(), 
                                 /*elidedAttrs*/{"indices"});
     p << ' ' << op.arr();
@@ -912,7 +898,6 @@ static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, StoreOp op){
-    p << op.getOperationName();
     printOptionalAttrDictNoNumList(p, op->getAttrs(), 
                                 /*elidedAttrs=*/{"indices"});
     p << ' ' << op.val() << "," << ' ' << op.arr();
@@ -967,7 +952,6 @@ static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, CopyOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src() << " -> " << op.dest();
     p << " : ";
@@ -1010,7 +994,6 @@ static ParseResult parseMemletCastOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, MemletCastOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src();
     p << " : ";
@@ -1059,7 +1042,6 @@ static ParseResult parseViewCastOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, ViewCastOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.src();
     p << " : ";
@@ -1104,7 +1086,6 @@ static ParseResult parseAllocStreamOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, AllocStreamOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "() : ";
     p << op.getOperation()->getResultTypes();
@@ -1141,7 +1122,6 @@ static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, AllocTransientStreamOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << "() : ";
     p << op.getOperation()->getResultTypes();
@@ -1183,7 +1163,6 @@ static ParseResult parseStreamPopOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, StreamPopOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.str();
     p << " : ";
@@ -1236,7 +1215,6 @@ static ParseResult parseStreamPushOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, StreamPushOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.val() << ", " << op.str();
     p << " : ";
@@ -1286,7 +1264,6 @@ static ParseResult parseStreamLengthOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, StreamLengthOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     p << ' ' << op.str();
     p << " : ";
@@ -1328,7 +1305,6 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, ReturnOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs());
     if(!op.input().empty()){
         p << ' ' << op.input();
@@ -1374,7 +1350,6 @@ static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, CallOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
     p << ' ';
     p.printAttributeWithoutType(op.calleeAttr());
@@ -1463,7 +1438,6 @@ static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result){
 }
 
 static void print(OpAsmPrinter &p, LibCallOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
     p << ' ';
     p.printAttributeWithoutType(op.calleeAttr());
@@ -1499,7 +1473,6 @@ static ParseResult parseAllocSymbolOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, AllocSymbolOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym"});
     p << "(";
     p.printAttributeWithoutType(op.symAttr());
@@ -1546,7 +1519,6 @@ static ParseResult parseSymbolExprOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, SymbolExprOp op){
-    p << op.getOperationName();
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"expr"});
     p << "(";
     p.printAttributeWithoutType(op.exprAttr());
