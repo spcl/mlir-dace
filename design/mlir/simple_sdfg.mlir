@@ -7,6 +7,10 @@ sdir.state @state_0{
     %a = sdir.get_access %A 
     %b = sdir.get_access %B 
     %c = sdir.get_access %C 
-     
-    %c = sdir.call @add(%a, %b)
+    
+    %a_val = sdir.load %a[0]
+    %b_val = sdir.load %b[0]
+    %c_val = sdir.call @add(%a, %b)
+
+    sdir.store %c_val, %c[0]
 }

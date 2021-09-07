@@ -1,11 +1,11 @@
 
-func @add(%old: i32, %new: i32) -> i32{
+builtin.func @add(%old: i32, %new: i32) -> i32{
     %res = addi %old, %1 : i32
     return %res : i32
 }
 
 sdir.state @state_0{ 
-    %a = sdir.get_access %A : !sdir.memlet<i32>
-    %c = sdir.get_access %C : !sdir.memlet<i32>
+    %a = sdir.get_access %A
+    %c = sdir.get_access %C
     sdir.copy{wcr=@add} %a -> %c
 }

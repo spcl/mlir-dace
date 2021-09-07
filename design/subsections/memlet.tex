@@ -4,5 +4,5 @@ Memlets are represented by using \codeword{sdir.memlet}, which extends the built
 \\
 
 \subsubsection{Parameterized sizes}
- One can also pass parameters to \codeword{sdir.alloc()} to define the size at runtime as seen on here:\codeword{\%A = sdir.alloc(\%n) : !sdir.memlet<?xi32>}. In this case the question mark \codeword{?} gets replaced by the value of \codeword{\%n}.
+ One can also pass parameters to \codeword{sdir.alloc()} to define the size at runtime as seen on here:\codeword{\%A = sdir.alloc(\%n) : !sdir.array<?xi32>}. In this case the question mark \codeword{?} gets replaced by the value of \codeword{\%n}.
  
