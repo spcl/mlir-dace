@@ -7,18 +7,21 @@
 
 #include "SDIR/SDIR_Dialect.h"
 
+using namespace mlir;
+using namespace sdir;
+
 int main(int argc, char **argv) {
-    mlir::registerAllPasses();
+    registerAllPasses();
     // TODO: Register SDIR passes here.
 
-    mlir::DialectRegistry registry;
-    registry.insert<mlir::sdir::SDIRDialect>();
-    registry.insert<mlir::StandardOpsDialect>();
+    DialectRegistry registry;
+    registry.insert<SDIRDialect>();
+    registry.insert<StandardOpsDialect>();
     // Add the following to include *all* MLIR Core dialects, or selectively
     // include what you need like above. You only need to register dialects that
     // will be *parsed* by the tool, not the one generated
     // registerAllDialects(registry);
 
-    return mlir::asMainReturnCode(
-            mlir::MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
+    return asMainReturnCode(
+                MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
 }

@@ -1,7 +1,7 @@
 #include "SDIR/SDIR_Dialect.h"
 
 using namespace mlir;
-using namespace mlir::sdir;
+using namespace sdir;
 
 //===----------------------------------------------------------------------===//
 // InlineSymbol
@@ -297,7 +297,7 @@ TaskletNode TaskletNode::create(Location location, StringRef name,
 TaskletNode TaskletNode::create(Location location, StringRef name, FunctionType type, 
                                         Operation::dialect_attr_range attrs){
     SmallVector<NamedAttribute, 8> attrRef(attrs);
-    return create(location, name, type, llvm::makeArrayRef(attrRef));
+    return create(location, name, type, makeArrayRef(attrRef));
 }
 
 TaskletNode TaskletNode::create(Location location, StringRef name, 
@@ -323,7 +323,7 @@ void TaskletNode::build(OpBuilder &builder, OperationState &state,
         return;
     assert(type.getNumInputs() == argAttrs.size());
     function_like_impl::addArgAndResultAttrs(builder, state, argAttrs,
-                                            /*resultAttrs=*/llvm::None);
+                                            /*resultAttrs=*/None);
 }
 
 void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper){
