@@ -1,7 +1,7 @@
 #include "SDIR/SDIR_Dialect.h"
 
 using namespace mlir;
-using namespace mlir::sdir;
+using namespace sdir;
 
 #include "SDIR/SDIR_OpsDialect.cpp.inc"
 

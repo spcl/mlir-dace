@@ -178,4 +178,36 @@ def SDIR_ViewCastOp : SDIR_Op<"view_cast", [
     let results = (outs SDIR_MemletType:$res);
 }
 
+//===----------------------------------------------------------------------===//
+// SubviewOp
+//===----------------------------------------------------------------------===//
+
+def SDIR_SubviewOp : SDIR_Op<"subview", [
+    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
+]> {
+    let summary = "Subview operation";
+    let description = [{
+        Return a subview of a memlet with the provided offsets, sizes and 
+        strides.
+        For example:
+
+        ```mlir
+        sdir.state {
+            ...
+            %B = sdir.subview %A[3, 4, 2][1, 6, 3][1, 1, 1] : !sdir.memlet<8x16x4xi32> -> !sdir.memlet<6x3xi32>
+            ...
+        }
+        ```
+    }];
+
+    let arguments = (ins 
+        Variadic<Index>:$ranges,
+        SDIR_MemletType:$src,
+        ArrayAttr:$offsets,
+        ArrayAttr:$sizes,
+        ArrayAttr:$strides
+    );
+    let results = (outs SDIR_MemletType:$res);
+}
+
 #endif // SDIR_MemletOps

@@ -1060,6 +1060,71 @@ LogicalResult verify(ViewCastOp op){
 }
 
 //===----------------------------------------------------------------------===//
+// SubviewOp
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseSubviewOp(OpAsmParser &parser, OperationState &result){
+    if(parser.parseOptionalAttrDict(result.attributes))
+        return failure();
+
+    OpAsmParser::OperandType memletOperand;
+    if(parser.parseOperand(memletOperand))
+        return failure();
+
+    if(parser.parseLSquare()
+            || parseNumberList(parser, result, "offsets")
+            || parser.parseRSquare())
+        return failure();
+
+    if(parser.parseLSquare()
+            || parseNumberList(parser, result, "sizes")
+            || parser.parseRSquare())
+        return failure();
+
+    if(parser.parseLSquare()
+            || parseNumberList(parser, result, "strides")
+            || parser.parseRSquare())
+        return failure();
+
+    Type srcType;
+    if(parser.parseColonType(srcType))
+        return failure();
+
+    if(parser.parseArrow())
+        return failure();
+
+    Type destType;
+    if(parser.parseType(destType))
+        return failure();
+    result.addTypes(destType);
+  
+    if(parser.resolveOperands(memletOperand, srcType, result.operands))
+        return failure();
+  
+    return success();
+}
+
+static void print(OpAsmPrinter &p, SubviewOp op){
+    printOptionalAttrDictNoNumList(p, op->getAttrs(),
+                                {"offsets", "sizes", "strides"});
+    p << ' ' << op.src() << "[";
+    printNumberList(p, op.getOperation(), "offsets");
+    p << "][";
+    printNumberList(p, op.getOperation(), "sizes");
+    p << "][";
+    printNumberList(p, op.getOperation(), "strides");
+    p << "]";
+    p << " : ";
+    p << ArrayRef<Type>(op.src().getType());
+    p << " -> ";
+    p << op.getOperation()->getResultTypes();
+}
+
+LogicalResult verify(SubviewOp op){    
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
 // AllocStreamOp
 //===----------------------------------------------------------------------===//
 
