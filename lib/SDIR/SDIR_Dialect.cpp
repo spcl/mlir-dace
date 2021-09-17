@@ -83,7 +83,7 @@ static void printDimensionList(DialectAsmPrinter &printer, Type &elemType,
 
     printer << "<";
 
-    for(unsigned i = 0; i < shape.size(); i++)
+    for(unsigned i = 0; i < shape.size(); ++i)
         if(shape[i])
             if(integers[intIdx++] == -1) printer << "?x";
             else printer << integers[intIdx-1] << "x";
