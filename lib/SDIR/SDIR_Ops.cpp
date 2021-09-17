@@ -1561,10 +1561,10 @@ LogicalResult verify(AllocSymbolOp op){
 }
 
 //===----------------------------------------------------------------------===//
-// SymbolExprOp
+// SymOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseSymbolExprOp(OpAsmParser &parser, 
+static ParseResult parseSymOp(OpAsmParser &parser, 
                                     OperationState &result){
     if(parser.parseOptionalAttrDict(result.attributes))
         return failure();
@@ -1583,14 +1583,14 @@ static ParseResult parseSymbolExprOp(OpAsmParser &parser,
     return success();
 }
 
-static void print(OpAsmPrinter &p, SymbolExprOp op){
+static void print(OpAsmPrinter &p, SymOp op){
     p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"expr"});
     p << "(";
     p.printAttributeWithoutType(op.exprAttr());
     p << ") : " << op->getResultTypes();
 }
 
-LogicalResult verify(SymbolExprOp op){
+LogicalResult verify(SymOp op){
     return success();
 }
 

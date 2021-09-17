@@ -26,10 +26,10 @@ def SDIR_AllocSymbolOp : SDIR_Op<"alloc_symbol", [
 }
 
 //===----------------------------------------------------------------------===//
-// SymbolExprOp
+// SymOp
 //===----------------------------------------------------------------------===//
 
-def SDIR_SymbolExprOp : SDIR_Op<"$">{
+def SDIR_SymOp : SDIR_Op<"sym">{
     let summary = "symbolic expression operation";
     let description = [{
         Describes an arithmetic symbolic expression.
@@ -38,7 +38,7 @@ def SDIR_SymbolExprOp : SDIR_Op<"$">{
         ```mlir
         sdir.state @state_0 {
             ...
-            %res = sdir.$("3*N+2") : i32
+            %res = sdir.sym("3*N+2") : i32
             ...
         }
         ```
