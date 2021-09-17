@@ -5,6 +5,6 @@ sdir.state @state_0{
 
     %c_t = sdir.libcall "dace.libraries
             .blas.nodes.Gemm" (%a, %b)
-    sdir.store %c_t, %c
+    sdir.store %c_t, %c[0]
 }
 

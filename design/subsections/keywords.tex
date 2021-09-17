@@ -1,15 +1,15 @@
 \subsection{Identifiers, keywords and types}
-SDIR introduces only one additional identifier with the symbol \codeword{\$} (see Section \ref{section:symbol}).\\
+SDIR introduces only one additional identifier with the keyword \codeword{sym} (see Section \ref{section:symbol}).\\
 Every op and region specific to SDIR is prefixed by the keyword \codeword{sdir} followed by a dot to clearly mark the end of the prefix. Some examples are: \codeword{sdir.tasklet\{\}}, \codeword{sdir.return}, \codeword{sdir.alloc()}. \\
-SDIR contains only two additional types on top of the builtin types: \codeword{!sdir.memlet<>} (See Section \ref{section:memlet}) and \codeword{!sdir.stream<>} (See Section \ref{section:stream}).
+SDIR contains only four additional types on top of the builtin types: \codeword{!sdir.array<>}, \codeword{!sdir.memlet<>} (See Section \ref{section:memlet}), \codeword{!sdir.stream_array<>} and \codeword{!sdir.stream<>} (See Section \ref{section:stream}).
 
 \subsubsection{Symbols} \label{section:symbol}
-The op \codeword{sdir.alloc_symbol} creates a new symbol, but does not return anything. In order to access symbols the identifier \codeword{\$()} can be used. See Figure \ref{fig:symbol}. One can describe arithmetic expressions inside the identifier. Example:\codeword{\$(2*N - 1)}. Parentheses can be omitted for a single symbol. \codeword{\$N} is the same as \codeword{\$(N)}.
+The op \codeword{sdir.alloc_symbol} creates a new symbol, but does not return anything. In order to access symbols the identifier \codeword{sym()} can be used. See Figure \ref{fig:symbol}. One can describe arithmetic expressions inside the identifier. Example:\codeword{sym("2*N - 1")}.
 \smc{symbol}{Symbol used for range in map}
 
  \subsubsection{Symbolic sizes}
- Symbols (see Section \ref{section:symbol}) can be used to define the size of an \codeword{sdir.memlet}. One simply replaces the constants in the type by the symbol identifier \codeword{\$()}.\\
- Example:\codeword{\%A = sdir.alloc() : !sdir.memlet<\$(2*N)xi32>}.
+ Symbols (see Section \ref{section:symbol}) can be used to define the size of an \codeword{sdir.memlet}. One simply replaces the constants in the type by the symbol identifier \codeword{sym()}.\\
+ Example:\codeword{\%A = sdir.alloc() : !sdir.memlet<sym("2*N")xi32>}.
  
  \subsubsection{Write conflict resolution}
 In some cases an op might write to a location that contains the result of an other op. To resolve this conflict any op that writes to a location has an optional attribute called \codeword{wcr}. Examples:\codeword{sdir.copy\{wcr="add"\} \%a -> \%c} or \codeword{sdir.store\{wcr="max"\} \%1, \%a : i32}. "overwrite" is the default if no \codeword{wcr} is provided. A function may be provided as well. The function must have the signature \codeword{old, new -> resolved} and the types must match the memlet types. See Figure \ref{fig:wcr}.
