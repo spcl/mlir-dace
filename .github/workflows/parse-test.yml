@@ -38,20 +38,25 @@ jobs:
         cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
         cmake --build . 
         cd ../test/SDIR
+        succ=0
         for filename in $(find * -name '*.mlir'); do
             if grep -q XFAIL "$filename"; then
                 if ../../build/bin/sdir-opt $filename &> /dev/null; then
                     echo "$filename Xpassed!"
-                    exit 1
+                    succ=1
                 fi
             else
                 if ! ../../build/bin/sdir-opt $filename &> /dev/null; then
                     echo "$filename failed!"
-                    exit 1
+                    succ=1
                 fi
             fi
         done
-        echo "All tests parsed successfully!"
+        if [ $succ -eq 0 ]; then
+          echo "All tests parsed successfully!"
+          exit 0
+        fi
+        exit 1
 
 
       

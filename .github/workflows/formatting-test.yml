@@ -22,13 +22,19 @@ jobs:
 
     - name: Test
       run: |
+        succ=0
         for filename in $(find * -name '*.cpp' -o -name '*.h'); do
           if ! clang-format --Werror --dry-run --style=file $filename &> /dev/null; then
               echo "$filename incorrectly formatted!"
-              exit 1
+              succ=1
           fi
         done
-        echo "All cpp/h files formatted correctly!"
+        if [ $succ -eq 0 ]; then
+          echo "All cpp/h files formatted correctly!"
+          exit 0
+        fi
+        exit 1
+        
 
 
       
