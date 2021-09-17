@@ -1,0 +1,40 @@
+name: Formatting Test
+
+on:   
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install clang-format
+
+    - name: Test
+      run: |
+        succ=0
+        for filename in $(find * -name '*.cpp' -o -name '*.h'); do
+          if ! clang-format --Werror --dry-run --style=file $filename &> /dev/null; then
+              echo "$filename incorrectly formatted!"
+              succ=1
+          fi
+        done
+        if [ $succ -eq 0 ]; then
+          echo "All cpp/h files formatted correctly!"
+          exit 0
+        fi
+        exit 1
+        
+
+
+      

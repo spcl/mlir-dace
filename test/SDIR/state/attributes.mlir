@@ -3,7 +3,7 @@
 // CHECK: module
 // CHECK: sdir.sdfg
 sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK-NEXT: sdir.state
+    // CHECK: sdir.state
     // CHECK-DAG: nosync = false
     // CHECK-DAG: instrument = "No_Instrumentation"
     // CHECK-SAME: @state_0

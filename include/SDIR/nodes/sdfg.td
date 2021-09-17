@@ -2,10 +2,13 @@
 #define SDIR_SDFGNode
 
 def SDIR_SDFGNode : SDIR_Op<"sdfg", [
-    SingleBlock,
+    //SingleBlock,
     NoTerminator,
     IsolatedFromAbove,
+    FunctionLike,
+    CallableOpInterface,
     SymbolTable,
+    Symbol,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
     let summary = "SDFG region";
@@ -21,9 +24,49 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$name, FlatSymbolRefAttr:$entry);
+    let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry, 
+                        TypeAttr:$type);
     let regions = (region SizedRegion<1>:$region);
-    let assemblyFormat = [{attr-dict $name $region}];
+
+    let extraClassDeclaration = [{
+        //===------------------------------------------------------------------===//
+        // CallableOpInterface
+        //===------------------------------------------------------------------===//
+
+        /// Returns the region on the current operation that is callable. This may
+        /// return null in the case of an external callable object, e.g. an external
+        /// function.
+        Region *getCallableRegion(){ return isExternal() ? nullptr : &getRegion(); }
+
+        /// Returns the results types that the callable region produces when
+        /// executed.
+        ArrayRef<Type> getCallableResults(){ return getType().getResults(); }
+
+        //===------------------------------------------------------------------===//
+        // SymbolOpInterface Methods
+        //===------------------------------------------------------------------===//
+
+        bool isDeclaration() { return isExternal(); }
+
+        private:
+        // This trait needs access to the hooks defined below.
+        friend class OpTrait::FunctionLike<SDFGNode>;
+
+        /// Returns the number of arguments. This is a hook for
+        /// OpTrait::FunctionLike.
+        unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+
+        /// Returns the number of results. This is a hook for OpTrait::FunctionLike.
+        unsigned getNumFuncResults() { return getType().getResults().size(); }
+
+        LogicalResult verifyType() {
+            auto type = getTypeAttr().getValue();
+            if (!type.isa<FunctionType>())
+                return emitOpError("requires '" + getTypeAttrName() 
+                                    + "' attribute of function type");
+            return success();
+        }
+    }];
 }
 
 #endif // SDIR_SDFGNode

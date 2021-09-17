@@ -22,7 +22,6 @@ def SDIR_StateNode : SDIR_Op<"state", [
 
     let arguments = (ins SymbolNameAttr:$sym_name);
     let regions = (region SizedRegion<1>:$region);
-    let assemblyFormat = [{attr-dict $sym_name $region}];
 }
 
 #endif // SDIR_StateNode

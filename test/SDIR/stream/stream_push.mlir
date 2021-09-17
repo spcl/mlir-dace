@@ -16,7 +16,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-SAME: !sdir.stream_array<i32> -> !sdir.stream<i32>
         %a = sdir.get_access %A : !sdir.stream_array<i32> -> !sdir.stream<i32>
         // CHECK-NEXT: sdir.stream_push [[NAMEB]], [[NAMEC]]
-        // CHECK-SAME: !sdir.stream<i32>
-        sdir.stream_push %1, %a : !sdir.stream<i32>
+        // CHECK-SAME: i32 -> !sdir.stream<i32>
+        sdir.stream_push %1, %a : i32 -> !sdir.stream<i32>
     }
 }

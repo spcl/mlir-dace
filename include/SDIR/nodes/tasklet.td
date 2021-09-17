@@ -1,7 +1,6 @@
 #ifndef SDIR_TaskletNode
 #define SDIR_TaskletNode
 
-
 def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     HasParent<"StateNode">,
     AffineScope, 
@@ -23,41 +22,9 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, OptionalAttr<StrAttr>:$sym_visibility);
+    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, 
+                        OptionalAttr<StrAttr>:$sym_visibility);
     let regions = (region AnyRegion:$body);
- 
-    let parser = [{
-        auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
-                                function_like_impl::VariadicFlag, std::string &) {
-            return builder.getFunctionType(argTypes, results);
-        };
-
-        return function_like_impl::parseFunctionLikeOp(parser, result, /*allowVariadic=*/false, buildFuncType);
-    }];
-
-    let printer =[{
-        FunctionType fnType = getType();
-        function_like_impl::printFunctionLikeOp(p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
-    }];
-
-    let verifier = [{ 
-        if (isExternal())
-            return success();
-
-        // Verify that the argument list of the function and the arg list of the entry
-        // block line up.  The trait already verified that the number of arguments is
-        // the same between the signature and the block.
-        auto fnInputTypes = getType().getInputs();
-        Block &entryBlock = front();
-        for (unsigned i = 0, e = entryBlock.getNumArguments(); i != e; ++i)
-            if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-            return emitOpError("type of entry block argument #")
-                    << i << '(' << entryBlock.getArgument(i).getType()
-                    << ") must match the type of the corresponding argument in "
-                    << "function signature(" << fnInputTypes[i] << ')';
-
-        return success();
-    }];
 
     let builders = [OpBuilder<(ins
         "StringRef":$name, "FunctionType":$type,
@@ -66,13 +33,16 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     >];
 
     let extraClassDeclaration = [{
-        static TaskletNode create(Location location, StringRef name, FunctionType type,
-                         ArrayRef<NamedAttribute> attrs = {});
-        static TaskletNode create(Location location, StringRef name, FunctionType type,
-                            Operation::dialect_attr_range attrs);
-        static TaskletNode create(Location location, StringRef name, FunctionType type,
-                            ArrayRef<NamedAttribute> attrs,
-                            ArrayRef<DictionaryAttr> argAttrs);
+        static TaskletNode create(Location location, StringRef name,
+                                FunctionType type, 
+                                ArrayRef<NamedAttribute> attrs = {});
+        static TaskletNode create(Location location, StringRef name, 
+                                FunctionType type, 
+                                Operation::dialect_attr_range attrs);
+        static TaskletNode create(Location location, StringRef name, 
+                                FunctionType type,
+                                ArrayRef<NamedAttribute> attrs,
+                                ArrayRef<DictionaryAttr> argAttrs);
 
         TaskletNode clone(BlockAndValueMapping &mapper);
         TaskletNode clone();
@@ -112,7 +82,8 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         LogicalResult verifyType() {
             auto type = getTypeAttr().getValue();
             if (!type.isa<FunctionType>())
-                return emitOpError("requires '" + getTypeAttrName() + "' attribute of function type");
+                return emitOpError("requires '" + getTypeAttrName() 
+                                    + "' attribute of function type");
             return success();
         }
     }];
