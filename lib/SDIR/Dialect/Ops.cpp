@@ -1,11 +1,8 @@
+#include "SDIR/Dialect/Dialect.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/FunctionImplementation.h"
-#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "llvm/ADT/MapVector.h"
-
-#include "SDIR/Dialect/Dialect.h"
 
 using namespace mlir;
 using namespace sdir;
