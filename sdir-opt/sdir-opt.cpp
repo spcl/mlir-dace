@@ -5,7 +5,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#include "SDIR/SDIR_Dialect.h"
+#include "SDIR/Dialect/Dialect.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();

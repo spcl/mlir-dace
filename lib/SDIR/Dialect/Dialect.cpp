@@ -1,9 +1,14 @@
-#include "SDIR/SDIR_Dialect.h"
+#include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "SDIR/Dialect/Dialect.h"
 
 using namespace mlir;
 using namespace sdir;
 
-#include "SDIR/SDIR_OpsDialect.cpp.inc"
+#include "SDIR/Dialect/OpsDialect.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // SDIR Dialect
@@ -12,12 +17,12 @@ using namespace sdir;
 void SDIRDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "SDIR/SDIR_Ops.cpp.inc"
+#include "SDIR/Dialect/Ops.cpp.inc"
       >();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "SDIR/SDIR_OpsTypes.cpp.inc"
+#include "SDIR/Dialect/OpsTypes.cpp.inc"
       >();
 }
 
@@ -100,7 +105,7 @@ static void printDimensionList(DialectAsmPrinter &printer, Type &elemType,
 }
 
 #define GET_TYPEDEF_CLASSES
-#include "SDIR/SDIR_OpsTypes.cpp.inc"
+#include "SDIR/Dialect/OpsTypes.cpp.inc"
 
 Type SDIRDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
