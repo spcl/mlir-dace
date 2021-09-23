@@ -1,9 +1,9 @@
-#include "mlir/IR/DialectImplementation.h"
+#include "SDIR/Dialect/Dialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "SDIR/Dialect/Dialect.h"
 
 using namespace mlir;
 using namespace sdir;
