@@ -110,9 +110,8 @@ LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit){
 //===----------------------------------------------------------------------===//
 // SDFGNode
 //===----------------------------------------------------------------------===//
-
-LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit){
-    jemit.startObject();
+unsigned sdfgID = 0; // TODO: Refactor this ugly hack. You can do better than global variables.
+LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit){
     jemit.printKVPair("type", "SDFG");
 
     jemit.startNamedObject("attributes");
@@ -152,11 +151,36 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit){
 
     jemit.endList(); // edges
 
+    jemit.printKVPair("sdfg_list_id", sdfgID++, /*stringify=*/false);
+
     StateNode entryState = op.getStateBySymRef(op.entry());
     unsigned start_state_idx = op.getIndexOfState(entryState);
     jemit.printKVPair("start_state", start_state_idx, /*stringify=*/false);
 
+    return success();
+}
+
+LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit){
+    if(!op.isNested()){
+        jemit.startObject();
+        if(printSDFGNode(op, jemit).failed()) return failure();
+        jemit.endObject();
+        return success();
+    }
+
+    jemit.startObject();
+    jemit.printKVPair("type", "NestedSDFG");
+    jemit.startNamedObject("attributes");
+    // TODO: Check if attribute already prints "instrument"
+    jemit.printKVPair("instrument", "No_Instrumentation");
+    // TODO: Check if attribute already prints "schedule"
+    jemit.printKVPair("schedule", "Default");
+    jemit.startNamedObject("sdfg");
+    if(printSDFGNode(op, jemit).failed()) return failure();
+    jemit.endObject(); // sdfg
+    jemit.endObject(); // attributes
     jemit.endObject();
+
     return success();
 }
 
@@ -262,12 +286,22 @@ LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit){
     jemit.startNamedObject("attributes");
     jemit.startNamedObject("data");
     jemit.printKVPair("type", "InterstateEdge");
+
     jemit.startNamedObject("attributes");
     jemit.startNamedObject("assignments");
     // TODO: Fill in the assignments
     jemit.endObject(); // assignments 
     jemit.startNamedObject("condition");
-    // TODO: Fill in the condition
+    jemit.printKVPair("language", "Python");
+    if(op.condition().hasValue()){
+        if(op.condition().getValue().empty()){
+            jemit.printKVPair("string_data", "1");
+        } else {
+            jemit.printKVPair("string_data", op.condition().getValue());
+        }
+    } else {
+        jemit.printKVPair("string_data", "1");
+    }
     jemit.endObject(); // condition 
     jemit.endObject(); // attributes 
     jemit.endObject(); // data
