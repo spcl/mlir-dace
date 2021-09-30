@@ -248,6 +248,13 @@ StateNode SDFGNode::getStateBySymRef(StringRef symRef){
   dyn_cast<StateNode>(op);
 }
 
+bool SDFGNode::isNested(){
+  Operation* parent = getOperation()->getParentOp();
+  if(StateNode state = dyn_cast<StateNode>(parent))
+    return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//

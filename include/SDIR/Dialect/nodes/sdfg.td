@@ -32,6 +32,7 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         unsigned getIndexOfState(StateNode &node);
         StateNode getStateByIndex(unsigned idx);
         StateNode getStateBySymRef(StringRef symRef);
+        bool isNested();
         
         //===------------------------------------------------------------------===//
         // CallableOpInterface
