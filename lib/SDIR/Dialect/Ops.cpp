@@ -1,4 +1,8 @@
-#include "SDIR/SDIR_Dialect.h"
+#include "SDIR/Dialect/Dialect.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/FunctionImplementation.h"
+#include "llvm/ADT/MapVector.h"
 
 using namespace mlir;
 using namespace sdir;
@@ -1581,4 +1585,4 @@ LogicalResult verify(SymOp op) { return success(); }
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "SDIR/SDIR_Ops.cpp.inc"
+#include "SDIR/Dialect/Ops.cpp.inc"

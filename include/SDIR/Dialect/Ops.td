@@ -1,7 +1,7 @@
 #ifndef SDIR_OPS
 #define SDIR_OPS
 
-include "SDIR/SDIR_Dialect.td"
+include "SDIR/Dialect/Dialect.td"
 
 //===----------------------------------------------------------------------===//
 // Base class for all SDIR ops
@@ -18,21 +18,21 @@ class SDIR_Op<string mnemonic, list<OpTrait> traits = []> :
 // Nodes
 //===----------------------------------------------------------------------===//
 
-include "SDIR/nodes/sdfg.td"
-include "SDIR/nodes/state.td"
-include "SDIR/nodes/tasklet.td"
-include "SDIR/nodes/map.td"
-include "SDIR/nodes/consume.td"
+include "SDIR/Dialect/nodes/sdfg.td"
+include "SDIR/Dialect/nodes/state.td"
+include "SDIR/Dialect/nodes/tasklet.td"
+include "SDIR/Dialect/nodes/map.td"
+include "SDIR/Dialect/nodes/consume.td"
 
 //===----------------------------------------------------------------------===//
 // Ops
 //===----------------------------------------------------------------------===//
 
-include "SDIR/ops/tasklet.td"
-include "SDIR/ops/memlet.td"
-include "SDIR/ops/stream.td"
-include "SDIR/ops/symbol.td"
-include "SDIR/ops/edge.td"
-include "SDIR/ops/get_access.td"
+include "SDIR/Dialect/ops/tasklet.td"
+include "SDIR/Dialect/ops/memlet.td"
+include "SDIR/Dialect/ops/stream.td"
+include "SDIR/Dialect/ops/symbol.td"
+include "SDIR/Dialect/ops/edge.td"
+include "SDIR/Dialect/ops/get_access.td"
 
 #endif // SDIR_OPS
