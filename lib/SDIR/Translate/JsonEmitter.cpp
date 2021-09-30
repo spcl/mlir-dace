@@ -1,6 +1,6 @@
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Types.h"
-#include "SDIR/JsonEmitter.h"
+#include "SDIR/Translate/JsonEmitter.h"
 
 using namespace mlir;
 

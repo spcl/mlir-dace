@@ -3,7 +3,7 @@
 #include "mlir/Translation.h"
 #include "llvm/IR/LLVMContext.h"
 
-#include "SDIR/Translation.h"
+#include "SDIR/Translate/Translation.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllTranslations();
