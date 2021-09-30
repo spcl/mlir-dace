@@ -180,7 +180,7 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
                                                /*isVariadic=*/false,
                                                op.getType().getResults());
 
-  p.printRegion(op.region(), /*printEntryBlockArgs=*/false,
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false, /*printEmptyBlock=*/true);
 }
 
@@ -219,6 +219,35 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+unsigned SDFGNode::getIndexOfState(StateNode &node){
+  unsigned state_idx = 0;
+  for(Operation &op : body().getOps()){
+    if(StateNode state = dyn_cast<StateNode>(op)){
+        if(state.sym_name() == node.sym_name())
+            return state_idx;
+        
+        ++state_idx;
+    }
+  }
+}
+
+StateNode SDFGNode::getStateByIndex(unsigned idx){
+  unsigned state_idx = 0;
+  for(Operation &op : body().getOps()){
+    if(StateNode state = dyn_cast<StateNode>(op)){
+        if(state_idx == idx)
+            return state;
+        
+        ++state_idx;
+    }
+  }
+}
+
+StateNode SDFGNode::getStateBySymRef(StringRef symRef){
+  Operation* op = lookupSymbol(symRef);
+  dyn_cast<StateNode>(op);
+}
+
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//
@@ -245,7 +274,7 @@ static void print(OpAsmPrinter &p, StateNode op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
   p << ' ';
   p.printSymbolName(op.sym_name());
-  p.printRegion(op.region());
+  p.printRegion(op.body());
 }
 
 LogicalResult verify(StateNode op) { return success(); }
@@ -449,7 +478,7 @@ static void print(OpAsmPrinter &p, MapNode op) {
 
   p << ")";
 
-  p.printRegion(op.region(), /*printEntryBlockArgs=*/false,
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
@@ -472,10 +501,10 @@ LogicalResult verify(MapNode op) {
 }
 
 bool MapNode::isDefinedOutsideOfLoop(Value value) {
-  return !region().isAncestor(value.getParentRegion());
+  return !body().isAncestor(value.getParentRegion());
 }
 
-Region &MapNode::getLoopBody() { return region(); }
+Region &MapNode::getLoopBody() { return body(); }
 
 LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
@@ -538,7 +567,7 @@ static void print(OpAsmPrinter &p, ConsumeNode op) {
   p << " (" << op.stream() << " : " << op.stream().getType() << ")";
   p << " -> (pe: " << op.getBody()->getArgument(0);
   p << ", elem: " << op.getBody()->getArgument(1) << ")";
-  p.printRegion(op.region(), /*printEntryBlockArgs=*/false,
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
@@ -575,10 +604,10 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 bool ConsumeNode::isDefinedOutsideOfLoop(Value value) {
-  return !region().isAncestor(value.getParentRegion());
+  return !body().isAncestor(value.getParentRegion());
 }
 
-Region &ConsumeNode::getLoopBody() { return region(); }
+Region &ConsumeNode::getLoopBody() { return body(); }
 
 LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();

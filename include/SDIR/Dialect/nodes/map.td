@@ -28,7 +28,7 @@ def SDIR_MapNode : SDIR_Op<"map", [
         ArrayAttr:$steps
     );
 
-    let regions = (region SizedRegion<1>:$region);
+    let regions = (region SizedRegion<1>:$body);
 }
 
 #endif // SDIR_MapNode

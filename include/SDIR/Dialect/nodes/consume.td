@@ -29,7 +29,7 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
         SDIR_StreamType:$stream
     );
 
-    let regions = (region SizedRegion<1>:$region);
+    let regions = (region SizedRegion<1>:$body);
 }
 
 #endif // SDIR_ConsumeNode
