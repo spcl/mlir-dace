@@ -24,8 +24,7 @@ def check_import(path):
 
     try:
         sdfg = SDFG.from_json(translated_json)
-        
-        json.dumps(sdfg.to_json())
+        sdfg.save(filename=os.devnull, use_pickle=False, hash=None, exception=None)
         return 0
     except:
         return 1
