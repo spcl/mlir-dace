@@ -110,12 +110,12 @@ LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit){
 //===----------------------------------------------------------------------===//
 // SDFGNode
 //===----------------------------------------------------------------------===//
-unsigned sdfgID = 0; // TODO: Refactor this ugly hack. You can do better than global variables.
+
 LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit){
     jemit.printKVPair("type", "SDFG");
 
     jemit.startNamedObject("attributes");
-    jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"entry", "sym_name", "type"});
+    jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "entry", "sym_name", "type"});
     
     jemit.startNamedObject("constants_prop");
     // TODO: Fill this out
@@ -151,7 +151,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit){
 
     jemit.endList(); // edges
 
-    jemit.printKVPair("sdfg_list_id", sdfgID++, /*stringify=*/false);
+    jemit.printKVPair("sdfg_list_id", op.ID(), /*stringify=*/false);
 
     StateNode entryState = op.getStateBySymRef(op.entry());
     unsigned start_state_idx = op.getIndexOfState(entryState);
@@ -194,10 +194,11 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit){
     jemit.printKVPair("label", op.sym_name());
 
     SDFGNode sdfg = dyn_cast<SDFGNode>(op->getParentOp());
-    jemit.printKVPair("id", sdfg.getIndexOfState(op), /*stringify=*/false);
+    //jemit.printKVPair("id", sdfg.getIndexOfState(op), /*stringify=*/false);
+    jemit.printKVPair("id", op.ID(), /*stringify=*/false);
 
     jemit.startNamedObject("attributes");
-    jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
+    jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
     if(!containsAttr(*op, "instrument")) 
         jemit.printKVPair("instrument", "No_Instrumentation");
     jemit.endObject(); // attributes
@@ -255,6 +256,8 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit){
     jemit.endObject(); // out_connectors
 
     jemit.endObject(); // attributes
+
+    jemit.printKVPair("id", op.ID(), /*stringify=*/false);
     jemit.endObject();
     return success();
 }
@@ -264,6 +267,42 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit){
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit){
+    jemit.startObject();
+    jemit.printKVPair("type", "MapEntry");
+
+    jemit.startNamedObject("attributes");
+    if(!containsAttr(*op, "instrument")) 
+        jemit.printKVPair("instrument", "No_Instrumentation");
+    if(!containsAttr(*op, "schedule")) 
+        jemit.printKVPair("schedule", "Default");
+
+    jemit.startNamedList("params");
+    AsmState state(op);
+    for(BlockArgument arg : op.getBody()->getArguments()){
+        jemit.startEntry();
+        jemit.printLiteral("\"");
+        arg.printAsOperand(jemit.ostream(), state);
+        jemit.printLiteral("\"");
+    }
+    jemit.endList(); // params
+
+    jemit.endObject(); // attributes
+    jemit.printKVPair("id", op.entryID(), /*stringify=*/false);
+    jemit.printKVPair("scope_exit", op.exitID());
+
+    jemit.endObject();
+
+    jemit.startObject();
+    jemit.printKVPair("type", "MapExit");
+
+    jemit.startNamedObject("attributes");
+
+    jemit.endObject(); // attributes
+    jemit.printKVPair("id", op.exitID(), /*stringify=*/false);
+    jemit.printKVPair("scope_entry", op.entryID());
+    jemit.printKVPair("scope_exit", op.exitID());
+
+    jemit.endObject();
     return success();
 }
 
