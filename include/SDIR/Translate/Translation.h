@@ -43,4 +43,6 @@ LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit);
 LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
 LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit);
 
+bool containsAttr(Operation &op, StringRef attrName);
+
 #endif // SDIR_Translation_H

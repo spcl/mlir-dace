@@ -121,8 +121,8 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit){
     // TODO: Fill this out
     jemit.endObject(); // constants_prop
 
-    // TODO: Check if attribute already prints "instrument"
-    jemit.printKVPair("instrument", "No_Instrumentation");
+    if(!containsAttr(*op, "instrument")) 
+        jemit.printKVPair("instrument", "No_Instrumentation");
     jemit.printKVPair("name", op.sym_name());
     jemit.endObject(); // attributes
 
@@ -171,10 +171,10 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit){
     jemit.startObject();
     jemit.printKVPair("type", "NestedSDFG");
     jemit.startNamedObject("attributes");
-    // TODO: Check if attribute already prints "instrument"
-    jemit.printKVPair("instrument", "No_Instrumentation");
-    // TODO: Check if attribute already prints "schedule"
-    jemit.printKVPair("schedule", "Default");
+    if(!containsAttr(*op, "instrument")) 
+        jemit.printKVPair("instrument", "No_Instrumentation");
+    if(!containsAttr(*op, "schedule")) 
+        jemit.printKVPair("schedule", "Default");
     jemit.startNamedObject("sdfg");
     if(printSDFGNode(op, jemit).failed()) return failure();
     jemit.endObject(); // sdfg
@@ -198,8 +198,8 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit){
 
     jemit.startNamedObject("attributes");
     jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
-    // TODO: Check if attribute already prints "instrument"
-    jemit.printKVPair("instrument", "No_Instrumentation");
+    if(!containsAttr(*op, "instrument")) 
+        jemit.printKVPair("instrument", "No_Instrumentation");
     jemit.endObject(); // attributes
 
     jemit.startNamedList("nodes");
@@ -228,8 +228,8 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit){
     jemit.printKVPair("label", op.sym_name());
 
     jemit.startNamedObject("attributes");
-    // TODO: Check if attribute already prints "instrument"
-    jemit.printKVPair("instrument", "No_Instrumentation");
+    if(!containsAttr(*op, "instrument")) 
+        jemit.printKVPair("instrument", "No_Instrumentation");
 
     jemit.startNamedObject("code");
     jemit.printKVPair("string_data", op.body());
@@ -471,4 +471,15 @@ LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op, JsonEmitter &jemit){
 
 LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit){
     return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Op contains Attr
+//===----------------------------------------------------------------------===//
+
+bool containsAttr(Operation &op, StringRef attrName){
+    for(NamedAttribute attr : op.getAttrs())
+        if(attr.first == attrName)
+            return true;
+    return false;
 }
