@@ -24,7 +24,8 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
     }];
 
     let arguments = (ins
-        I32Attr:$ID,
+        I32Attr:$entryID,
+        I32Attr:$exitID,
         OptionalAttr<APIntAttr>:$num_pes, 
         OptionalAttr<FlatSymbolRefAttr>:$condition,
         SDIR_StreamType:$stream

@@ -22,7 +22,8 @@ def SDIR_MapNode : SDIR_Op<"map", [
     }];
 
     let arguments = (ins 
-        I32Attr:$ID,
+        I32Attr:$entryID,
+        I32Attr:$exitID,
         Variadic<Index>:$ranges,
         ArrayAttr:$lowerBounds,
         ArrayAttr:$upperBounds,

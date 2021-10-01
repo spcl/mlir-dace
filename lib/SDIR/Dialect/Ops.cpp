@@ -453,7 +453,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   IndexType indexType = builder.getIndexType();
 
   IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
-  result.addAttribute("ID", intAttr);
+  result.addAttribute("entryID", intAttr);
 
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -489,6 +489,8 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
+  intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("exitID", intAttr);
   return success();
 }
 
@@ -549,7 +551,7 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
 static ParseResult parseConsumeNode(OpAsmParser &parser,
                                     OperationState &result) {
   IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
-  result.addAttribute("ID", intAttr);
+  result.addAttribute("entryID", intAttr);
 
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -594,6 +596,8 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
+  intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("exitID", intAttr);
   return success();
 }
 
