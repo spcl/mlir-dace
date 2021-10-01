@@ -24,8 +24,12 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry, 
-                        TypeAttr:$type);
+    let arguments = (ins 
+        I32Attr:$ID,
+        SymbolNameAttr:$sym_name, 
+        FlatSymbolRefAttr:$entry, 
+        TypeAttr:$type
+    );
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{

@@ -121,6 +121,9 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
+  IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   StringAttr sym_nameAttr;
   if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
     return failure();
@@ -171,7 +174,7 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, SDFGNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"sym_name", "type"});
+                          /*elidedAttrs=*/{"ID", "sym_name", "type"});
   p << ' ';
   p.printSymbolName(op.sym_name());
 
@@ -263,6 +266,9 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
+  IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   StringAttr sym_nameAttr;
   if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
     return failure();
@@ -278,7 +284,7 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
 }
 
 static void print(OpAsmPrinter &p, StateNode op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
   p << ' ';
   p.printSymbolName(op.sym_name());
   p.printRegion(op.body());
@@ -292,6 +298,9 @@ LogicalResult verify(StateNode op) { return success(); }
 
 static ParseResult parseTaskletNode(OpAsmParser &parser,
                                     OperationState &result) {
+  IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
                           ArrayRef<Type> results,
                           function_like_impl::VariadicFlag, std::string &) {
@@ -305,9 +314,22 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 
 static void print(OpAsmPrinter &p, TaskletNode op) {
   FunctionType fnType = op.getType();
-  function_like_impl::printFunctionLikeOp(p, op, fnType.getInputs(),
-                                          /*isVariadic=*/false,
-                                          fnType.getResults());
+  ArrayRef<Type> argTypes = fnType.getInputs();
+  ArrayRef<Type> resultTypes = fnType.getResults();
+  bool isVariadic = false;
+  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+
+  p << ' ';
+  p.printSymbolName(op.sym_name());
+
+  function_like_impl::printFunctionSignature(p, op, argTypes, isVariadic, resultTypes);
+  function_like_impl::printFunctionAttributes(p, op, argTypes.size(), resultTypes.size(),
+                          {"ID", visibilityAttrName});
+  // Print the body if this is not an external function.
+  Region &body = op->getRegion(0);
+  if (!body.empty())
+    p.printRegion(body, /*printEntryBlockArgs=*/false,
+                  /*printBlockTerminators=*/true);
 }
 
 LogicalResult verify(TaskletNode op) {
@@ -430,6 +452,9 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   Builder &builder = parser.getBuilder();
   IndexType indexType = builder.getIndexType();
 
+  IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -469,7 +494,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, MapNode op) {
   printOptionalAttrDictNoNumList(p, op->getAttrs(),
-                                 {"lowerBounds", "upperBounds", "steps"});
+                                 {"ID","lowerBounds", "upperBounds", "steps"});
 
   p << " (" << op.getBody()->getArguments() << ") = (";
 
@@ -523,6 +548,9 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
 
 static ParseResult parseConsumeNode(OpAsmParser &parser,
                                     OperationState &result) {
+  IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -570,7 +598,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, ConsumeNode op) {
-  p.printOptionalAttrDict(op->getAttrs());
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
   p << " (" << op.stream() << " : " << op.stream().getType() << ")";
   p << " -> (pe: " << op.getBody()->getArgument(0);
   p << ", elem: " << op.getBody()->getArgument(1) << ")";

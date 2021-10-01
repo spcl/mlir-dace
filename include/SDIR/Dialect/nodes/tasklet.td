@@ -22,8 +22,12 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, 
-                        OptionalAttr<StrAttr>:$sym_visibility);
+    let arguments = (ins
+        I32Attr:$ID,
+        SymbolNameAttr:$sym_name, 
+        TypeAttr:$type, 
+        OptionalAttr<StrAttr>:$sym_visibility
+    );
     let regions = (region AnyRegion:$body);
 
     let builders = [OpBuilder<(ins
