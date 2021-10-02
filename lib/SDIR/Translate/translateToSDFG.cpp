@@ -267,6 +267,7 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit){
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit){
+    // MapEntry
     jemit.startObject();
     jemit.printKVPair("type", "MapEntry");
 
@@ -292,6 +293,7 @@ LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit){
 
     jemit.endObject();
 
+    // MapExit
     jemit.startObject();
     jemit.printKVPair("type", "MapExit");
 
