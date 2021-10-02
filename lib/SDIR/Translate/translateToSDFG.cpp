@@ -313,6 +313,34 @@ LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit){
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateConsumeToSDFG(ConsumeNode &op, JsonEmitter &jemit){
+    // ConsumeEntry
+    jemit.startObject();
+    jemit.printKVPair("type", "ConsumeEntry");
+
+    jemit.startNamedObject("attributes");
+    if(!containsAttr(*op, "instrument")) 
+        jemit.printKVPair("instrument", "No_Instrumentation");
+    if(!containsAttr(*op, "schedule")) 
+        jemit.printKVPair("schedule", "Default");
+
+    jemit.endObject(); // attributes
+    jemit.printKVPair("id", op.entryID(), /*stringify=*/false);
+    jemit.printKVPair("scope_exit", op.exitID());
+
+    jemit.endObject();
+
+    // ConsumeExit
+    jemit.startObject();
+    jemit.printKVPair("type", "ConsumeExit");
+
+    jemit.startNamedObject("attributes");
+
+    jemit.endObject(); // attributes
+    jemit.printKVPair("id", op.exitID(), /*stringify=*/false);
+    jemit.printKVPair("scope_entry", op.entryID());
+    jemit.printKVPair("scope_exit", op.exitID());
+
+    jemit.endObject();
     return success();
 }
 
