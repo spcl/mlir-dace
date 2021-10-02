@@ -18,8 +18,10 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
         ```
     }];
 
-    let arguments = (ins AnyTypeOf<[SDIR_ArrayType, 
-                                    SDIR_StreamArrayType]>:$arr);
+    let arguments = (ins 
+        I32Attr:$ID,
+        AnyTypeOf<[SDIR_ArrayType, SDIR_StreamArrayType]>:$arr
+    );
     let results = (outs AnyTypeOf<[SDIR_MemletType, SDIR_StreamType]>:$res);
 }
 

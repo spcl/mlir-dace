@@ -496,7 +496,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, MapNode op) {
   printOptionalAttrDictNoNumList(p, op->getAttrs(),
-                                 {"ID","lowerBounds", "upperBounds", "steps"});
+                                 {"entryID", "exitID","lowerBounds", "upperBounds", "steps"});
 
   p << " (" << op.getBody()->getArguments() << ") = (";
 
@@ -602,7 +602,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, ConsumeNode op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"entryID", "exitID"});
   p << " (" << op.stream() << " : " << op.stream().getType() << ")";
   p << " -> (pe: " << op.getBody()->getArgument(0);
   p << ", elem: " << op.getBody()->getArgument(1) << ")";
@@ -812,6 +812,9 @@ LogicalResult verify(AllocTransientOp op) {
 
 static ParseResult parseGetAccessOp(OpAsmParser &parser,
                                     OperationState &result) {
+  IntegerAttr intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -838,7 +841,7 @@ static ParseResult parseGetAccessOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, GetAccessOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
   p << ' ' << op.arr();
   p << " : ";
   p << ArrayRef<Type>(op.arr().getType());
