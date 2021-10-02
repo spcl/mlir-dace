@@ -40,6 +40,7 @@ struct JsonEmitter {
                       ArrayRef<StringRef> elidedAttrs = {});
   
   private:
+    // output stream
     raw_ostream &os;
     unsigned indentation;
     // Avoids printing commas for first entries (objects or lists)
@@ -48,10 +49,12 @@ struct JsonEmitter {
     bool emptyLine;
     // Used to check for proper closing of opened objects/lists
     enum class SYM{
+      // "{" or "}"
       BRACE,
+      // "[" or "]"
       SQUARE
     };
-
+    
     SmallVector<SYM> symStack;
     void tryPop(SYM sym);
 

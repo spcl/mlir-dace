@@ -52,6 +52,13 @@ void JsonEmitter::printString(StringRef str){
 void JsonEmitter::startObject(){
     startEntry();
     printLiteral("{");
+    if(!symStack.empty() && symStack.back() == SYM::BRACE){
+        // Need a key inside objects
+        os.changeColor(os.RED, /*Bold=*/true);
+        printLiteral(" <<<<<<<<<<<< Started object without a key");
+        os.resetColor();
+        error = true;
+    }
     symStack.push_back(SYM::BRACE);
     indent();
     newLine();
@@ -63,6 +70,13 @@ void JsonEmitter::startNamedObject(StringRef name){
     printString(name);
     printLiteral(": ");
     printLiteral("{");
+    if(symStack.empty() || symStack.back() == SYM::SQUARE){
+        // Can't have keyed values as root object or in a list
+        os.changeColor(os.RED, /*Bold=*/true);
+        printLiteral(" <<<<<<<<<<<< Started keyed object in a list");
+        os.resetColor();
+        error = true;
+    }
     symStack.push_back(SYM::BRACE);
     indent();
     newLine();
@@ -130,6 +144,13 @@ void JsonEmitter::startNamedList(StringRef name){
     printString(name);
     printLiteral(": ");
     printLiteral("[");
+    if(!symStack.empty() && symStack.back() == SYM::SQUARE){
+        // Can't have keyed values in a list
+        os.changeColor(os.RED, /*Bold=*/true);
+        printLiteral(" <<<<<<<<<<<< Started keyed list in a list");
+        os.resetColor();
+        error = true;
+    }
     symStack.push_back(SYM::SQUARE);
     indent();
     newLine();
