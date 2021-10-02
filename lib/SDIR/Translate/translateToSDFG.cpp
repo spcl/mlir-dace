@@ -362,7 +362,7 @@ LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit){
 
 //===----------------------------------------------------------------------===//
 // AllocOp
-//===----------------------------------------------------------------------===/
+//===----------------------------------------------------------------------===//
 
 LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit){
     return success();
