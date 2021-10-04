@@ -488,6 +488,40 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
 LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
                                             JsonEmitter &jemit) {
+  AsmState state(op);
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  op->getResult(0).printAsOperand(nameStream, state);
+
+  jemit.startNamedObject("A");
+  jemit.printKVPair("type", "Array");
+
+  jemit.startNamedObject("attributes");
+  // TODO: Print the values you can derive
+  // jemit.printKVPair("allow_conflicts", "false", /*stringify=*/false);
+  // jemit.startNamedList("strides");
+  // jemit.endList(); // strides
+
+  // jemit.printKVPair("total_size", "4");
+  // jemit.startNamedList("offset");
+  // jemit.endList(); // offset
+
+  // jemit.printKVPair("may_alias", "false", /*stringify*/false);
+  // jemit.printKVPair("alignment", 0, /*stringify*/false);
+  jemit.printKVPair("dtype", "int32");
+  // jemit.startNamedList("shape");
+  // jemit.endList(); // shape
+
+  jemit.printKVPair("transient", "true", /*stringify=*/false);
+  jemit.printKVPair("storage", "Default");
+  jemit.printKVPair("lifetime", "Scope");
+  // jemit.startNamedObject("location");
+  // jemit.endObject(); // location
+
+  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+
+  jemit.endObject(); // attributes
+  jemit.endObject();
   return success();
 }
 
@@ -614,6 +648,35 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
 
 LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
                                                   JsonEmitter &jemit) {
+  AsmState state(op);
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  op->getResult(0).printAsOperand(nameStream, state);
+
+  jemit.startNamedObject("A");
+  jemit.printKVPair("type", "Stream");
+
+  jemit.startNamedObject("attributes");
+
+  // TODO: Print the values you can derive
+  // jemit.startNamedList("offset");
+  // jemit.endList(); // offset
+
+  // jemit.printKVPair("buffer_size", "1");
+  jemit.printKVPair("dtype", "int32");
+  // jemit.startNamedList("shape");
+  // jemit.endList(); // shape
+
+  jemit.printKVPair("transient", "true", /*stringify=*/false);
+  jemit.printKVPair("storage", "Default");
+  jemit.printKVPair("lifetime", "Scope");
+  // jemit.startNamedObject("location");
+  // jemit.endObject(); // location
+
+  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+
+  jemit.endObject(); // attributes
+  jemit.endObject();
   return success();
 }
 
