@@ -20,7 +20,8 @@ LogicalResult translateConsumeToSDFG(ConsumeNode &op, JsonEmitter &jemit);
 LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit);
 
 LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit);
-LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op, JsonEmitter &jemit);
+LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
+                                            JsonEmitter &jemit);
 LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit);
 LogicalResult translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit);
 
@@ -31,11 +32,13 @@ LogicalResult translateViewCastToSDFG(ViewCastOp &op, JsonEmitter &jemit);
 LogicalResult translateSubviewToSDFG(SubviewOp &op, JsonEmitter &jemit);
 
 LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op, JsonEmitter &jemit);
-LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op, JsonEmitter &jemit);
+LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
+                                                  JsonEmitter &jemit);
 LogicalResult translateStreamPopToSDFG(StreamPopOp &op, JsonEmitter &jemit);
 LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit);
 
-LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op, JsonEmitter &jemit);
+LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
+                                          JsonEmitter &jemit);
 LogicalResult translateReturnToSDFG(sdir::ReturnOp &op, JsonEmitter &jemit);
 LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit);
 LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit);

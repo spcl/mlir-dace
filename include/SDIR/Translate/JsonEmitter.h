@@ -14,7 +14,7 @@ struct JsonEmitter {
   // Avoid writing directly to the output stream if possible.
   raw_ostream &ostream() { return os; };
   unsigned getIndentation() { return indentation; };
-  // Checks for errors (open objects/lists) and adds trailing newline 
+  // Checks for errors (open objects/lists) and adds trailing newline
   bool finish();
 
   void indent();
@@ -35,32 +35,31 @@ struct JsonEmitter {
   void printKVPair(StringRef key, int val, bool stringify = true);
   void printKVPair(StringRef key, Attribute &val, bool stringify = true);
   void printKVPair(StringRef key, Region &val, bool stringify = true);
-  
-  void printAttributes(ArrayRef<NamedAttribute> arr, 
-                      ArrayRef<StringRef> elidedAttrs = {});
-  
-  private:
-    // output stream
-    raw_ostream &os;
-    unsigned indentation;
-    // Avoids printing commas for first entries (objects or lists)
-    bool firstEntry;
-    // Stores if the current line is empty or not
-    bool emptyLine;
-    // Used to check for proper closing of opened objects/lists
-    enum class SYM{
-      // "{" or "}"
-      BRACE,
-      // "[" or "]"
-      SQUARE
-    };
-    
-    SmallVector<SYM> symStack;
-    void tryPop(SYM sym);
 
-    // Tracks if there was an erronous printing
-    bool error;
+  void printAttributes(ArrayRef<NamedAttribute> arr,
+                       ArrayRef<StringRef> elidedAttrs = {});
+
+private:
+  // output stream
+  raw_ostream &os;
+  unsigned indentation;
+  // Avoids printing commas for first entries (objects or lists)
+  bool firstEntry;
+  // Stores if the current line is empty or not
+  bool emptyLine;
+  // Used to check for proper closing of opened objects/lists
+  enum class SYM {
+    // "{" or "}"
+    BRACE,
+    // "[" or "]"
+    SQUARE
+  };
+
+  SmallVector<SYM> symStack;
+  void tryPop(SYM sym);
+
+  // Tracks if there was an erronous printing
+  bool error;
 };
-
 
 #endif // SDIR_JsonEmitter_H
