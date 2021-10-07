@@ -23,6 +23,10 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
         AnyTypeOf<[SDIR_ArrayType, SDIR_StreamArrayType]>:$arr
     );
     let results = (outs AnyTypeOf<[SDIR_MemletType, SDIR_StreamType]>:$res);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+    }];
 }
 
 #endif // SDIR_GetAccessOp

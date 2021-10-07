@@ -20,6 +20,10 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 
     let arguments = (ins Variadic<AnyInteger>:$params);
     let results = (outs SDIR_ArrayType:$res);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+    }];
 }
 
 
@@ -43,6 +47,10 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
 
     let arguments = (ins Variadic<AnyInteger>:$params);
     let results = (outs SDIR_ArrayType:$res);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+    }];
 }
 
 //===----------------------------------------------------------------------===//

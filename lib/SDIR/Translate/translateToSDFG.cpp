@@ -197,8 +197,10 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   if (!op.isNested()) {
     jemit.startObject();
+    
     if (printSDFGNode(op, jemit).failed())
       return failure();
+
     jemit.endObject();
     return success();
   }
@@ -206,13 +208,18 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "NestedSDFG");
   jemit.startNamedObject("attributes");
+
   if (!containsAttr(*op, "instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
+
   if (!containsAttr(*op, "schedule"))
     jemit.printKVPair("schedule", "Default");
+
   jemit.startNamedObject("sdfg");
+
   if (printSDFGNode(op, jemit).failed())
     return failure();
+
   jemit.endObject(); // sdfg
   jemit.endObject(); // attributes
   jemit.endObject();
@@ -445,12 +452,12 @@ LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
-  AsmState state(op);
+  AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
 
-  jemit.startNamedObject("A");
+  jemit.startNamedObject(name);
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
@@ -488,12 +495,12 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
 LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
                                             JsonEmitter &jemit) {
-  AsmState state(op);
+  AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
 
-  jemit.startNamedObject("A");
+  jemit.startNamedObject(name);
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
@@ -533,16 +540,16 @@ LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "AccessNode");
 
-  AsmState state(op);
+  AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op.arr().printAsOperand(nameStream, state);
-  jemit.printKVPair("label", "A"); // FIXME: name prints <<UNKNOWN SSA VALUE>>
+  jemit.printKVPair("label", name);
 
   jemit.startNamedObject("attributes");
   jemit.printKVPair("access", "ReadWrite");
   jemit.printKVPair("setzero", "false", /*stringify=*/false);
-  jemit.printKVPair("data", "A");
+  jemit.printKVPair("data", name);
   jemit.startNamedObject("in_connectors");
   jemit.endObject(); // in_connectors
   jemit.startNamedObject("out_connectors");
@@ -610,12 +617,12 @@ LogicalResult translateSubviewToSDFG(SubviewOp &op, JsonEmitter &jemit) {
 
 LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
                                          JsonEmitter &jemit) {
-  AsmState state(op);
+  AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
 
-  jemit.startNamedObject("A");
+  jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
 
   jemit.startNamedObject("attributes");
@@ -648,12 +655,12 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
 
 LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
                                                   JsonEmitter &jemit) {
-  AsmState state(op);
+  AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
 
-  jemit.startNamedObject("A");
+  jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
 
   jemit.startNamedObject("attributes");

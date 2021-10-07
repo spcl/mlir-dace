@@ -19,6 +19,10 @@ def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
     }];
 
     let results = (outs SDIR_StreamArrayType);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+    }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -39,6 +43,10 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
     }];
 
     let results = (outs SDIR_StreamArrayType);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+    }];
 }
 
 //===----------------------------------------------------------------------===//

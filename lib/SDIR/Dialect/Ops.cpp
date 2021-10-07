@@ -766,6 +766,16 @@ LogicalResult verify(AllocOp op) {
   return success();
 }
 
+SDFGNode AllocOp::getParentSDFG(){
+  Operation* sdfgOrState = (*this)->getParentOp();
+
+  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation* sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
 //===----------------------------------------------------------------------===//
 // AllocTransientOp
 //===----------------------------------------------------------------------===//
@@ -812,6 +822,16 @@ LogicalResult verify(AllocTransientOp op) {
                           "contain dimensions of size zero");
 
   return success();
+}
+
+SDFGNode AllocTransientOp::getParentSDFG(){
+  Operation* sdfgOrState = (*this)->getParentOp();
+
+  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation* sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
 }
 
 //===----------------------------------------------------------------------===//
@@ -883,6 +903,11 @@ LogicalResult verify(GetAccessOp op) {
                           "derived type of 'stream_array'");
 
   return success();
+}
+
+SDFGNode GetAccessOp::getParentSDFG(){
+  Operation* sdfg = (*this)->getParentOp()->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1242,6 +1267,16 @@ static void print(OpAsmPrinter &p, AllocStreamOp op) {
 
 LogicalResult verify(AllocStreamOp op) { return success(); }
 
+SDFGNode AllocStreamOp::getParentSDFG(){
+  Operation* sdfgOrState = (*this)->getParentOp();
+  
+  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation* sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
 //===----------------------------------------------------------------------===//
 // AllocTransientStreamOp
 //===----------------------------------------------------------------------===//
@@ -1275,6 +1310,16 @@ static void print(OpAsmPrinter &p, AllocTransientStreamOp op) {
 }
 
 LogicalResult verify(AllocTransientStreamOp op) { return success(); }
+
+SDFGNode AllocTransientStreamOp::getParentSDFG(){
+  Operation* sdfgOrState = (*this)->getParentOp();
+
+  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation* sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
 
 //===----------------------------------------------------------------------===//
 // StreamPopOp
