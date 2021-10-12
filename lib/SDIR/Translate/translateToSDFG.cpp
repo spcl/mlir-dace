@@ -114,7 +114,8 @@ LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 
 LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "SDFG");
-  jemit.printKVPair("sdfg_list_id", SDIRDialect::getNextID(), /*stringify=*/false);
+  jemit.printKVPair("sdfg_list_id", SDIRDialect::getNextID(),
+                    /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(),
@@ -143,21 +144,21 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
         return failure();
   }
 
-  for (Operation &oper : op.body().getOps()) 
-    if (StateNode state = dyn_cast<StateNode>(oper)){
-      for (AllocOp allocOper : state.getAllocs()) 
-        if (translateToSDFG(*allocOper, jemit).failed())
-          return failure();
-            
-      for (AllocTransientOp allocOper : state.getTransientAllocs()) 
-        if (translateToSDFG(*allocOper, jemit).failed())
-          return failure();
-            
-      for (AllocStreamOp allocOper : state.getStreamAllocs()) 
+  for (Operation &oper : op.body().getOps())
+    if (StateNode state = dyn_cast<StateNode>(oper)) {
+      for (AllocOp allocOper : state.getAllocs())
         if (translateToSDFG(*allocOper, jemit).failed())
           return failure();
 
-      for (AllocTransientStreamOp allocOper : state.getTransientStreamAllocs()) 
+      for (AllocTransientOp allocOper : state.getTransientAllocs())
+        if (translateToSDFG(*allocOper, jemit).failed())
+          return failure();
+
+      for (AllocStreamOp allocOper : state.getStreamAllocs())
+        if (translateToSDFG(*allocOper, jemit).failed())
+          return failure();
+
+      for (AllocTransientStreamOp allocOper : state.getTransientStreamAllocs())
         if (translateToSDFG(*allocOper, jemit).failed())
           return failure();
     }
@@ -172,8 +173,8 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   unsigned stateID = 0;
 
-  for (Operation &oper : op.body().getOps()) 
-    if (StateNode state = dyn_cast<StateNode>(oper)){
+  for (Operation &oper : op.body().getOps())
+    if (StateNode state = dyn_cast<StateNode>(oper)) {
       state.setID(stateID);
       if (translateStateToSDFG(state, jemit).failed())
         return failure();
@@ -200,7 +201,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   if (!op.isNested()) {
     jemit.startObject();
-    
+
     if (printSDFGNode(op, jemit).failed())
       return failure();
 
@@ -253,32 +254,32 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
   unsigned nodeID = 0;
   for (Operation &oper : op.body().getOps()) {
-    if (TaskletNode tasklet = dyn_cast<TaskletNode>(oper)){
+    if (TaskletNode tasklet = dyn_cast<TaskletNode>(oper)) {
       tasklet.setID(nodeID);
       if (translateTaskletToSDFG(tasklet, jemit).failed())
         return failure();
     }
-    
-    if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper)){
+
+    if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper)) {
       sdfg.setID(nodeID);
       if (translateSDFGToSDFG(sdfg, jemit).failed())
         return failure();
     }
 
-    if (GetAccessOp acc = dyn_cast<GetAccessOp>(oper)){
+    if (GetAccessOp acc = dyn_cast<GetAccessOp>(oper)) {
       acc.setID(nodeID);
       if (translateGetAccessToSDFG(acc, jemit).failed())
         return failure();
     }
 
-    if (MapNode map = dyn_cast<MapNode>(oper)){
+    if (MapNode map = dyn_cast<MapNode>(oper)) {
       map.setEntryID(nodeID);
       map.setExitID(++nodeID);
       if (translateMapToSDFG(map, jemit).failed())
         return failure();
     }
-    
-    if (ConsumeNode consume = dyn_cast<ConsumeNode>(oper)){
+
+    if (ConsumeNode consume = dyn_cast<ConsumeNode>(oper)) {
       consume.setEntryID(nodeID);
       consume.setExitID(++nodeID);
       if (translateConsumeToSDFG(consume, jemit).failed())
@@ -292,14 +293,13 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedList("edges");
 
-  for (Operation &oper : op.body().getOps()){
+  for (Operation &oper : op.body().getOps()) {
     if (CopyOp edge = dyn_cast<CopyOp>(oper))
       if (translateToSDFG(*edge, jemit).failed())
         return failure();
   }
 
   jemit.endList(); // edges
-
 
   jemit.endObject();
   return success();
@@ -616,8 +616,8 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  //jemit.printKVPair("volume", "1");
-  //jemit.printKVPair("dynamic", "false", /*stringify=*/false);
+  // jemit.printKVPair("volume", "1");
+  // jemit.printKVPair("dynamic", "false", /*stringify=*/false);
 
   /*jemit.startNamedObject("subset");
   jemit.printKVPair("type", "Range");
@@ -633,19 +633,19 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.endList(); // ranges
   jemit.endObject(); // subset*/
 
-  //jemit.printKVPair("other_subset", "null", /*stringify=*/false);
-  if(GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())){
+  // jemit.printKVPair("other_subset", "null", /*stringify=*/false);
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
     return failure();
   }
-  //jemit.printKVPair("wcr", "null", /*stringify=*/false);
-  //jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
-  //jemit.printKVPair("wcr_nonatomic", "false", /*stringify=*/false);
-  //jemit.printKVPair("allow_oob", "false", /*stringify=*/false);
-  //jemit.printKVPair("num_accesses", "1");
+  // jemit.printKVPair("wcr", "null", /*stringify=*/false);
+  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+  // jemit.printKVPair("wcr_nonatomic", "false", /*stringify=*/false);
+  // jemit.printKVPair("allow_oob", "false", /*stringify=*/false);
+  // jemit.printKVPair("num_accesses", "1");
 
-  //jemit.printKVPair("src_subset", "null", /*stringify=*/false);
+  // jemit.printKVPair("src_subset", "null", /*stringify=*/false);
   /*jemit.startNamedObject("src_subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
@@ -660,20 +660,20 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.endList(); // ranges
   jemit.endObject(); // src_subset*/
 
-  //jemit.printKVPair("dst_subset", "null", /*stringify=*/false);
+  // jemit.printKVPair("dst_subset", "null", /*stringify=*/false);
 
   jemit.endObject(); // attributes
   jemit.endObject(); // data
   jemit.endObject(); // attributes
 
-  if(GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())){
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
     jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
     return failure();
   }
 
-  if(GetAccessOp aNode = dyn_cast<GetAccessOp>(op.dest().getDefiningOp())){
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.dest().getDefiningOp())) {
     jemit.printKVPair("dst", aNode.ID());
     jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
   } else {

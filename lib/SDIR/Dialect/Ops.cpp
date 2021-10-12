@@ -1,9 +1,9 @@
 #include "SDIR/Dialect/Dialect.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "llvm/ADT/MapVector.h"
-#include "mlir/IR/AsmState.h"
 
 using namespace mlir;
 using namespace sdir;
@@ -260,10 +260,10 @@ bool SDFGNode::isNested() {
   return false;
 }
 
-void SDFGNode::setID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    IDAttr(intAttr);
+void SDFGNode::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -301,46 +301,46 @@ static void print(OpAsmPrinter &p, StateNode op) {
 
 LogicalResult verify(StateNode op) { return success(); }
 
-void StateNode::setID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    IDAttr(intAttr);
+void StateNode::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
 }
 
-SmallVector<AllocOp> StateNode::getAllocs(){
+SmallVector<AllocOp> StateNode::getAllocs() {
   SmallVector<AllocOp> allocs;
 
-  for (Operation &oper : body().getOps()) 
+  for (Operation &oper : body().getOps())
     if (AllocOp alloc = dyn_cast<AllocOp>(oper))
       allocs.push_back(alloc);
 
   return allocs;
 }
 
-SmallVector<AllocTransientOp> StateNode::getTransientAllocs(){
+SmallVector<AllocTransientOp> StateNode::getTransientAllocs() {
   SmallVector<AllocTransientOp> allocs;
 
-  for (Operation &oper : body().getOps()) 
+  for (Operation &oper : body().getOps())
     if (AllocTransientOp alloc = dyn_cast<AllocTransientOp>(oper))
       allocs.push_back(alloc);
 
   return allocs;
 }
 
-SmallVector<AllocStreamOp> StateNode::getStreamAllocs(){
+SmallVector<AllocStreamOp> StateNode::getStreamAllocs() {
   SmallVector<AllocStreamOp> allocs;
 
-  for (Operation &oper : body().getOps()) 
+  for (Operation &oper : body().getOps())
     if (AllocStreamOp alloc = dyn_cast<AllocStreamOp>(oper))
       allocs.push_back(alloc);
 
   return allocs;
 }
 
-SmallVector<AllocTransientStreamOp> StateNode::getTransientStreamAllocs(){
+SmallVector<AllocTransientStreamOp> StateNode::getTransientStreamAllocs() {
   SmallVector<AllocTransientStreamOp> allocs;
 
-  for (Operation &oper : body().getOps()) 
+  for (Operation &oper : body().getOps())
     if (AllocTransientStreamOp alloc = dyn_cast<AllocTransientStreamOp>(oper))
       allocs.push_back(alloc);
 
@@ -501,12 +501,11 @@ TaskletNode TaskletNode::clone() {
   return clone(mapper);
 }
 
-void TaskletNode::setID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    IDAttr(intAttr);
+void TaskletNode::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
 }
-
 
 //===----------------------------------------------------------------------===//
 // MapNode
@@ -610,16 +609,16 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
 }
 
-void MapNode::setEntryID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    entryIDAttr(intAttr);
+void MapNode::setEntryID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  entryIDAttr(intAttr);
 }
 
-void MapNode::setExitID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    exitIDAttr(intAttr);
+void MapNode::setExitID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  exitIDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -732,16 +731,16 @@ LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
 }
 
-void ConsumeNode::setEntryID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    entryIDAttr(intAttr);
+void ConsumeNode::setEntryID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  entryIDAttr(intAttr);
 }
 
-void ConsumeNode::setExitID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    exitIDAttr(intAttr);
+void ConsumeNode::setExitID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  exitIDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -850,13 +849,13 @@ LogicalResult verify(AllocOp op) {
   return success();
 }
 
-SDFGNode AllocOp::getParentSDFG(){
-  Operation* sdfgOrState = (*this)->getParentOp();
+SDFGNode AllocOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
 
-  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
     return sdfg;
 
-  Operation* sdfg = sdfgOrState->getParentOp();
+  Operation *sdfg = sdfgOrState->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
 }
 
@@ -908,13 +907,13 @@ LogicalResult verify(AllocTransientOp op) {
   return success();
 }
 
-SDFGNode AllocTransientOp::getParentSDFG(){
-  Operation* sdfgOrState = (*this)->getParentOp();
+SDFGNode AllocTransientOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
 
-  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
     return sdfg;
 
-  Operation* sdfg = sdfgOrState->getParentOp();
+  Operation *sdfg = sdfgOrState->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
 }
 
@@ -989,12 +988,12 @@ LogicalResult verify(GetAccessOp op) {
   return success();
 }
 
-SDFGNode GetAccessOp::getParentSDFG(){
-  Operation* sdfg = (*this)->getParentOp()->getParentOp();
+SDFGNode GetAccessOp::getParentSDFG() {
+  Operation *sdfg = (*this)->getParentOp()->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
 }
 
-std::string GetAccessOp::getName(){
+std::string GetAccessOp::getName() {
   AsmState state(getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
@@ -1002,10 +1001,10 @@ std::string GetAccessOp::getName(){
   return name;
 }
 
-void GetAccessOp::setID(unsigned id){
-    Builder builder(*this);
-    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-    IDAttr(intAttr);
+void GetAccessOp::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1365,13 +1364,13 @@ static void print(OpAsmPrinter &p, AllocStreamOp op) {
 
 LogicalResult verify(AllocStreamOp op) { return success(); }
 
-SDFGNode AllocStreamOp::getParentSDFG(){
-  Operation* sdfgOrState = (*this)->getParentOp();
-  
-  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+SDFGNode AllocStreamOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
     return sdfg;
 
-  Operation* sdfg = sdfgOrState->getParentOp();
+  Operation *sdfg = sdfgOrState->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
 }
 
@@ -1409,13 +1408,13 @@ static void print(OpAsmPrinter &p, AllocTransientStreamOp op) {
 
 LogicalResult verify(AllocTransientStreamOp op) { return success(); }
 
-SDFGNode AllocTransientStreamOp::getParentSDFG(){
-  Operation* sdfgOrState = (*this)->getParentOp();
+SDFGNode AllocTransientStreamOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
 
-  if(SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
     return sdfg;
 
-  Operation* sdfg = sdfgOrState->getParentOp();
+  Operation *sdfg = sdfgOrState->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
 }
 
