@@ -22,6 +22,7 @@ def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
 
     let extraClassDeclaration = [{
         SDFGNode getParentSDFG();
+        bool isInState();
     }];
 }
 
@@ -46,6 +47,7 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
 
     let extraClassDeclaration = [{
         SDFGNode getParentSDFG();
+        bool isInState();
     }];
 }
 

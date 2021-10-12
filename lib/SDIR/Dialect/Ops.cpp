@@ -859,6 +859,13 @@ SDFGNode AllocOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
+bool AllocOp::isInState(){
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // AllocTransientOp
 //===----------------------------------------------------------------------===//
@@ -915,6 +922,13 @@ SDFGNode AllocTransientOp::getParentSDFG() {
 
   Operation *sdfg = sdfgOrState->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
+}
+
+bool AllocTransientOp::isInState(){
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1374,6 +1388,13 @@ SDFGNode AllocStreamOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
+bool AllocStreamOp::isInState(){
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // AllocTransientStreamOp
 //===----------------------------------------------------------------------===//
@@ -1416,6 +1437,13 @@ SDFGNode AllocTransientStreamOp::getParentSDFG() {
 
   Operation *sdfg = sdfgOrState->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
+}
+
+bool AllocTransientStreamOp::isInState(){
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

@@ -23,6 +23,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 
     let extraClassDeclaration = [{
         SDFGNode getParentSDFG();
+        bool isInState();
     }];
 }
 
@@ -50,6 +51,7 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
 
     let extraClassDeclaration = [{
         SDFGNode getParentSDFG();
+        bool isInState();
     }];
 }
 
