@@ -111,7 +111,7 @@ Type SDIRDialect::parseType(DialectAsmParser &parser) const {
 
   Type genType;
   OptionalParseResult parseResult =
-      generatedTypeParser(getContext(), parser, mnemonic, genType);
+      generatedTypeParser(parser, mnemonic, genType);
   if (parseResult.hasValue())
     return genType;
 
