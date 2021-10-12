@@ -25,6 +25,10 @@ def SDIR_StateNode : SDIR_Op<"state", [
         SymbolNameAttr:$sym_name
     );
     let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        void setID(unsigned id);
+    }];
 }
 
 #endif // SDIR_StateNode

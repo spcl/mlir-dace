@@ -32,6 +32,10 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
     );
 
     let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        void setEntryID(unsigned id);
+    }];
 }
 
 #endif // SDIR_ConsumeNode

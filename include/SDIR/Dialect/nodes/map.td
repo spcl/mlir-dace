@@ -31,6 +31,10 @@ def SDIR_MapNode : SDIR_Op<"map", [
     );
 
     let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        void setEntryID(unsigned id);
+    }];
 }
 
 #endif // SDIR_MapNode

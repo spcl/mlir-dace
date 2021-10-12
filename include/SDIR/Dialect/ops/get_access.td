@@ -26,6 +26,8 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
 
     let extraClassDeclaration = [{
         SDFGNode getParentSDFG();
+        std::string getName();
+        void setID(unsigned id);
     }];
 }
 

@@ -37,6 +37,7 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         StateNode getStateByIndex(unsigned idx);
         StateNode getStateBySymRef(StringRef symRef);
         bool isNested();
+        void setID(unsigned id);
         
         //===------------------------------------------------------------------===//
         // CallableOpInterface

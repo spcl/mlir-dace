@@ -52,6 +52,7 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         TaskletNode clone();
 
         void cloneInto(TaskletNode dest, BlockAndValueMapping &mapper);
+        void setID(unsigned id);
 
         //===------------------------------------------------------------------===//
         // CallableOpInterface

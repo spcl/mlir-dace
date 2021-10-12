@@ -3,6 +3,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "llvm/ADT/MapVector.h"
+#include "mlir/IR/AsmState.h"
 
 using namespace mlir;
 using namespace sdir;
@@ -259,6 +260,12 @@ bool SDFGNode::isNested() {
   return false;
 }
 
+void SDFGNode::setID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    IDAttr(intAttr);
+}
+
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//
@@ -293,6 +300,13 @@ static void print(OpAsmPrinter &p, StateNode op) {
 }
 
 LogicalResult verify(StateNode op) { return success(); }
+
+void StateNode::setID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    IDAttr(intAttr);
+}
+
 
 //===----------------------------------------------------------------------===//
 // TaskletNode
@@ -448,6 +462,13 @@ TaskletNode TaskletNode::clone() {
   return clone(mapper);
 }
 
+void TaskletNode::setID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    IDAttr(intAttr);
+}
+
+
 //===----------------------------------------------------------------------===//
 // MapNode
 //===----------------------------------------------------------------------===//
@@ -548,6 +569,12 @@ Region &MapNode::getLoopBody() { return body(); }
 
 LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
+}
+
+void MapNode::setEntryID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    entryIDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -659,6 +686,13 @@ Region &ConsumeNode::getLoopBody() { return body(); }
 LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
 }
+
+void ConsumeNode::setEntryID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    entryIDAttr(intAttr);
+}
+
 
 //===----------------------------------------------------------------------===//
 // EdgeOp
@@ -908,6 +942,20 @@ LogicalResult verify(GetAccessOp op) {
 SDFGNode GetAccessOp::getParentSDFG(){
   Operation* sdfg = (*this)->getParentOp()->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
+}
+
+std::string GetAccessOp::getName(){
+  AsmState state(getParentSDFG());
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  arr().printAsOperand(nameStream, state);
+  return name;
+}
+
+void GetAccessOp::setID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    IDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
