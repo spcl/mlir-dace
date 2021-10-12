@@ -70,9 +70,6 @@ LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
   if (StreamLengthOp Op = dyn_cast<StreamLengthOp>(op))
     return translateStreamLengthToSDFG(Op, jemit);
 
-  if (sdir::ReturnOp Op = dyn_cast<sdir::ReturnOp>(op))
-    return translateReturnToSDFG(Op, jemit);
-
   if (sdir::CallOp Op = dyn_cast<sdir::CallOp>(op))
     return translateCallToSDFG(Op, jemit);
 
@@ -101,9 +98,13 @@ LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit) {
+  SDIRDialect::resetIDGenerator();
+
   for (Operation &oper : op.body().getOps())
-    if (translateToSDFG(oper, jemit).failed())
-      return failure();
+    if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper))
+      if (translateSDFGToSDFG(sdfg, jemit).failed())
+        return failure();
+
   return success();
 }
 
@@ -113,6 +114,7 @@ LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 
 LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "SDFG");
+  jemit.printKVPair("sdfg_list_id", SDIRDialect::getNextID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(),
@@ -140,6 +142,25 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
       if (translateToSDFG(*alloc, jemit).failed())
         return failure();
   }
+
+  for (Operation &oper : op.body().getOps()) 
+    if (StateNode state = dyn_cast<StateNode>(oper)){
+      for (AllocOp allocOper : state.getAllocs()) 
+        if (translateToSDFG(*allocOper, jemit).failed())
+          return failure();
+            
+      for (AllocTransientOp allocOper : state.getTransientAllocs()) 
+        if (translateToSDFG(*allocOper, jemit).failed())
+          return failure();
+            
+      for (AllocStreamOp allocOper : state.getStreamAllocs()) 
+        if (translateToSDFG(*allocOper, jemit).failed())
+          return failure();
+
+      for (AllocTransientStreamOp allocOper : state.getTransientStreamAllocs()) 
+        if (translateToSDFG(*allocOper, jemit).failed())
+          return failure();
+    }
   jemit.endObject(); // _arrays
 
   if (!containsAttr(*op, "instrument"))
@@ -149,27 +170,15 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedList("nodes");
 
-  for (Operation &oper : op.body().getOps()) {
-    // Skip edges to print them in "edges"
-    if (EdgeOp edge = dyn_cast<EdgeOp>(oper))
-      continue;
+  unsigned stateID = 0;
 
-    // Skip allocs because they're already printed
-    if (AllocOp alloc = dyn_cast<AllocOp>(oper))
-      continue;
-
-    if (AllocTransientOp alloc = dyn_cast<AllocTransientOp>(oper))
-      continue;
-
-    if (AllocStreamOp alloc = dyn_cast<AllocStreamOp>(oper))
-      continue;
-
-    if (AllocTransientStreamOp alloc = dyn_cast<AllocTransientStreamOp>(oper))
-      continue;
-
-    if (translateToSDFG(oper, jemit).failed())
-      return failure();
-  }
+  for (Operation &oper : op.body().getOps()) 
+    if (StateNode state = dyn_cast<StateNode>(oper)){
+      state.setID(stateID);
+      if (translateStateToSDFG(state, jemit).failed())
+        return failure();
+      stateID++;
+    }
 
   jemit.endList(); // nodes
 
@@ -182,14 +191,8 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.endList(); // edges
 
-  jemit.startNamedObject("_arrays");
-  jemit.endObject();
-
-  jemit.printKVPair("sdfg_list_id", op.ID(), /*stringify=*/false);
-
   StateNode entryState = op.getStateBySymRef(op.entry());
-  unsigned start_state_idx = op.getIndexOfState(entryState);
-  jemit.printKVPair("start_state", start_state_idx, /*stringify=*/false);
+  jemit.printKVPair("start_state", entryState.ID(), /*stringify=*/false);
 
   return success();
 }
@@ -207,6 +210,8 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startObject();
   jemit.printKVPair("type", "NestedSDFG");
+  jemit.printKVPair("id", op.ID(), /*stringify=*/false);
+
   jemit.startNamedObject("attributes");
 
   if (!containsAttr(*op, "instrument"))
@@ -222,8 +227,8 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.endObject(); // sdfg
   jemit.endObject(); // attributes
-  jemit.endObject();
 
+  jemit.endObject();
   return success();
 }
 
@@ -235,42 +240,66 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
   jemit.printKVPair("label", op.sym_name());
-
-  SDFGNode sdfg = dyn_cast<SDFGNode>(op->getParentOp());
-  // jemit.printKVPair("id", sdfg.getIndexOfState(op), /*stringify=*/false);
   jemit.printKVPair("id", op.ID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
   if (!containsAttr(*op, "instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
+
   jemit.endObject(); // attributes
 
   jemit.startNamedList("nodes");
 
+  unsigned nodeID = 0;
   for (Operation &oper : op.body().getOps()) {
-    // Skip allocs
-    if (AllocOp alloc = dyn_cast<AllocOp>(oper))
-      continue;
+    if (TaskletNode tasklet = dyn_cast<TaskletNode>(oper)){
+      tasklet.setID(nodeID);
+      if (translateTaskletToSDFG(tasklet, jemit).failed())
+        return failure();
+    }
+    
+    if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper)){
+      sdfg.setID(nodeID);
+      if (translateSDFGToSDFG(sdfg, jemit).failed())
+        return failure();
+    }
 
-    if (AllocTransientOp alloc = dyn_cast<AllocTransientOp>(oper))
-      continue;
+    if (GetAccessOp acc = dyn_cast<GetAccessOp>(oper)){
+      acc.setID(nodeID);
+      if (translateGetAccessToSDFG(acc, jemit).failed())
+        return failure();
+    }
 
-    if (AllocStreamOp alloc = dyn_cast<AllocStreamOp>(oper))
-      continue;
+    if (MapNode map = dyn_cast<MapNode>(oper)){
+      map.setEntryID(nodeID);
+      map.setExitID(++nodeID);
+      if (translateMapToSDFG(map, jemit).failed())
+        return failure();
+    }
+    
+    if (ConsumeNode consume = dyn_cast<ConsumeNode>(oper)){
+      consume.setEntryID(nodeID);
+      consume.setExitID(++nodeID);
+      if (translateConsumeToSDFG(consume, jemit).failed())
+        return failure();
+    }
 
-    if (AllocTransientStreamOp alloc = dyn_cast<AllocTransientStreamOp>(oper))
-      continue;
-
-    if (translateToSDFG(oper, jemit).failed())
-      return failure();
+    nodeID++;
   }
 
   jemit.endList(); // nodes
 
   jemit.startNamedList("edges");
-  // TODO: Fill edges
+
+  for (Operation &oper : op.body().getOps()){
+    if (CopyOp edge = dyn_cast<CopyOp>(oper))
+      if (translateToSDFG(*edge, jemit).failed())
+        return failure();
+  }
+
   jemit.endList(); // edges
+
 
   jemit.endObject();
   return success();
@@ -539,17 +568,12 @@ LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
 LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "AccessNode");
-
-  AsmState state(op.getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  op.arr().printAsOperand(nameStream, state);
-  jemit.printKVPair("label", name);
+  jemit.printKVPair("label", op.getName());
 
   jemit.startNamedObject("attributes");
   jemit.printKVPair("access", "ReadWrite");
   jemit.printKVPair("setzero", "false", /*stringify=*/false);
-  jemit.printKVPair("data", name);
+  jemit.printKVPair("data", op.getName());
   jemit.startNamedObject("in_connectors");
   jemit.endObject(); // in_connectors
   jemit.startNamedObject("out_connectors");
@@ -584,6 +608,79 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+
+  //jemit.printKVPair("volume", "1");
+  //jemit.printKVPair("dynamic", "false", /*stringify=*/false);
+
+  /*jemit.startNamedObject("subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+
+  jemit.startObject();
+  jemit.printKVPair("start", "0");
+  jemit.printKVPair("end", "0");
+  jemit.printKVPair("step", "1");
+  jemit.printKVPair("tile", "1");
+  jemit.endObject();
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // subset*/
+
+  //jemit.printKVPair("other_subset", "null", /*stringify=*/false);
+  if(GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())){
+    jemit.printKVPair("data", aNode.getName());
+  } else {
+    return failure();
+  }
+  //jemit.printKVPair("wcr", "null", /*stringify=*/false);
+  //jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+  //jemit.printKVPair("wcr_nonatomic", "false", /*stringify=*/false);
+  //jemit.printKVPair("allow_oob", "false", /*stringify=*/false);
+  //jemit.printKVPair("num_accesses", "1");
+
+  //jemit.printKVPair("src_subset", "null", /*stringify=*/false);
+  /*jemit.startNamedObject("src_subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+
+  jemit.startObject();
+  jemit.printKVPair("start", "0");
+  jemit.printKVPair("end", "0");
+  jemit.printKVPair("step", "1");
+  jemit.printKVPair("tile", "1");
+  jemit.endObject();
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // src_subset*/
+
+  //jemit.printKVPair("dst_subset", "null", /*stringify=*/false);
+
+  jemit.endObject(); // attributes
+  jemit.endObject(); // data
+  jemit.endObject(); // attributes
+
+  if(GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())){
+    jemit.printKVPair("src", aNode.ID());
+    jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  } else {
+    return failure();
+  }
+
+  if(GetAccessOp aNode = dyn_cast<GetAccessOp>(op.dest().getDefiningOp())){
+    jemit.printKVPair("dst", aNode.ID());
+    jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
+  } else {
+    return failure();
+  }
+
+  jemit.endObject();
   return success();
 }
 
@@ -709,14 +806,6 @@ LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit) {
 
 LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
                                           JsonEmitter &jemit) {
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// ReturnOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult translateReturnToSDFG(sdir::ReturnOp &op, JsonEmitter &jemit) {
   return success();
 }
 

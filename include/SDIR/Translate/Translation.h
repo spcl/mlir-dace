@@ -39,7 +39,6 @@ LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit);
 
 LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
                                           JsonEmitter &jemit);
-LogicalResult translateReturnToSDFG(sdir::ReturnOp &op, JsonEmitter &jemit);
 LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit);
 LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit);
 
