@@ -307,6 +307,45 @@ void StateNode::setID(unsigned id){
     IDAttr(intAttr);
 }
 
+SmallVector<AllocOp> StateNode::getAllocs(){
+  SmallVector<AllocOp> allocs;
+
+  for (Operation &oper : body().getOps()) 
+    if (AllocOp alloc = dyn_cast<AllocOp>(oper))
+      allocs.push_back(alloc);
+
+  return allocs;
+}
+
+SmallVector<AllocTransientOp> StateNode::getTransientAllocs(){
+  SmallVector<AllocTransientOp> allocs;
+
+  for (Operation &oper : body().getOps()) 
+    if (AllocTransientOp alloc = dyn_cast<AllocTransientOp>(oper))
+      allocs.push_back(alloc);
+
+  return allocs;
+}
+
+SmallVector<AllocStreamOp> StateNode::getStreamAllocs(){
+  SmallVector<AllocStreamOp> allocs;
+
+  for (Operation &oper : body().getOps()) 
+    if (AllocStreamOp alloc = dyn_cast<AllocStreamOp>(oper))
+      allocs.push_back(alloc);
+
+  return allocs;
+}
+
+SmallVector<AllocTransientStreamOp> StateNode::getTransientStreamAllocs(){
+  SmallVector<AllocTransientStreamOp> allocs;
+
+  for (Operation &oper : body().getOps()) 
+    if (AllocTransientStreamOp alloc = dyn_cast<AllocTransientStreamOp>(oper))
+      allocs.push_back(alloc);
+
+  return allocs;
+}
 
 //===----------------------------------------------------------------------===//
 // TaskletNode
@@ -577,6 +616,12 @@ void MapNode::setEntryID(unsigned id){
     entryIDAttr(intAttr);
 }
 
+void MapNode::setExitID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    exitIDAttr(intAttr);
+}
+
 //===----------------------------------------------------------------------===//
 // ConsumeNode
 //===----------------------------------------------------------------------===//
@@ -693,6 +738,11 @@ void ConsumeNode::setEntryID(unsigned id){
     entryIDAttr(intAttr);
 }
 
+void ConsumeNode::setExitID(unsigned id){
+    Builder builder(*this);
+    IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+    exitIDAttr(intAttr);
+}
 
 //===----------------------------------------------------------------------===//
 // EdgeOp

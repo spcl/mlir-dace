@@ -35,6 +35,7 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
 
     let extraClassDeclaration = [{
         void setEntryID(unsigned id);
+        void setExitID(unsigned id);
     }];
 }
 

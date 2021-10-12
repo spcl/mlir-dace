@@ -34,6 +34,7 @@ def SDIR_MapNode : SDIR_Op<"map", [
 
     let extraClassDeclaration = [{
         void setEntryID(unsigned id);
+        void setExitID(unsigned id);
     }];
 }
 

@@ -21,6 +21,7 @@ def SDIR_Dialect : Dialect{
 
         public:
             inline static int getNextID(){ return nextNodeID++; }
+            inline static void resetIDGenerator(){ nextNodeID = 0; }
     }];
 }
 
