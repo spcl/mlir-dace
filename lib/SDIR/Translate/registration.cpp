@@ -1,6 +1,7 @@
 #include "SDIR/Translate/Translation.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Translation.h"
+#include "mlir/InitAllDialects.h"
 
 //===----------------------------------------------------------------------===//
 // SDFG registration
@@ -23,5 +24,6 @@ void registerToSDFGTranslation() {
       [](mlir::DialectRegistry &registry) {
         registry.insert<mlir::sdir::SDIRDialect>();
         registry.insert<mlir::StandardOpsDialect>();
+        registerAllDialects(registry);
       });
 }
