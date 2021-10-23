@@ -355,7 +355,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
                                     OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
-  
+
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
   result.addAttribute("ID", intAttr);
@@ -866,7 +866,7 @@ SDFGNode AllocOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
-bool AllocOp::isInState(){
+bool AllocOp::isInState() {
   Operation *sdfgOrState = (*this)->getParentOp();
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
     return true;
@@ -874,9 +874,9 @@ bool AllocOp::isInState(){
 }
 
 std::string AllocOp::getName() {
-  if((*this)->hasAttr("name")){
+  if ((*this)->hasAttr("name")) {
     Attribute nameAttr = (*this)->getAttr("name");
-    if(StringAttr name = nameAttr.cast<StringAttr>())
+    if (StringAttr name = nameAttr.cast<StringAttr>())
       return name.getValue().str();
   }
 
@@ -946,7 +946,7 @@ SDFGNode AllocTransientOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
-bool AllocTransientOp::isInState(){
+bool AllocTransientOp::isInState() {
   Operation *sdfgOrState = (*this)->getParentOp();
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
     return true;
@@ -1032,9 +1032,9 @@ SDFGNode GetAccessOp::getParentSDFG() {
 std::string GetAccessOp::getName() {
   Operation *alloc = arr().getDefiningOp();
 
-  if(AllocOp allocArr = dyn_cast<AllocOp>(alloc))
+  if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
     return allocArr.getName();
-  
+
   AsmState state(getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
@@ -1416,7 +1416,7 @@ SDFGNode AllocStreamOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
-bool AllocStreamOp::isInState(){
+bool AllocStreamOp::isInState() {
   Operation *sdfgOrState = (*this)->getParentOp();
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
     return true;
@@ -1467,7 +1467,7 @@ SDFGNode AllocTransientStreamOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
-bool AllocTransientStreamOp::isInState(){
+bool AllocTransientStreamOp::isInState() {
   Operation *sdfgOrState = (*this)->getParentOp();
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
     return true;
@@ -1739,7 +1739,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-StateNode CallOp::getParentState(){
+StateNode CallOp::getParentState() {
   Operation *stateOrMapConsume = (*this)->getParentOp();
 
   if (StateNode state = dyn_cast<StateNode>(stateOrMapConsume))
@@ -1749,7 +1749,7 @@ StateNode CallOp::getParentState(){
   return dyn_cast<StateNode>(state);
 }
 
-TaskletNode CallOp::getTasklet(){
+TaskletNode CallOp::getTasklet() {
   StateNode state = getParentState();
   Operation *task = state.lookupSymbol(callee());
   TaskletNode tasklet = dyn_cast<TaskletNode>(task);
