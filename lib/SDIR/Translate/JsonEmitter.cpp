@@ -55,6 +55,12 @@ void JsonEmitter::printString(StringRef str) {
   printLiteral("\"");
 }
 
+void JsonEmitter::printInt(int i) {
+  printLiteral("\"");
+  os << i;
+  printLiteral("\"");
+}
+
 void JsonEmitter::startObject() {
   startEntry();
   printLiteral("{");
@@ -138,20 +144,6 @@ void JsonEmitter::printKVPair(StringRef key, Attribute &val, bool stringify) {
     if (stringify)
       printLiteral("\"");
   }
-}
-
-void JsonEmitter::printKVPair(StringRef key, Region &val, bool stringify) {
-  startEntry();
-  printString(key);
-  printLiteral(": ");
-  if (stringify)
-    printLiteral("\"");
-  for (Operation &oper : val.getOps()) {
-    oper.print(os);
-    printLiteral("\\n");
-  }
-  if (stringify)
-    printLiteral("\"");
 }
 
 void JsonEmitter::startNamedList(StringRef name) {

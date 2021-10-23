@@ -22,6 +22,7 @@ struct JsonEmitter {
   void newLine();
   void printLiteral(StringRef str);
   void printString(StringRef str);
+  void printInt(int i);
 
   void startObject();
   void startNamedObject(StringRef name);
@@ -34,7 +35,6 @@ struct JsonEmitter {
   void printKVPair(StringRef key, StringRef val, bool stringify = true);
   void printKVPair(StringRef key, int val, bool stringify = true);
   void printKVPair(StringRef key, Attribute &val, bool stringify = true);
-  void printKVPair(StringRef key, Region &val, bool stringify = true);
 
   void printAttributes(ArrayRef<NamedAttribute> arr,
                        ArrayRef<StringRef> elidedAttrs = {});
