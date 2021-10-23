@@ -18,12 +18,13 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
         ```
     }];
 
-    let arguments = (ins Variadic<AnyInteger>:$params);
+    let arguments = (ins Variadic<Index>:$params);
     let results = (outs SDIR_ArrayType:$res);
 
     let extraClassDeclaration = [{
         SDFGNode getParentSDFG();
         bool isInState();
+        std::string getName();
     }];
 }
 
@@ -109,8 +110,11 @@ def SDIR_StoreOp : SDIR_Op<"store", [
         ```
     }];
 
-    let arguments = (ins Variadic<Index>:$indices, AnyType:$val, 
-                        SDIR_MemletType:$arr);
+    let arguments = (ins 
+        Variadic<Index>:$indices, 
+        AnyType:$val, 
+        SDIR_MemletType:$arr
+    );
 }
 
 //===----------------------------------------------------------------------===//

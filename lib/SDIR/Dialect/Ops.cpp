@@ -353,6 +353,9 @@ SmallVector<AllocTransientStreamOp> StateNode::getTransientStreamAllocs() {
 
 static ParseResult parseTaskletNode(OpAsmParser &parser,
                                     OperationState &result) {
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
   result.addAttribute("ID", intAttr);
@@ -815,7 +818,11 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  /*if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+                             result.operands))
+    return failure();*/
+
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -864,6 +871,21 @@ bool AllocOp::isInState(){
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
     return true;
   return false;
+}
+
+std::string AllocOp::getName() {
+  if((*this)->hasAttr("name")){
+    Attribute nameAttr = (*this)->getAttr("name");
+    if(StringAttr name = nameAttr.cast<StringAttr>())
+      return name.getValue().str();
+  }
+
+  AsmState state(getParentSDFG());
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  (*this)->getResult(0).printAsOperand(nameStream, state);
+
+  return name;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1008,10 +1030,16 @@ SDFGNode GetAccessOp::getParentSDFG() {
 }
 
 std::string GetAccessOp::getName() {
+  Operation *alloc = arr().getDefiningOp();
+
+  if(AllocOp allocArr = dyn_cast<AllocOp>(alloc))
+    return allocArr.getName();
+  
   AsmState state(getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   arr().printAsOperand(nameStream, state);
+
   return name;
 }
 
@@ -1709,6 +1737,23 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     }
 
   return success();
+}
+
+StateNode CallOp::getParentState(){
+  Operation *stateOrMapConsume = (*this)->getParentOp();
+
+  if (StateNode state = dyn_cast<StateNode>(stateOrMapConsume))
+    return state;
+
+  Operation *state = stateOrMapConsume->getParentOp();
+  return dyn_cast<StateNode>(state);
+}
+
+TaskletNode CallOp::getTasklet(){
+  StateNode state = getParentState();
+  Operation *task = state.lookupSymbol(callee());
+  TaskletNode tasklet = dyn_cast<TaskletNode>(task);
+  return tasklet;
 }
 
 //===----------------------------------------------------------------------===//
