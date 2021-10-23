@@ -1327,6 +1327,11 @@ LogicalResult translateTypeToSDFG(Type &t, JsonEmitter &jemit, StringRef key) {
     return success();
   }
 
+  if(t.isInteger(32)){
+    jemit.printKVPair(key, "int32");
+    return success();
+  }
+
   return failure();
 }
 
