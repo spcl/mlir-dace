@@ -44,6 +44,7 @@ LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit);
 
 LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
 LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit);
+LogicalResult translateTypeToSDFG(Type &t, JsonEmitter &jemit, StringRef key);
 
 bool containsAttr(Operation &op, StringRef attrName);
 

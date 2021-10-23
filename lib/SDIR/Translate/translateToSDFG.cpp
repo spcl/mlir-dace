@@ -119,11 +119,31 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(),
-                        /*elidedAttrs=*/{"ID", "entry", "sym_name", "type"});
+                        /*elidedAttrs=*/{"ID", "entry", "sym_name", "type", "arg_names"});
 
   jemit.startNamedObject("constants_prop");
   // TODO: Fill this out
   jemit.endObject(); // constants_prop
+
+  if(containsAttr(*op, "arg_names")){
+    Attribute arg_names = op->getAttr("arg_names");
+    if (ArrayAttr arg_names_arr = arg_names.cast<ArrayAttr>()){
+      jemit.startNamedList("arg_names");
+
+      for(Attribute arg_name : arg_names_arr.getValue()){
+        if (StringAttr arg_name_str = arg_name.cast<StringAttr>()){
+          jemit.startEntry();
+          jemit.printString(arg_name_str.getValue());
+        } else {
+          return failure();
+        }
+      }
+
+      jemit.endList(); // arg_names*/
+    } else {
+      return failure();
+    }
+  }
 
   jemit.startNamedObject("_arrays");
   for (Operation &oper : op.body().getOps()) {
@@ -164,8 +184,39 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
     }
   jemit.endObject(); // _arrays
 
+  jemit.startNamedObject("symbols");
+  for (Operation &oper : op.body().getOps()) {
+    if (AllocSymbolOp alloc = dyn_cast<AllocSymbolOp>(oper))
+      if (translateToSDFG(*alloc, jemit).failed())
+        return failure();
+  }
+
+  jemit.endObject(); // symbols
+
   if (!containsAttr(*op, "instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
+
+  jemit.startNamedObject("init_code");
+  jemit.startNamedObject("frame");
+  jemit.printKVPair("string_data","");
+  jemit.printKVPair("language", "CPP");
+  jemit.endObject(); // frame
+  jemit.endObject(); // init_code
+
+  jemit.startNamedObject("exit_code");
+  jemit.startNamedObject("frame");
+  jemit.printKVPair("string_data","");
+  jemit.printKVPair("language", "CPP");
+  jemit.endObject(); // frame
+  jemit.endObject(); // exit_code
+
+  jemit.startNamedObject("global_code");
+  jemit.startNamedObject("frame");
+  jemit.printKVPair("string_data","");
+  jemit.printKVPair("language", "CPP");
+  jemit.endObject(); // frame
+  jemit.endObject(); // global_code
+
   jemit.printKVPair("name", op.sym_name());
   jemit.endObject(); // attributes
 
@@ -297,6 +348,14 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
     if (CopyOp edge = dyn_cast<CopyOp>(oper))
       if (translateToSDFG(*edge, jemit).failed())
         return failure();
+
+    if (StoreOp edge = dyn_cast<StoreOp>(oper))
+      if (translateToSDFG(*edge, jemit).failed())
+        return failure();
+
+    if (sdir::CallOp edge = dyn_cast<sdir::CallOp>(oper))
+      if (translateToSDFG(*edge, jemit).failed())
+        return failure();
   }
 
   jemit.endList(); // edges
@@ -315,21 +374,68 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("label", op.sym_name());
 
   jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", op.sym_name());
+
   if (!containsAttr(*op, "instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
 
   jemit.startNamedObject("code");
-  jemit.printKVPair("string_data", op.body());
+
+  AsmState state(op);
+  std::string code = "module {\\n func @mlir_entry(";
+
+  for (int i = 0; i < op.getNumArguments(); ++i) {
+    BlockArgument bArg = op.getArgument(i);
+
+    std::string name;
+    llvm::raw_string_ostream nameStream(name);
+    bArg.printAsOperand(nameStream, state);
+
+    std::string type;
+    llvm::raw_string_ostream typeStream(type);
+    bArg.getType().print(typeStream);
+
+    if(i > 0) code.append(", ");
+    code.append(name);
+    code.append(": ");
+    code.append(type);
+  }
+
+  code.append(") -> ");
+
+  std::string retType;
+  llvm::raw_string_ostream retTypeStream(retType);
+  for(Type res : op.getCallableResults())
+    res.print(retTypeStream);
+  code.append(retType);
+
+  code.append(" {\\n");
+  
+  for (Operation &oper : op.body().getOps()) {
+    std::string codeLine;
+    llvm::raw_string_ostream codeLineStream(codeLine);
+    oper.print(codeLineStream);
+
+    if(sdir::ReturnOp ret = dyn_cast<sdir::ReturnOp>(oper))
+      codeLine.replace(codeLine.find("sdir.return"), 11, "return");
+
+    codeLine.append("\\n");
+    code.append(codeLine);
+  }
+
+  code.append("}\\n}");
+
+  jemit.printKVPair("string_data", code);
   jemit.printKVPair("language", "MLIR");
   jemit.endObject(); // code
 
   jemit.startNamedObject("in_connectors");
 
-  AsmState state(op);
   for (BlockArgument bArg : op.getArguments()) {
     std::string name;
     llvm::raw_string_ostream nameStream(name);
     bArg.printAsOperand(nameStream, state);
+    name.erase(0,1); // Remove %-sign
     jemit.printKVPair(name, "null", /*stringify=*/false);
     // bArg.getType().print(jemit.ostream());
   }
@@ -338,6 +444,7 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("out_connectors");
   // TODO: print out_connectors
+  jemit.printKVPair("__out", "null", /*stringify=*/false);
   jemit.endObject(); // out_connectors
 
   jemit.endObject(); // attributes
@@ -444,7 +551,21 @@ LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.startNamedObject("assignments");
-  // TODO: Fill in the assignments
+  
+  if(op.assign().hasValue()){
+    ArrayAttr assignments = op.assign().getValue();
+
+    for(Attribute assignment : assignments){
+      if(StringAttr strAttr = assignment.dyn_cast<StringAttr>()){
+        StringRef content = strAttr.getValue();
+        std::pair<StringRef, StringRef> kv = content.split(':');
+        jemit.printKVPair(kv.first.trim(), kv.second.trim());
+      } else {
+        return failure();
+      }
+    }
+  }
+
   jemit.endObject(); // assignments
   jemit.startNamedObject("condition");
   jemit.printKVPair("language", "Python");
@@ -480,30 +601,74 @@ LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit) {
 // AllocOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
-  AsmState state(op.getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  op->getResult(0).printAsOperand(nameStream, state);
+LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit){
+  jemit.startNamedObject(op.getName());
+  jemit.printKVPair("type", "Scalar");
 
-  jemit.startNamedObject(name);
+  jemit.startNamedObject("attributes");
+
+  Type element = op.getType().getElementType();
+  if(translateTypeToSDFG(element, jemit, "dtype").failed())
+    return failure();
+
+  jemit.startNamedList("shape");
+  jemit.startEntry();
+  jemit.printInt(1);
+  jemit.endList(); // shape
+
+  jemit.printKVPair("transient", "false", /*stringify=*/false);
+  jemit.printKVPair("storage", "Default");
+  jemit.printKVPair("lifetime", "Scope");
+
+  jemit.endObject(); // attributes
+
+  jemit.endObject();
+  return success();
+}
+
+LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
+  if(op.getType().getShape().size() == 0)
+    return printScalar(op, jemit);
+
+  jemit.startNamedObject(op.getName());
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
   // TODO: Print the values you can derive
   // jemit.printKVPair("allow_conflicts", "false", /*stringify=*/false);
-  // jemit.startNamedList("strides");
-  // jemit.endList(); // strides
+
+  jemit.startNamedList("strides");
+  ArrayRef<int64_t> shape = op.getType().getIntegers();
+
+  for(int i = shape.size()-1; i > 0; --i){
+    jemit.startEntry();
+    jemit.printInt(shape[i]);
+  }
+
+  jemit.startEntry();
+  jemit.printInt(1);
+  jemit.endList(); // strides
 
   // jemit.printKVPair("total_size", "4");
-  // jemit.startNamedList("offset");
-  // jemit.endList(); // offset
+  jemit.startNamedList("offset");
+  for(int i = 0; i < shape.size(); ++i){
+    jemit.startEntry();
+    jemit.printInt(0);
+  }
+  jemit.endList(); // offset
 
   // jemit.printKVPair("may_alias", "false", /*stringify*/false);
   // jemit.printKVPair("alignment", 0, /*stringify*/false);
-  jemit.printKVPair("dtype", "int32");
-  // jemit.startNamedList("shape");
-  // jemit.endList(); // shape
+  Type element = op.getType().getElementType();
+  if(translateTypeToSDFG(element, jemit, "dtype").failed())
+    return failure();
+
+  jemit.startNamedList("shape");
+  for(int64_t s : shape){
+    jemit.startEntry();
+    jemit.printInt(s);
+  }
+  jemit.endList(); // shape
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
@@ -600,6 +765,91 @@ LogicalResult translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+
+  jemit.printKVPair("volume", 1);
+  jemit.printKVPair("num_accesses", 1);
+
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
+    jemit.printKVPair("data", aNode.getName());
+  } else {
+    return failure();
+  }
+
+  jemit.startNamedObject("subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+
+  if(ArrayAttr syms = op->getAttr("indices").cast<ArrayAttr>()){
+    for(Attribute sym : syms.getValue()){
+      if (StringAttr sym_str = sym.cast<StringAttr>()) {
+        jemit.startObject();
+        jemit.printKVPair("start", sym_str.getValue());
+        jemit.printKVPair("end", sym_str.getValue());
+        jemit.printKVPair("step", 1);
+        jemit.printKVPair("tile", 1);
+        jemit.endObject();
+      } else {
+        return failure();
+      }
+    }
+  } else {
+    return failure();
+  }
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // subset
+
+  jemit.startNamedObject("dst_subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+
+  if(ArrayAttr syms = op->getAttr("indices").cast<ArrayAttr>()){
+    for(Attribute sym : syms.getValue()){
+      if (StringAttr sym_str = sym.cast<StringAttr>()) {
+        jemit.startObject();
+        jemit.printKVPair("start", sym_str.getValue());
+        jemit.printKVPair("end", sym_str.getValue());
+        jemit.printKVPair("step", 1);
+        jemit.printKVPair("tile", 1);
+        jemit.endObject();
+      } else {
+        return failure();
+      }
+    }
+  } else {
+    return failure();
+  }
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // dst_subset
+
+  jemit.endObject(); // attributes
+  jemit.endObject(); // data
+  jemit.endObject(); // attributes
+
+  if (sdir::CallOp call = dyn_cast<sdir::CallOp>(op.val().getDefiningOp())) {
+    TaskletNode aNode = call.getTasklet();
+    jemit.printKVPair("src", aNode.ID());
+    jemit.printKVPair("src_connector", "__out");
+  } else {
+    return failure();
+  }
+
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
+    jemit.printKVPair("dst", aNode.ID());
+    jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
+  } else {
+    return failure();
+  }
+
+  jemit.endObject();
   return success();
 }
 
@@ -813,7 +1063,226 @@ LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
 // CallOp
 //===----------------------------------------------------------------------===//
 
+LogicalResult printArrayTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
+                                JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+
+  jemit.printKVPair("volume", 1);
+  jemit.printKVPair("num_accesses", 1);
+
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
+    jemit.printKVPair("data", aNode.getName());
+  } else {
+    return failure();
+  }
+
+  jemit.startNamedObject("subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+
+  if(ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()){
+    if(syms.getValue().size() == 0){
+      jemit.startObject();
+      jemit.printKVPair("start", 0);
+      jemit.printKVPair("end", 0);
+      jemit.printKVPair("step", 1);
+      jemit.printKVPair("tile", 1);
+      jemit.endObject();
+    }
+
+    for(Attribute sym : syms.getValue()){
+      if (StringAttr sym_str = sym.cast<StringAttr>()) {
+        jemit.startObject();
+        jemit.printKVPair("start", sym_str.getValue());
+        jemit.printKVPair("end", sym_str.getValue());
+        jemit.printKVPair("step", 1);
+        jemit.printKVPair("tile", 1);
+        jemit.endObject();
+      } else {
+        return failure();
+      }
+    }
+  } else {
+    return failure();
+  }
+  
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // subset
+
+  jemit.startNamedObject("src_subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+  
+  if(ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()){
+    if(syms.getValue().size() == 0){
+      jemit.startObject();
+      jemit.printKVPair("start", 0);
+      jemit.printKVPair("end", 0);
+      jemit.printKVPair("step", 1);
+      jemit.printKVPair("tile", 1);
+      jemit.endObject();
+    }
+
+    for(Attribute sym : syms.getValue()){
+      if (StringAttr sym_str = sym.cast<StringAttr>()) {
+        jemit.startObject();
+        jemit.printKVPair("start", sym_str.getValue());
+        jemit.printKVPair("end", sym_str.getValue());
+        jemit.printKVPair("step", 1);
+        jemit.printKVPair("tile", 1);
+        jemit.endObject();
+      } else {
+        return failure();
+      }
+    }
+  } else {
+    return failure();
+  }
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // src_subset
+
+  jemit.endObject(); // attributes
+  jemit.endObject(); // data
+  jemit.endObject(); // attributes
+
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
+    jemit.printKVPair("src", aNode.ID());
+    jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  } else {
+    return failure();
+  }
+  
+  jemit.printKVPair("dst", task.ID());
+
+  std::string argname;
+  AsmState state(task);
+  BlockArgument bArg = task.getArgument(argIdx);
+  llvm::raw_string_ostream argnameStream(argname);
+  bArg.printAsOperand(argnameStream, state);
+
+  argname.erase(0,1); // remove %-sign
+  jemit.printKVPair("dst_connector", argname);
+
+  jemit.endObject();
+  return success();
+}
+
+LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc, TaskletNode &taskDest, int argIdx,
+                                JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+
+  jemit.printKVPair("volume", 1);
+  jemit.printKVPair("num_accesses", 1);
+
+  /*if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
+    jemit.printKVPair("data", aNode.getName());
+  } else {
+    return failure();
+  }*/
+
+  /*jemit.startNamedObject("subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+
+  if(ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()){
+    for(Attribute sym : syms.getValue()){
+      if (StringAttr sym_str = sym.cast<StringAttr>()) {
+        jemit.startObject();
+        jemit.printKVPair("start", sym_str.getValue());
+        jemit.printKVPair("end", sym_str.getValue());
+        jemit.printKVPair("step", 1);
+        jemit.printKVPair("tile", 1);
+        jemit.endObject();
+      } else {
+        return failure();
+      }
+    }
+  } else {
+    return failure();
+  }
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // subset
+  */
+
+  /*jemit.startNamedObject("src_subset");
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+  
+  if(ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()){
+    for(Attribute sym : syms.getValue()){
+      if (StringAttr sym_str = sym.cast<StringAttr>()) {
+        jemit.startObject();
+        jemit.printKVPair("start", sym_str.getValue());
+        jemit.printKVPair("end", sym_str.getValue());
+        jemit.printKVPair("step", 1);
+        jemit.printKVPair("tile", 1);
+        jemit.endObject();
+      } else {
+        return failure();
+      }
+    }
+  } else {
+    return failure();
+  }
+
+  jemit.endList(); // ranges
+  jemit.endObject(); // src_subset
+  */
+
+  jemit.endObject(); // attributes
+  jemit.endObject(); // data
+  jemit.endObject(); // attributes
+
+  jemit.printKVPair("src", taskSrc.ID());
+  jemit.printKVPair("src_connector", "__out");
+  
+  jemit.printKVPair("dst", taskDest.ID());
+
+  std::string argname;
+  AsmState state(taskDest);
+  BlockArgument bArg = taskDest.getArgument(argIdx);
+  llvm::raw_string_ostream argnameStream(argname);
+  bArg.printAsOperand(argnameStream, state);
+
+  argname.erase(0,1); // remove %-sign
+  jemit.printKVPair("dst_connector", argname);
+
+  jemit.endObject();
+  return success();
+}
+
 LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
+  TaskletNode task = op.getTasklet();
+
+  for(int i = 0; i < op.getNumOperands(); ++i){
+    Value val = op.getOperand(i);
+    if(LoadOp load = dyn_cast<LoadOp>(val.getDefiningOp())){
+      if(printArrayTaskletEdge(load, task, i, jemit).failed())
+        return failure();
+    } else if(sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())){
+      TaskletNode taskSrc = call.getTasklet();
+      if(printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
+        return failure();
+    } else {
+      return failure();
+    }
+  }
+
   return success();
 }
 
@@ -831,6 +1300,7 @@ LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit) {
 
 LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op,
                                          JsonEmitter &jemit) {
+  jemit.printKVPair(op.sym(),"int64");
   return success();
 }
 
@@ -843,10 +1313,29 @@ LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit) {
 }
 
 //===----------------------------------------------------------------------===//
+// Translate type
+//===----------------------------------------------------------------------===//
+
+LogicalResult translateTypeToSDFG(Type &t, JsonEmitter &jemit, StringRef key) {
+  if(t.isF64()){
+    jemit.printKVPair(key, "float64");
+    return success();
+  }
+
+  if(t.isInteger(64)){
+    jemit.printKVPair(key, "int64");
+    return success();
+  }
+
+  return failure();
+}
+
+//===----------------------------------------------------------------------===//
 // Op contains Attr
 //===----------------------------------------------------------------------===//
 
 bool containsAttr(Operation &op, StringRef attrName) {
+  // TODO: Replace with hasAttr
   for (NamedAttribute attr : op.getAttrs())
     if (attr.first == attrName)
       return true;
