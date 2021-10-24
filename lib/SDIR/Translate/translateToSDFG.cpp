@@ -369,6 +369,64 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
+// Temporary auto-lifting. Will be included into DaCe
+LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit){
+  int numOps = 0;
+  Operation *firstOp = nullptr;
+
+  for (Operation &oper : op.body().getOps()) {
+    if(numOps >= 2)
+      return failure();
+    if(numOps == 0)
+      firstOp = &oper;
+    ++numOps;
+  }
+
+  AsmState state(op);
+
+  if (arith::AddFOp oper = dyn_cast<arith::AddFOp>(firstOp)){
+    std::string nameArg0;
+    llvm::raw_string_ostream nameArg0Stream(nameArg0);
+    op.getArgument(0).printAsOperand(nameArg0Stream, state);
+    nameArg0.erase(0, 1); // Remove %-sign
+
+    std::string nameArg1;
+    llvm::raw_string_ostream nameArg1Stream(nameArg1);
+    op.getArgument(1).printAsOperand(nameArg1Stream, state);
+    nameArg1.erase(0, 1); // Remove %-sign
+
+    jemit.printKVPair("string_data", "__out = " + nameArg0 + " + " + nameArg1);
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
+  if (arith::MulFOp oper = dyn_cast<arith::MulFOp>(firstOp)){
+    std::string nameArg0;
+    llvm::raw_string_ostream nameArg0Stream(nameArg0);
+    op.getArgument(0).printAsOperand(nameArg0Stream, state);
+    nameArg0.erase(0, 1); // Remove %-sign
+
+    std::string nameArg1;
+    llvm::raw_string_ostream nameArg1Stream(nameArg1);
+    op.getArgument(1).printAsOperand(nameArg1Stream, state);
+    nameArg1.erase(0, 1); // Remove %-sign
+
+    jemit.printKVPair("string_data", "__out = " + nameArg0 + " * " + nameArg1);
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
+  if (arith::ConstantFloatOp oper = dyn_cast<arith::ConstantFloatOp>(firstOp)){
+    std::string val = std::to_string(oper.value().convertToDouble());
+
+    jemit.printKVPair("string_data", "__out = dace.float64(" + val + ")");
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
+  return failure();
+}
+
 LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "Tasklet");
@@ -383,52 +441,55 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("code");
 
   AsmState state(op);
-  std::string code = "module {\\n func @mlir_entry(";
 
-  for (int i = 0; i < op.getNumArguments(); ++i) {
-    BlockArgument bArg = op.getArgument(i);
+  if(liftToPython(op, jemit).failed()){
+    std::string code = "module {\\n func @mlir_entry(";
 
-    std::string name;
-    llvm::raw_string_ostream nameStream(name);
-    bArg.printAsOperand(nameStream, state);
+    for (int i = 0; i < op.getNumArguments(); ++i) {
+      BlockArgument bArg = op.getArgument(i);
 
-    std::string type;
-    llvm::raw_string_ostream typeStream(type);
-    bArg.getType().print(typeStream);
+      std::string name;
+      llvm::raw_string_ostream nameStream(name);
+      bArg.printAsOperand(nameStream, state);
 
-    if (i > 0)
-      code.append(", ");
-    code.append(name);
-    code.append(": ");
-    code.append(type);
+      std::string type;
+      llvm::raw_string_ostream typeStream(type);
+      bArg.getType().print(typeStream);
+
+      if (i > 0)
+        code.append(", ");
+      code.append(name);
+      code.append(": ");
+      code.append(type);
+    }
+
+    code.append(") -> ");
+
+    std::string retType;
+    llvm::raw_string_ostream retTypeStream(retType);
+    for (Type res : op.getCallableResults())
+      res.print(retTypeStream);
+    code.append(retType);
+
+    code.append(" {\\n");
+
+    for (Operation &oper : op.body().getOps()) {
+      std::string codeLine;
+      llvm::raw_string_ostream codeLineStream(codeLine);
+      oper.print(codeLineStream);
+
+      if (sdir::ReturnOp ret = dyn_cast<sdir::ReturnOp>(oper))
+        codeLine.replace(codeLine.find("sdir.return"), 11, "return");
+
+      codeLine.append("\\n");
+      code.append(codeLine);
+    }
+
+    code.append("}\\n}");
+    jemit.printKVPair("string_data", code);
+    jemit.printKVPair("language", "MLIR");
   }
 
-  code.append(") -> ");
-
-  std::string retType;
-  llvm::raw_string_ostream retTypeStream(retType);
-  for (Type res : op.getCallableResults())
-    res.print(retTypeStream);
-  code.append(retType);
-
-  code.append(" {\\n");
-
-  for (Operation &oper : op.body().getOps()) {
-    std::string codeLine;
-    llvm::raw_string_ostream codeLineStream(codeLine);
-    oper.print(codeLineStream);
-
-    if (sdir::ReturnOp ret = dyn_cast<sdir::ReturnOp>(oper))
-      codeLine.replace(codeLine.find("sdir.return"), 11, "return");
-
-    codeLine.append("\\n");
-    code.append(codeLine);
-  }
-
-  code.append("}\\n}");
-
-  jemit.printKVPair("string_data", code);
-  jemit.printKVPair("language", "MLIR");
   jemit.endObject(); // code
 
   jemit.startNamedObject("in_connectors");
