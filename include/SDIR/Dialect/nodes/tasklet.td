@@ -16,7 +16,7 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
 
         ```mlir
         sdir.tasklet @add(%a: i32, %b: i32) -> i32{
-            %c = addi %a, %b, : i32
+            %c = arith.addi %a, %b, : i32
             sdir.return %c
         }
         ```

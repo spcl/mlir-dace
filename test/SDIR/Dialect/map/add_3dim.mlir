@@ -26,7 +26,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         %c = sdir.get_access %C : !sdir.array<2x6x8xi32> -> !sdir.memlet<2x6x8xi32>
         // CHECK: sdir.tasklet @add
         sdir.tasklet @add(%x: i32, %y: i32) -> i32{
-            %z = addi %x, %y : i32
+            %z = arith.addi %x, %y : i32
             sdir.return %z : i32
         }
         // CHECK: sdir.map 

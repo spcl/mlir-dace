@@ -102,7 +102,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
         ```mlir
         sdir.state @state_0 {
             ...
-            %1 = constant 1 : i32
+            %1 = arith.constant 1 : i32
             %a = sdir.get_access %A : !sdir.memlet<i32>
             sdir.store %1, %a[0] : !sdir.memlet<i32>
             ...

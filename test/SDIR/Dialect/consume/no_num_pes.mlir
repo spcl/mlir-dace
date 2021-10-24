@@ -14,9 +14,9 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         %a = sdir.get_access %A : !sdir.stream_array<2x6xi32> -> !sdir.stream<2x6xi32>
         // CHECK: builtin.func @empty
         builtin.func @empty(%x: !sdir.stream<2x6xi32>) -> i1{
-            %0 = constant 0 : i32
+            %0 = arith.constant 0 : i32
             %length = sdir.stream_length %x : !sdir.stream<2x6xi32> -> i32
-            %isZero = cmpi "eq", %length, %0 : i32
+            %isZero = arith.cmpi "eq", %length, %0 : i32
             return %isZero : i1
         }
         // CHECK: sdir.consume

@@ -5,7 +5,7 @@ builtin.func @empty(%A : !sdir.stream<i32>)
                                     -> i1
 {
     %l = sdir.stream_length %A : i32
-    %isZero = cmpi "eq", %l, %0 : i32
+    %isZero = arith.cmpi "eq", %l, %0 : i32
     cond_br %isZero, ^zero, ^one
     
     ^zero: sdir.return %1 : i1

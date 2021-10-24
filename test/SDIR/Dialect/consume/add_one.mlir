@@ -20,18 +20,18 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         %c = sdir.get_access %C : !sdir.array<6xi32> -> !sdir.memlet<6xi32>
         // CHECK: sdir.tasklet @add_one
         sdir.tasklet @add_one(%x: i32) -> i32{
-            %1 = constant 1 : i32
-            %res = addi %x, %1 : i32
+            %1 = arith.constant 1 : i32
+            %res = arith.addi %x, %1 : i32
             sdir.return %res : i32
         }
         // CHECK: builtin.func @empty
         builtin.func @empty(%x: !sdir.stream<i32>) -> i1{
-            %0 = constant 0 : i32
+            %0 = arith.constant 0 : i32
             %length = sdir.stream_length %x : !sdir.stream<i32> -> i32
-            %isZero = cmpi "eq", %length, %0 : i32
+            %isZero = arith.cmpi "eq", %length, %0 : i32
             return %isZero : i1
         }
-        %0 = constant 0 : index
+        %0 = arith.constant 0 : index
         // CHECK: sdir.consume
         // CHECK-DAG: num_pes = 5
         // CHECK-DAG: condition = @empty

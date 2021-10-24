@@ -9,9 +9,9 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {
-        // CHECK-NEXT: [[NAMEB:%[a-zA-Z0-9_]*]] = constant 
+        // CHECK-NEXT: [[NAMEB:%[a-zA-Z0-9_]*]] = arith.constant 
         // CHECK-SAME: i32
-        %1 = constant 0 : i32
+        %1 = arith.constant 0 : i32
         // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
         // CHECK-SAME: !sdir.stream_array<i32> -> !sdir.stream<i32>
         %a = sdir.get_access %A : !sdir.stream_array<i32> -> !sdir.stream<i32>

@@ -95,7 +95,7 @@ def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
         ```mlir
         sdir.state @state_0 {
             ...
-            %1 = constant 1 : i32
+            %1 = arith.constant 1 : i32
             sdir.stream_push %1, %A : i32 -> !sdir.stream<i32>
             ...
         }
