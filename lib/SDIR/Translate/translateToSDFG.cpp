@@ -370,21 +370,21 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 // Temporary auto-lifting. Will be included into DaCe
-LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit){
+LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   int numOps = 0;
   Operation *firstOp = nullptr;
 
   for (Operation &oper : op.body().getOps()) {
-    if(numOps >= 2)
+    if (numOps >= 2)
       return failure();
-    if(numOps == 0)
+    if (numOps == 0)
       firstOp = &oper;
     ++numOps;
   }
 
   AsmState state(op);
 
-  if (arith::AddFOp oper = dyn_cast<arith::AddFOp>(firstOp)){
+  if (arith::AddFOp oper = dyn_cast<arith::AddFOp>(firstOp)) {
     std::string nameArg0;
     llvm::raw_string_ostream nameArg0Stream(nameArg0);
     op.getArgument(0).printAsOperand(nameArg0Stream, state);
@@ -400,7 +400,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit){
     return success();
   }
 
-  if (arith::MulFOp oper = dyn_cast<arith::MulFOp>(firstOp)){
+  if (arith::MulFOp oper = dyn_cast<arith::MulFOp>(firstOp)) {
     std::string nameArg0;
     llvm::raw_string_ostream nameArg0Stream(nameArg0);
     op.getArgument(0).printAsOperand(nameArg0Stream, state);
@@ -416,7 +416,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit){
     return success();
   }
 
-  if (arith::ConstantFloatOp oper = dyn_cast<arith::ConstantFloatOp>(firstOp)){
+  if (arith::ConstantFloatOp oper = dyn_cast<arith::ConstantFloatOp>(firstOp)) {
     std::string val = std::to_string(oper.value().convertToDouble());
 
     jemit.printKVPair("string_data", "__out = dace.float64(" + val + ")");
@@ -442,7 +442,7 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
 
   AsmState state(op);
 
-  if(liftToPython(op, jemit).failed()){
+  if (liftToPython(op, jemit).failed()) {
     std::string code = "module {\\n func @mlir_entry(";
 
     for (int i = 0; i < op.getNumArguments(); ++i) {
