@@ -226,6 +226,7 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
 unsigned SDFGNode::getIndexOfState(StateNode &node) {
   unsigned state_idx = 0;
+
   for (Operation &op : body().getOps()) {
     if (StateNode state = dyn_cast<StateNode>(op)) {
       if (state.sym_name() == node.sym_name())
@@ -234,10 +235,13 @@ unsigned SDFGNode::getIndexOfState(StateNode &node) {
       ++state_idx;
     }
   }
+
+  return -1;
 }
 
 StateNode SDFGNode::getStateByIndex(unsigned idx) {
   unsigned state_idx = 0;
+
   for (Operation &op : body().getOps()) {
     if (StateNode state = dyn_cast<StateNode>(op)) {
       if (state_idx == idx)
@@ -246,11 +250,13 @@ StateNode SDFGNode::getStateByIndex(unsigned idx) {
       ++state_idx;
     }
   }
+
+  return nullptr;
 }
 
 StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
   Operation *op = lookupSymbol(symRef);
-  dyn_cast<StateNode>(op);
+  return dyn_cast<StateNode>(op);
 }
 
 bool SDFGNode::isNested() {
