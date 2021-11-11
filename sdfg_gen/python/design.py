@@ -10,7 +10,17 @@ sdfg = dace.SDFG("design")
 state = sdfg.add_state()
 export_sdfg(sdfg, "state")
 
+# Simple movement
+A = state.add_read('A')
+C = state.add_write('C')
+e1 = state.add_edge(A, None, C, None, dace.Memlet('A[0]'))
+
+export_sdfg(sdfg, "simple_movement")
+
 # Tasklet
+state.remove_node(A)
+state.remove_node(C)
+
 tasklet = state.add_tasklet(name='add',
                             inputs={'a', 'b'},
                             outputs={'c', 'd'},
@@ -120,15 +130,18 @@ export_sdfg(sdfg, "map")
 
 # nested & lib
 @dace.program
-def mmm(A, B):
+def design_mmm(A, B):
     return A @ B
 
 @dace.program
 def design_nested(A, B):
-    C = mmm(A, B)
+    C = design_mmm(A, B)
 
 a = np.random.rand(2, 2)
 sdfg = design_nested.to_sdfg(a, a)
+export_sdfg(sdfg)
+
+sdfg = design_mmm.to_sdfg(a, a)
 export_sdfg(sdfg)
 
 # Symbols
@@ -167,10 +180,9 @@ export_sdfg(sdfg, "multistate")
 sdfg = dace.SDFG("design")
 state = sdfg.add_state()
 A = state.add_stream('A', dtypes.int32)
-#A_2 = state.add_stream('A', dtypes.int32)
 C = state.add_write('C')
 
-consEntry, consExit = state.add_consume("add_one", ("p","P"), "A = 0")
+consEntry, consExit = state.add_consume("add_one", ("p","P"), "len(A) == 0")
 
 tasklet = state.add_tasklet(name='add',
                             inputs={'a'},
@@ -182,7 +194,6 @@ state.add_edge(A, None, consEntry, None, memlet=dace.Memlet('A[0:2]'))
 state.add_edge(consEntry, None, tasklet, None, memlet=dace.Memlet('A[p]'))
 state.add_edge(tasklet, None, consExit, None, memlet=dace.Memlet('C[p]'))
 state.add_edge(consExit, None, C, None, memlet=dace.Memlet('C[0:2]'))
-#state.add_edge(consExit, None, A_2, None, memlet=dace.Memlet('A[0:2]'))
 
 export_sdfg(sdfg, "stream")
 
