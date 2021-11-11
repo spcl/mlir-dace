@@ -51,7 +51,6 @@ def SDIR_ArrayType : SDIR_Type<"Array">{
     );
 
     let printer = [{
-        $_printer << "array";
         printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
                         getImpl()->integers, getImpl()->shape);
     }];
@@ -100,7 +99,6 @@ def SDIR_MemletType : SDIR_Type<"Memlet">{
     );
 
     let printer = [{
-        $_printer << "memlet";
         printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
                         getImpl()->integers, getImpl()->shape);
     }];
@@ -140,7 +138,6 @@ def SDIR_StreamArrayType : SDIR_Type<"StreamArray">{
     );
 
     let printer = [{
-        $_printer << "stream_array";
         printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
                         getImpl()->integers, getImpl()->shape);
     }];
@@ -176,7 +173,6 @@ def SDIR_StreamType : SDIR_Type<"Stream">{
     );
 
     let printer = [{
-        $_printer << "stream";
         printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
                         getImpl()->integers, getImpl()->shape);
     }];
