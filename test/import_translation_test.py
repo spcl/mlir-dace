@@ -3,7 +3,7 @@ import json
 import os
 from glob import glob
 from dace import SDFG
-
+# TODO: Change to LIT tests
 folderPath = os.path.abspath(os.path.dirname(__file__))
 
 def check_import(path):
