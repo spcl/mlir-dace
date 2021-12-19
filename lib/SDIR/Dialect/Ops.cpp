@@ -102,8 +102,8 @@ printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
   SmallVector<StringRef> numListAttrs(elidedAttrs.begin(), elidedAttrs.end());
 
   for (NamedAttribute na : attrs)
-    if (na.first.strref().endswith("numList"))
-      numListAttrs.push_back(na.first.strref());
+    if (na.getName().strref().endswith("numList"))
+      numListAttrs.push_back(na.getName().strref());
 
   p.printOptionalAttrDict(attrs, /*elidedAttrs=*/numListAttrs);
 }
@@ -461,12 +461,17 @@ void TaskletNode::build(OpBuilder &builder, OperationState &state,
 }
 
 void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
-  llvm::MapVector<Identifier, Attribute> newAttrs;
+  llvm::MapVector<StringAttr, Attribute> newAttrMap;
   for (const NamedAttribute &attr : dest->getAttrs())
-    newAttrs.insert(attr);
+    newAttrMap.insert({attr.getName(), attr.getValue()});
   for (const NamedAttribute &attr : (*this)->getAttrs())
-    newAttrs.insert(attr);
-  dest->setAttrs(DictionaryAttr::get(getContext(), newAttrs.takeVector()));
+    newAttrMap.insert({attr.getName(), attr.getValue()});
+
+  auto newAttrs = llvm::to_vector(llvm::map_range(
+      newAttrMap, [](std::pair<StringAttr, Attribute> attrPair) {
+        return NamedAttribute(attrPair.first, attrPair.second);
+      }));
+  dest->setAttrs(DictionaryAttr::get(getContext(), newAttrs));
 
   getBody().cloneInto(&dest.getBody(), mapper);
 }

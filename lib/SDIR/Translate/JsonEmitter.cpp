@@ -12,7 +12,7 @@ JsonEmitter::JsonEmitter(raw_ostream &os) : os(os) {
   symStack.clear();
 }
 
-bool JsonEmitter::finish() {
+LogicalResult JsonEmitter::finish() {
   while (!symStack.empty()) {
     SYM sym = symStack.pop_back_val();
     newLine();
@@ -27,7 +27,7 @@ bool JsonEmitter::finish() {
     error = true;
   }
   newLine(); // Makes sure to have a trailing newline
-  return error;
+  return failure(error);
 }
 
 void JsonEmitter::indent() { indentation += 2; }
@@ -131,7 +131,7 @@ void JsonEmitter::printKVPair(StringRef key, int val, bool stringify) {
     printLiteral("\"");
 }
 
-void JsonEmitter::printKVPair(StringRef key, Attribute &val, bool stringify) {
+void JsonEmitter::printKVPair(StringRef key, Attribute val, bool stringify) {
   startEntry();
   printString(key);
   printLiteral(": ");
@@ -208,8 +208,8 @@ void JsonEmitter::printAttributes(ArrayRef<NamedAttribute> arr,
                                                 elidedAttrs.end());
 
   for (NamedAttribute attr : arr) {
-    if (elidedAttrsSet.contains(attr.first.strref()))
+    if (elidedAttrsSet.contains(attr.getName().strref()))
       continue;
-    printKVPair(attr.first, attr.second);
+    printKVPair(attr.getName(), attr.getValue());
   }
 }

@@ -15,7 +15,7 @@ struct JsonEmitter {
   raw_ostream &ostream() { return os; };
   unsigned getIndentation() { return indentation; };
   // Checks for errors (open objects/lists) and adds trailing newline
-  bool finish();
+  LogicalResult finish();
 
   void indent();
   void unindent();
@@ -34,7 +34,7 @@ struct JsonEmitter {
   void startEntry();
   void printKVPair(StringRef key, StringRef val, bool stringify = true);
   void printKVPair(StringRef key, int val, bool stringify = true);
-  void printKVPair(StringRef key, Attribute &val, bool stringify = true);
+  void printKVPair(StringRef key, Attribute val, bool stringify = true);
 
   void printAttributes(ArrayRef<NamedAttribute> arr,
                        ArrayRef<StringRef> elidedAttrs = {});

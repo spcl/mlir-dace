@@ -445,7 +445,7 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
   if (liftToPython(op, jemit).failed()) {
     std::string code = "module {\\n func @mlir_entry(";
 
-    for (int i = 0; i < op.getNumArguments(); ++i) {
+    for (unsigned i = 0; i < op.getNumArguments(); ++i) {
       BlockArgument bArg = op.getArgument(i);
 
       std::string name;
@@ -714,7 +714,7 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
   // jemit.printKVPair("total_size", "4");
   jemit.startNamedList("offset");
-  for (int i = 0; i < shape.size(); ++i) {
+  for (unsigned i = 0; i < shape.size(); ++i) {
     jemit.startEntry();
     jemit.printInt(0);
   }
@@ -1332,7 +1332,7 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
 LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
   TaskletNode task = op.getTasklet();
 
-  for (int i = 0; i < op.getNumOperands(); ++i) {
+  for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Value val = op.getOperand(i);
     if (LoadOp load = dyn_cast<LoadOp>(val.getDefiningOp())) {
       if (printArrayTaskletEdge(load, task, i, jemit).failed())
@@ -1343,6 +1343,7 @@ LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
       if (printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
         return failure();
     } else {
+      // llvm::errs() << "here\n";
       return failure();
     }
   }
@@ -1406,7 +1407,7 @@ LogicalResult translateTypeToSDFG(Type &t, JsonEmitter &jemit, StringRef key) {
 bool containsAttr(Operation &op, StringRef attrName) {
   // TODO: Replace with hasAttr
   for (NamedAttribute attr : op.getAttrs())
-    if (attr.first == attrName)
+    if (attr.getName() == attrName)
       return true;
   return false;
 }

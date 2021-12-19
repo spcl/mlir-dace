@@ -1,5 +1,4 @@
 #include "SDIR/Translate/Translation.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Translation.h"
 
@@ -13,10 +12,10 @@ void registerToSDFGTranslation() {
       [](mlir::ModuleOp module, llvm::raw_ostream &output) {
         JsonEmitter jemit(output);
 
-        if (translateModuleToSDFG(module, jemit).failed())
-          return mlir::failure();
+        LogicalResult res = translateModuleToSDFG(module, jemit);
+        LogicalResult jRes = jemit.finish();
 
-        if (jemit.finish())
+        if (res.failed() || jRes.failed())
           return mlir::failure();
 
         return mlir::success();
@@ -24,6 +23,8 @@ void registerToSDFGTranslation() {
       [](mlir::DialectRegistry &registry) {
         registry.insert<mlir::sdir::SDIRDialect>();
         registry.insert<mlir::StandardOpsDialect>();
-        registerAllDialects(registry);
+        registry.insert<mlir::arith::ArithmeticDialect>();
+        // FIXME: Throws a link-time error
+        // registerAllDialects(registry);
       });
 }
