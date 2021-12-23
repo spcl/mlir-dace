@@ -1436,7 +1436,7 @@ LogicalResult translateTypeToSDFG(Type &t, Location loc, JsonEmitter &jemit,
 bool containsAttr(Operation &op, StringRef attrName) {
   // TODO: Replace with hasAttr
   for (NamedAttribute attr : op.getAttrs())
-    if (attr.getName() == attrName)
+    if (attr.first.strref() == attrName)
       return true;
   return false;
 }
