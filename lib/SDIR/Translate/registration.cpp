@@ -14,11 +14,15 @@ void registerToSDFGTranslation() {
 
         LogicalResult res = translateModuleToSDFG(module, jemit);
         LogicalResult jRes = jemit.finish();
+        if (jRes.failed()) {
+          emitError(module.getLoc(), "Invalid JSON generated");
+          return failure();
+        }
 
-        if (res.failed() || jRes.failed())
-          return mlir::failure();
+        if (res.failed())
+          return failure();
 
-        return mlir::success();
+        return success();
       },
       [](mlir::DialectRegistry &registry) {
         registry.insert<mlir::sdir::SDIRDialect>();

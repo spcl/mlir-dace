@@ -9,6 +9,7 @@ using namespace sdir;
 // TranslateToSDFG
 //===----------------------------------------------------------------------===//
 
+// NOTE: Prefer calling the specific translating functions instead
 LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
   if (SDFGNode node = dyn_cast<SDFGNode>(op))
     return translateSDFGToSDFG(node, jemit);
@@ -136,12 +137,14 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
           jemit.startEntry();
           jemit.printString(arg_name_str.getValue());
         } else {
+          emitError(op.getLoc(), "'arg_names' must consist of StringAttr");
           return failure();
         }
       }
 
-      jemit.endList(); // arg_names*/
+      jemit.endList(); // arg_names
     } else {
+      emitError(op.getLoc(), "'arg_names' must be an ArrayAttr");
       return failure();
     }
   }
@@ -624,6 +627,8 @@ LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit) {
         std::pair<StringRef, StringRef> kv = content.split(':');
         jemit.printKVPair(kv.first.trim(), kv.second.trim());
       } else {
+        emitError(op.getLoc(),
+                  "'assign' must be an ArrayAttr consisting of StringAttr");
         return failure();
       }
     }
@@ -671,7 +676,7 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   Type element = op.getType().getElementType();
-  if (translateTypeToSDFG(element, jemit, "dtype").failed())
+  if (translateTypeToSDFG(element, op.getLoc(), jemit, "dtype").failed())
     return failure();
 
   jemit.startNamedList("shape");
@@ -723,7 +728,7 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   // jemit.printKVPair("may_alias", "false", /*stringify*/false);
   // jemit.printKVPair("alignment", 0, /*stringify*/false);
   Type element = op.getType().getElementType();
-  if (translateTypeToSDFG(element, jemit, "dtype").failed())
+  if (translateTypeToSDFG(element, op.getLoc(), jemit, "dtype").failed())
     return failure();
 
   jemit.startNamedList("shape");
@@ -842,6 +847,7 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
+    emitError(op.getLoc(), "Array must be defined by a GetAccessOp");
     return failure();
   }
 
@@ -859,10 +865,12 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
         jemit.printKVPair("tile", 1);
         jemit.endObject();
       } else {
+        emitError(op.getLoc(), "'indices' must consist of StringAttr");
         return failure();
       }
     }
   } else {
+    emitError(op.getLoc(), "'indices' must be an ArrayAttr");
     return failure();
   }
 
@@ -883,10 +891,12 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
         jemit.printKVPair("tile", 1);
         jemit.endObject();
       } else {
+        emitError(op.getLoc(), "'indices' must consist of StringAttr");
         return failure();
       }
     }
   } else {
+    emitError(op.getLoc(), "'indices' must be an ArrayAttr");
     return failure();
   }
 
@@ -902,6 +912,7 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
     jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "__out");
   } else {
+    emitError(op.getLoc(), "Value must be result of TaskletNode");
     return failure();
   }
 
@@ -909,6 +920,7 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
     jemit.printKVPair("dst", aNode.ID());
     jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
   } else {
+    emitError(op.getLoc(), "Array must be defined by a GetAccessOp");
     return failure();
   }
 
@@ -950,6 +962,7 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
+    emitError(op.getLoc(), "Source array must be defined by a GetAccessOp");
     return failure();
   }
   // jemit.printKVPair("wcr", "null", /*stringify=*/false);
@@ -983,6 +996,7 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
     jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
+    emitError(op.getLoc(), "Source array must be defined by a GetAccessOp");
     return failure();
   }
 
@@ -990,6 +1004,8 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
     jemit.printKVPair("dst", aNode.ID());
     jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
   } else {
+    emitError(op.getLoc(),
+              "Destination array must be defined by a GetAccessOp");
     return failure();
   }
 
@@ -1142,6 +1158,7 @@ LogicalResult printArrayTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
+    emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
     return failure();
   }
 
@@ -1168,10 +1185,12 @@ LogicalResult printArrayTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
         jemit.printKVPair("tile", 1);
         jemit.endObject();
       } else {
+        emitError(load.getLoc(), "'indices' must consist of StringAttr");
         return failure();
       }
     }
   } else {
+    emitError(load.getLoc(), "'indices' must be an ArrayAttr");
     return failure();
   }
 
@@ -1201,10 +1220,12 @@ LogicalResult printArrayTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
         jemit.printKVPair("tile", 1);
         jemit.endObject();
       } else {
+        emitError(load.getLoc(), "'indices' must consist of StringAttr");
         return failure();
       }
     }
   } else {
+    emitError(load.getLoc(), "'indices' must be an ArrayAttr");
     return failure();
   }
 
@@ -1219,6 +1240,7 @@ LogicalResult printArrayTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
     jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
+    emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
     return failure();
   }
 
@@ -1343,6 +1365,8 @@ LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
       if (printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
         return failure();
     } else {
+      emitError(op.getLoc(),
+                "Operands must be results of LoadOp or TaskletNode");
       return failure();
     }
   }
@@ -1380,7 +1404,8 @@ LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit) {
 // Translate type
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateTypeToSDFG(Type &t, JsonEmitter &jemit, StringRef key) {
+LogicalResult translateTypeToSDFG(Type &t, Location loc, JsonEmitter &jemit,
+                                  StringRef key) {
   if (t.isF64()) {
     jemit.printKVPair(key, "float64");
     return success();
@@ -1396,6 +1421,11 @@ LogicalResult translateTypeToSDFG(Type &t, JsonEmitter &jemit, StringRef key) {
     return success();
   }
 
+  std::string type;
+  llvm::raw_string_ostream typeStream(type);
+  t.print(typeStream);
+
+  emitError(loc, "Unsupported type: " + type);
   return failure();
 }
 
