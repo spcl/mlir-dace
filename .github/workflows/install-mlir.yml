@@ -21,9 +21,11 @@ jobs:
         path: llvm-project/build
         key: ${{ runner.os }}-mlir
     
-    - name: Checkout repository
+    - name: Checkout repository and submodules
       if: steps.cache-mlir-build.outputs.cache-hit != 'true'
       uses: actions/checkout@v2
+      with:
+        submodules: recursive
 
     - name: Install dependencies
       if: steps.cache-mlir-build.outputs.cache-hit != 'true'
