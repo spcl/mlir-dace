@@ -1,3 +1,4 @@
+
 #include "SDIR/Dialect/Dialect.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -351,6 +352,16 @@ SmallVector<AllocTransientStreamOp> StateNode::getTransientStreamAllocs() {
       allocs.push_back(alloc);
 
   return allocs;
+}
+
+SmallVector<arith::ConstantOp> StateNode::getConstants() {
+  SmallVector<arith::ConstantOp> constants;
+
+  for (Operation &oper : body().getOps())
+    if (arith::ConstantOp con = dyn_cast<arith::ConstantOp>(oper))
+      constants.push_back(con);
+
+  return constants;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1649,7 +1660,7 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, ReturnOp op) {
+static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
   p.printOptionalAttrDict(op->getAttrs());
   if (!op.input().empty()) {
     p << ' ' << op.input();
@@ -1658,7 +1669,7 @@ static void print(OpAsmPrinter &p, ReturnOp op) {
   }
 }
 
-LogicalResult verify(ReturnOp op) { return success(); }
+LogicalResult verify(sdir::ReturnOp op) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // CallOp
@@ -1692,7 +1703,7 @@ static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, CallOp op) {
+static void print(OpAsmPrinter &p, sdir::CallOp op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
   p << ' ';
   p.printAttributeWithoutType(op.calleeAttr());
@@ -1702,9 +1713,10 @@ static void print(OpAsmPrinter &p, CallOp op) {
                         op.getOperation()->getResultTypes());
 }
 
-LogicalResult verify(CallOp op) { return success(); }
+LogicalResult verify(sdir::CallOp op) { return success(); }
 
-LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult
+sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the callee attribute was specified.
   FlatSymbolRefAttr fnAttr =
       (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
@@ -1745,7 +1757,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-StateNode CallOp::getParentState() {
+StateNode sdir::CallOp::getParentState() {
   Operation *stateOrMapConsume = (*this)->getParentOp();
 
   if (StateNode state = dyn_cast<StateNode>(stateOrMapConsume))
@@ -1755,12 +1767,21 @@ StateNode CallOp::getParentState() {
   return dyn_cast<StateNode>(state);
 }
 
-TaskletNode CallOp::getTasklet() {
+TaskletNode sdir::CallOp::getTasklet() {
   StateNode state = getParentState();
   Operation *task = state.lookupSymbol(callee());
   TaskletNode tasklet = dyn_cast<TaskletNode>(task);
   return tasklet;
 }
+
+SDFGNode sdir::CallOp::getSDFG() {
+  StateNode state = getParentState();
+  Operation *op = state.lookupSymbol(callee());
+  SDFGNode sdfg = dyn_cast<SDFGNode>(op);
+  return sdfg;
+}
+
+bool sdir::CallOp::callsTasklet() { return getTasklet() != nullptr; }
 
 //===----------------------------------------------------------------------===//
 // LibCallOp

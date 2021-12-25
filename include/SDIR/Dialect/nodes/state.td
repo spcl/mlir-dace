@@ -32,6 +32,7 @@ def SDIR_StateNode : SDIR_Op<"state", [
         SmallVector<AllocTransientOp> getTransientAllocs();
         SmallVector<AllocStreamOp> getStreamAllocs();
         SmallVector<AllocTransientStreamOp> getTransientStreamAllocs();
+        SmallVector<arith::ConstantOp> getConstants();
     }];
 }
 

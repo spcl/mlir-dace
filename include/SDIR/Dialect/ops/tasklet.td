@@ -57,6 +57,8 @@ def SDIR_CallOp : SDIR_Op<"call", [
     let extraClassDeclaration = [{
         StateNode getParentState();
         TaskletNode getTasklet();
+        SDFGNode getSDFG();
+        bool callsTasklet();
         StringRef getCallee() { return callee(); }
 
         FunctionType getCalleeType() {
