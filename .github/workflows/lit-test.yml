@@ -29,7 +29,7 @@ jobs:
 
     - name: Check MLIR cache
       if: steps.mlir-cache.outputs.cache-hit != 'true'
-      uses: spcl/mlir-dace/.github/workflows/install_mlir.yml
+      uses: spcl/mlir-dace/.github/workflows/install_mlir.yml@${GITHUB_REF##*/}
 
     - name: Build & Test
       run: |
