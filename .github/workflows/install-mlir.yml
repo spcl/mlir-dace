@@ -20,6 +20,10 @@ jobs:
       with:
         path: llvm-project/build
         key: ${{ runner.os }}-mlir
+    
+    - name: Checkout repository
+      if: steps.cache-mlir-build.outputs.cache-hit != 'true'
+      uses: actions/checkout@v2
 
     - name: Install dependencies
       if: steps.cache-mlir-build.outputs.cache-hit != 'true'
