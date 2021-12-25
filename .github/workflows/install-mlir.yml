@@ -1,6 +1,8 @@
 name: Install MLIR
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  workflow_call:
 
 jobs:
   install-mlir:
@@ -9,8 +11,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-      with:
-        ref: 'sdir-to-sdfg-translation'
 
     - name: Check MLIR cache
       id: cache-mlir
