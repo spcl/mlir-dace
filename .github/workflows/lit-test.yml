@@ -9,7 +9,7 @@ on:
 
 jobs:
   install-mlir:
-    uses: spcl/mlir-dace/.github/workflows/install_mlir.yml@${GITHUB_REF##*/}
+    uses: spcl/mlir-dace/.github/workflows/install_mlir.yml@${{ github.ref }}
       
   check-sdir:
     runs-on: ubuntu-latest
