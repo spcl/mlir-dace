@@ -25,7 +25,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: llvm-project
-        key: ${{ runner.os }}-mlir
+        key: ${{ runner.os }}-mlir-commit
 
     - name: Check MLIR cache
       if: steps.mlir-cache.outputs.cache-hit != 'true'

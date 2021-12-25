@@ -12,11 +12,11 @@ jobs:
       uses: actions/cache@v2
       with:
         path: llvm-project
-        key: ${{ runner.os }}-mlir
+        key: ${{ runner.os }}-mlir-commit
 
     - name: Clone MLIR
+      if: steps.cache-mlir.outputs.cache-hit != 'true'
       run: |
-        rm -rf llvm-project
         git clone https://github.com/llvm/llvm-project
         cd llvm-project
         git checkout 30d87d4
@@ -27,16 +27,17 @@ jobs:
       uses: actions/cache@v2
       with:
         path: llvm-project/build
-        key: ${{ runner.os }}-mlir
+        key: ${{ runner.os }}-mlir-commit
 
     - name: Install dependencies
+      if: steps.cache-mlir-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install ninja-build
 
     - name: Build MLIR
+      if: steps.cache-mlir-build.outputs.cache-hit != 'true'
       run: |
-        rm -rf llvm-project/build
         mkdir llvm-project/build
         cd llvm-project/build
         cmake -G Ninja ../llvm -DLLVM_ENABLE_PROJECTS=mlir -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
