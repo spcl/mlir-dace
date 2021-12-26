@@ -55,6 +55,7 @@ jobs:
         mkdir build
         cd build
         cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
-        cmake --build . --target check-sdir
+        ninja
+        ninja check-sdir
 
       
