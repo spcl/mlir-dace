@@ -11,21 +11,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-
-    - name: Check MLIR cache
-      id: cache-mlir
-      uses: actions/cache@v2
       with:
-        path: llvm-project
-        key: ${{ runner.os }}-mlir-commit
-
-    - name: Clone MLIR
-      if: steps.cache-mlir.outputs.cache-hit != 'true'
-      run: |
-        git clone https://github.com/llvm/llvm-project
-        cd llvm-project
-        git checkout 30d87d4
-        cd ..
+        submodules: recursive
     
     - name: Check MLIR Build cache
       id: cache-mlir-build
@@ -46,5 +33,5 @@ jobs:
         mkdir llvm-project/build
         cd llvm-project/build
         cmake -G Ninja ../llvm -DLLVM_ENABLE_PROJECTS=mlir -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
-        cmake --build . --target check-mlir 
+        ninja
       
