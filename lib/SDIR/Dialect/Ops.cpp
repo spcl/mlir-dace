@@ -313,56 +313,6 @@ void StateNode::setID(unsigned id) {
   IDAttr(intAttr);
 }
 
-SmallVector<AllocOp> StateNode::getAllocs() {
-  SmallVector<AllocOp> allocs;
-
-  for (Operation &oper : body().getOps())
-    if (AllocOp alloc = dyn_cast<AllocOp>(oper))
-      allocs.push_back(alloc);
-
-  return allocs;
-}
-
-SmallVector<AllocTransientOp> StateNode::getTransientAllocs() {
-  SmallVector<AllocTransientOp> allocs;
-
-  for (Operation &oper : body().getOps())
-    if (AllocTransientOp alloc = dyn_cast<AllocTransientOp>(oper))
-      allocs.push_back(alloc);
-
-  return allocs;
-}
-
-SmallVector<AllocStreamOp> StateNode::getStreamAllocs() {
-  SmallVector<AllocStreamOp> allocs;
-
-  for (Operation &oper : body().getOps())
-    if (AllocStreamOp alloc = dyn_cast<AllocStreamOp>(oper))
-      allocs.push_back(alloc);
-
-  return allocs;
-}
-
-SmallVector<AllocTransientStreamOp> StateNode::getTransientStreamAllocs() {
-  SmallVector<AllocTransientStreamOp> allocs;
-
-  for (Operation &oper : body().getOps())
-    if (AllocTransientStreamOp alloc = dyn_cast<AllocTransientStreamOp>(oper))
-      allocs.push_back(alloc);
-
-  return allocs;
-}
-
-SmallVector<arith::ConstantOp> StateNode::getConstants() {
-  SmallVector<arith::ConstantOp> constants;
-
-  for (Operation &oper : body().getOps())
-    if (arith::ConstantOp con = dyn_cast<arith::ConstantOp>(oper))
-      constants.push_back(con);
-
-  return constants;
-}
-
 //===----------------------------------------------------------------------===//
 // TaskletNode
 //===----------------------------------------------------------------------===//

@@ -163,11 +163,11 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
       /*elidedAttrs=*/{"ID", "entry", "sym_name", "type", "arg_names"});
 
   jemit.startNamedObject("constants_prop");
-  for (Operation &oper : op.body().getOps())
-    if (StateNode state = dyn_cast<StateNode>(oper))
-      for (arith::ConstantOp constOp : state.getConstants())
-        if (printConstant(constOp, jemit).failed())
-          return failure();
+  for (StateNode state : op.body().getOps<StateNode>())
+    for (arith::ConstantOp constOp : state.body().getOps<arith::ConstantOp>())
+      if (printConstant(constOp, jemit).failed())
+        return failure();
+
   jemit.endObject(); // constants_prop
 
   if ((*op).hasAttr("arg_names")) {
@@ -208,42 +208,43 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   }
 
   jemit.startNamedObject("_arrays");
-  for (Operation &oper : op.body().getOps()) {
-    if (AllocOp alloc = dyn_cast<AllocOp>(oper))
-      if (translateToSDFG(*alloc, jemit).failed())
+
+  for (AllocOp alloc : op.body().getOps<AllocOp>())
+    if (translateToSDFG(*alloc, jemit).failed())
+      return failure();
+
+  for (AllocTransientOp alloc : op.body().getOps<AllocTransientOp>())
+    if (translateToSDFG(*alloc, jemit).failed())
+      return failure();
+
+  for (AllocStreamOp alloc : op.body().getOps<AllocStreamOp>())
+    if (translateToSDFG(*alloc, jemit).failed())
+      return failure();
+
+  for (AllocTransientStreamOp alloc :
+       op.body().getOps<AllocTransientStreamOp>())
+    if (translateToSDFG(*alloc, jemit).failed())
+      return failure();
+
+  for (StateNode state : op.body().getOps<StateNode>()) {
+    for (AllocOp allocOper : state.body().getOps<AllocOp>())
+      if (translateToSDFG(*allocOper, jemit).failed())
         return failure();
 
-    if (AllocTransientOp alloc = dyn_cast<AllocTransientOp>(oper))
-      if (translateToSDFG(*alloc, jemit).failed())
+    for (AllocTransientOp allocOper : state.body().getOps<AllocTransientOp>())
+      if (translateToSDFG(*allocOper, jemit).failed())
         return failure();
 
-    if (AllocStreamOp alloc = dyn_cast<AllocStreamOp>(oper))
-      if (translateToSDFG(*alloc, jemit).failed())
+    for (AllocStreamOp allocOper : state.body().getOps<AllocStreamOp>())
+      if (translateToSDFG(*allocOper, jemit).failed())
         return failure();
 
-    if (AllocTransientStreamOp alloc = dyn_cast<AllocTransientStreamOp>(oper))
-      if (translateToSDFG(*alloc, jemit).failed())
+    for (AllocTransientStreamOp allocOper :
+         state.body().getOps<AllocTransientStreamOp>())
+      if (translateToSDFG(*allocOper, jemit).failed())
         return failure();
   }
 
-  for (Operation &oper : op.body().getOps())
-    if (StateNode state = dyn_cast<StateNode>(oper)) {
-      for (AllocOp allocOper : state.getAllocs())
-        if (translateToSDFG(*allocOper, jemit).failed())
-          return failure();
-
-      for (AllocTransientOp allocOper : state.getTransientAllocs())
-        if (translateToSDFG(*allocOper, jemit).failed())
-          return failure();
-
-      for (AllocStreamOp allocOper : state.getStreamAllocs())
-        if (translateToSDFG(*allocOper, jemit).failed())
-          return failure();
-
-      for (AllocTransientStreamOp allocOper : state.getTransientStreamAllocs())
-        if (translateToSDFG(*allocOper, jemit).failed())
-          return failure();
-    }
   jemit.endObject(); // _arrays
 
   jemit.startNamedObject("symbols");

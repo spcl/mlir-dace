@@ -28,11 +28,6 @@ def SDIR_StateNode : SDIR_Op<"state", [
 
     let extraClassDeclaration = [{
         void setID(unsigned id);
-        SmallVector<AllocOp> getAllocs();
-        SmallVector<AllocTransientOp> getTransientAllocs();
-        SmallVector<AllocStreamOp> getStreamAllocs();
-        SmallVector<AllocTransientStreamOp> getTransientStreamAllocs();
-        SmallVector<arith::ConstantOp> getConstants();
     }];
 }
 
