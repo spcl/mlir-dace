@@ -6,6 +6,8 @@ from dace import SDFG
 
 # TODO: Add this test to CMake tests
 
+folderPath = os.path.abspath(os.path.dirname(__file__))
+
 
 def check_import(path):
     with open(path) as f:
@@ -34,16 +36,20 @@ def check_import(path):
         return 1
 
 
-folderPath = os.path.abspath(os.path.dirname(__file__))
 anyFailed = False
 
 for testPath in glob(folderPath + "/**/*.mlir", recursive=True):
     shortPath = testPath.replace(folderPath, "")
-    # To manually check all the test files
-    #print("Testing: " + shortPath)
-    if (check_import(testPath) != 0):
-        print(shortPath + " failed!")
+
+    os.sys.stderr = open(os.devnull, 'w')
+    testResult = check_import(testPath)
+    os.sys.stderr = os.sys.__stderr__
+
+    if (testResult != 0):
+        print("\u274c " + shortPath)
         anyFailed = True
+    else:
+        print("\u2705 " + shortPath)
 
 if (anyFailed):
     exit(1)
