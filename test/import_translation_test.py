@@ -4,7 +4,6 @@ import os
 from glob import glob
 from dace import SDFG
 
-# TODO: Add LIT tests
 # TODO: Add this test to CMake tests
 
 
