@@ -171,7 +171,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
           return failure();
   jemit.endObject(); // constants_prop
 
-  if (containsAttr(*op, "arg_names")) {
+  if ((*op).hasAttr("arg_names")) {
     Attribute arg_names = op->getAttr("arg_names");
     if (ArrayAttr arg_names_arr = arg_names.cast<ArrayAttr>()) {
       jemit.startNamedList("arg_names");
@@ -256,7 +256,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.endObject(); // symbols
 
-  if (!containsAttr(*op, "instrument"))
+  if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
 
   jemit.startNamedObject("init_code");
@@ -329,10 +329,10 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
 
-  if (!containsAttr(*op, "instrument"))
+  if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
 
-  if (!containsAttr(*op, "schedule"))
+  if (!(*op).hasAttr("schedule"))
     jemit.printKVPair("schedule", "Default");
 
   jemit.startNamedObject("in_connectors");
@@ -375,7 +375,7 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
-  if (!containsAttr(*op, "instrument"))
+  if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
 
   jemit.endObject(); // attributes
@@ -526,7 +526,7 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.printKVPair("label", op.sym_name());
 
-  if (!containsAttr(*op, "instrument"))
+  if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
 
   jemit.startNamedObject("code");
@@ -625,9 +625,9 @@ LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "MapEntry");
 
   jemit.startNamedObject("attributes");
-  if (!containsAttr(*op, "instrument"))
+  if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
-  if (!containsAttr(*op, "schedule"))
+  if (!(*op).hasAttr("schedule"))
     jemit.printKVPair("schedule", "Default");
 
   jemit.startNamedList("params");
@@ -672,9 +672,9 @@ LogicalResult translateConsumeToSDFG(ConsumeNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "ConsumeEntry");
 
   jemit.startNamedObject("attributes");
-  if (!containsAttr(*op, "instrument"))
+  if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
-  if (!containsAttr(*op, "schedule"))
+  if (!(*op).hasAttr("schedule"))
     jemit.printKVPair("schedule", "Default");
 
   jemit.endObject(); // attributes
@@ -1471,22 +1471,10 @@ StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit) {
 }
 
 //===----------------------------------------------------------------------===//
-// Op contains Attr
-//===----------------------------------------------------------------------===//
-
-bool containsAttr(Operation &op, StringRef attrName) {
-  // TODO: Replace with hasAttr
-  for (NamedAttribute attr : op.getAttrs())
-    if (attr.first.strref() == attrName)
-      return true;
-  return false;
-}
-
-//===----------------------------------------------------------------------===//
 // Print debuginfo
 //===----------------------------------------------------------------------===//
 
-void printDebuginfo(Operation &op, JsonEmitter &jemit) {
+inline void printDebuginfo(Operation &op, JsonEmitter &jemit) {
   std::string loc;
   llvm::raw_string_ostream locStream(loc);
   op.getLoc().print(locStream);

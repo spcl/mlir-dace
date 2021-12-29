@@ -46,7 +46,6 @@ LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
 LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit);
 StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit);
 
-bool containsAttr(Operation &op, StringRef attrName);
-void printDebuginfo(Operation &op, JsonEmitter &jemit);
+inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
 
 #endif // SDIR_Translation_H
