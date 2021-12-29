@@ -83,9 +83,7 @@ LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
   if (SymOp Op = dyn_cast<SymOp>(op))
     return translateSymbolExprToSDFG(Op, jemit);
 
-  // TODO: Implement ConstantOp & FuncOp
-  if (ConstantOp Op = dyn_cast<ConstantOp>(op))
-    return success();
+  // TODO: Implement FuncOp
 
   if (FuncOp Op = dyn_cast<FuncOp>(op))
     return success();
@@ -114,7 +112,6 @@ LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
-  Type t = op.getType();
   std::string val;
   llvm::raw_string_ostream valStream(val);
   op.getValue().print(valStream);
@@ -132,7 +129,16 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.printKVPair("allow_conflicts", "false", /*stringify=*/false);
-  translateTypeToSDFG(t, op.getLoc(), jemit, "dtype");
+
+  Type type = op.getType();
+  Location loc = op.getLoc();
+  StringRef dtype = translateTypeToSDFG(type, loc, jemit);
+
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
+    return failure();
+
   jemit.startNamedList("shape");
   jemit.printString("1");
   jemit.endList(); // shape
@@ -440,7 +446,7 @@ LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
-// Temporary auto-lifting. Will be included into DaCe
+// TODO(later): Temporary auto-lifting. Will be included into DaCe
 LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   int numOps = 0;
   Operation *firstOp = nullptr;
@@ -751,7 +757,12 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   Type element = op.getType().getElementType();
-  if (translateTypeToSDFG(element, op.getLoc(), jemit, "dtype").failed())
+  Location loc = op.getLoc();
+  StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
     return failure();
 
   jemit.startNamedList("shape");
@@ -803,7 +814,12 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   // jemit.printKVPair("may_alias", "false", /*stringify*/false);
   // jemit.printKVPair("alignment", 0, /*stringify*/false);
   Type element = op.getType().getElementType();
-  if (translateTypeToSDFG(element, op.getLoc(), jemit, "dtype").failed())
+  Location loc = op.getLoc();
+
+  StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
     return failure();
 
   jemit.startNamedList("shape");
@@ -1554,34 +1570,28 @@ LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit) {
 // Translate type
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateTypeToSDFG(Type &t, Location loc, JsonEmitter &jemit,
-                                  StringRef key) {
-  if (t.isF64()) {
-    jemit.printKVPair(key, "float64");
-    return success();
-  }
+StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit) {
+  if (t.isF64())
+    return "float64";
 
-  if (t.isF32()) {
-    jemit.printKVPair(key, "float32");
-    return success();
-  }
+  if (t.isF32())
+    return "float32";
 
-  if (t.isInteger(64)) {
-    jemit.printKVPair(key, "int64");
-    return success();
-  }
+  if (t.isInteger(64))
+    return "int64";
 
-  if (t.isInteger(32)) {
-    jemit.printKVPair(key, "int32");
-    return success();
-  }
+  if (t.isInteger(32))
+    return "int32";
+
+  if (t.isIndex())
+    return "int64";
 
   std::string type;
   llvm::raw_string_ostream typeStream(type);
   t.print(typeStream);
-
   mlir::emitError(loc, "Unsupported type: " + type);
-  return failure();
+
+  return "";
 }
 
 //===----------------------------------------------------------------------===//
