@@ -493,16 +493,25 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
-  if (arith::ConstantFloatOp oper = dyn_cast<arith::ConstantFloatOp>(firstOp)) {
-    std::string val = std::to_string(oper.value().convertToDouble());
-    jemit.printKVPair("string_data", "__out = dace.float64(" + val + ")");
-    jemit.printKVPair("language", "Python");
-    return success();
-  }
+  if (arith::ConstantOp oper = dyn_cast<arith::ConstantOp>(firstOp)) {
+    Type t = oper.value().getType();
+    Location loc = oper.getLoc();
+    StringRef type = translateTypeToSDFG(t, loc, jemit);
+    std::string val;
 
-  if (arith::ConstantIntOp oper = dyn_cast<arith::ConstantIntOp>(firstOp)) {
-    std::string val = std::to_string(oper.value());
-    jemit.printKVPair("string_data", "__out = dace.int64(" + val + ")");
+    if (arith::ConstantFloatOp flop =
+            dyn_cast<arith::ConstantFloatOp>(firstOp)) {
+      SmallVector<char> flopVec;
+      flop.value().toString(flopVec);
+      for (char c : flopVec)
+        val += c;
+    } else if (arith::ConstantIntOp iop =
+                   dyn_cast<arith::ConstantIntOp>(firstOp)) {
+      val = std::to_string(iop.value());
+    }
+
+    std::string entry = "__out = dace." + type.str() + "(" + val + ")";
+    jemit.printKVPair("string_data", entry);
     jemit.printKVPair("language", "Python");
     return success();
   }
