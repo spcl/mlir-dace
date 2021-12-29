@@ -911,8 +911,6 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  jemit.printKVPair("volume", 1);
-
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
@@ -1191,8 +1189,6 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  jemit.printKVPair("volume", 1);
-
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
@@ -1338,7 +1334,6 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  jemit.printKVPair("volume", 1);
   jemit.endObject(); // attributes
   jemit.endObject(); // data
   jemit.endObject(); // attributes
