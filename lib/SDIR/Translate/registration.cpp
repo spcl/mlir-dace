@@ -28,7 +28,5 @@ void registerToSDFGTranslation() {
         registry.insert<mlir::sdir::SDIRDialect>();
         registry.insert<mlir::StandardOpsDialect>();
         registry.insert<mlir::arith::ArithmeticDialect>();
-        // FIXME: Throws a link-time error
-        // registerAllDialects(registry);
       });
 }
