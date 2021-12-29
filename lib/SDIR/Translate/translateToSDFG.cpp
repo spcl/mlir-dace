@@ -538,8 +538,10 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
   // If lifting fails (body is complex) then emit MLIR code directly
   // liftToPython() emits automatically emits the generated python code
   if (liftToPython(op, jemit).failed()) {
+    // Convention: MLIR tasklets use the mlir_entry function as the entry point
     std::string code = "module {\\n func @mlir_entry(";
 
+    // Prints all arguments with types
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
       BlockArgument bArg = op.getArgument(i);
 
@@ -568,11 +570,14 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
 
     code.append(" {\\n");
 
+    // Emits the body of the tasklet
     for (Operation &oper : op.body().getOps()) {
       std::string codeLine;
       llvm::raw_string_ostream codeLineStream(codeLine);
       oper.print(codeLineStream);
 
+      // SDIR is not a core dialect. Therefore "sdir.return" does not exist
+      // Replace it with the standard "return"
       if (sdir::ReturnOp ret = dyn_cast<sdir::ReturnOp>(oper))
         codeLine.replace(codeLine.find("sdir.return"), 11, "return");
 
