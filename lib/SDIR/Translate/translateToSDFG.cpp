@@ -84,7 +84,6 @@ LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
     return translateSymbolExprToSDFG(Op, jemit);
 
   // TODO: Implement FuncOp
-
   if (FuncOp Op = dyn_cast<FuncOp>(op))
     return success();
 
@@ -805,9 +804,6 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
-  // TODO: Print the values you can derive
-  // jemit.printKVPair("allow_conflicts", "false", /*stringify=*/false);
-
   jemit.startNamedList("strides");
   ArrayRef<int64_t> shape = op.getType().getIntegers();
 
@@ -820,7 +816,6 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   jemit.printInt(1);
   jemit.endList(); // strides
 
-  // jemit.printKVPair("total_size", "4");
   jemit.startNamedList("offset");
   for (unsigned i = 0; i < shape.size(); ++i) {
     jemit.startEntry();
@@ -828,8 +823,6 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   }
   jemit.endList(); // offset
 
-  // jemit.printKVPair("may_alias", "false", /*stringify*/false);
-  // jemit.printKVPair("alignment", 0, /*stringify*/false);
   Type element = op.getType().getElementType();
   Location loc = op.getLoc();
 
@@ -849,9 +842,6 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
-  // jemit.startNamedObject("location");
-  // jemit.endObject(); // location
-
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -874,28 +864,11 @@ LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
-  // TODO: Print the values you can derive
-  // jemit.printKVPair("allow_conflicts", "false", /*stringify=*/false);
-  // jemit.startNamedList("strides");
-  // jemit.endList(); // strides
-
-  // jemit.printKVPair("total_size", "4");
-  // jemit.startNamedList("offset");
-  // jemit.endList(); // offset
-
-  // jemit.printKVPair("may_alias", "false", /*stringify*/false);
-  // jemit.printKVPair("alignment", 0, /*stringify*/false);
   jemit.printKVPair("dtype", "int32");
-  // jemit.startNamedList("shape");
-  // jemit.endList(); // shape
-
   jemit.printKVPair("transient", "true", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
-  // jemit.startNamedObject("location");
-  // jemit.endObject(); // location
-
-  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+  printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
   jemit.endObject();
@@ -1053,24 +1026,6 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  // jemit.printKVPair("volume", "1");
-  // jemit.printKVPair("dynamic", "false", /*stringify=*/false);
-
-  /*jemit.startNamedObject("subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-
-  jemit.startObject();
-  jemit.printKVPair("start", "0");
-  jemit.printKVPair("end", "0");
-  jemit.printKVPair("step", "1");
-  jemit.printKVPair("tile", "1");
-  jemit.endObject();
-
-  jemit.endList(); // ranges
-  jemit.endObject(); // subset*/
-
-  // jemit.printKVPair("other_subset", "null", /*stringify=*/false);
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
@@ -1078,28 +1033,6 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
                     "Source array must be defined by a GetAccessOp");
     return failure();
   }
-  // jemit.printKVPair("wcr", "null", /*stringify=*/false);
-  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
-  // jemit.printKVPair("wcr_nonatomic", "false", /*stringify=*/false);
-  // jemit.printKVPair("allow_oob", "false", /*stringify=*/false);
-  // jemit.printKVPair("num_accesses", "1");
-
-  // jemit.printKVPair("src_subset", "null", /*stringify=*/false);
-  /*jemit.startNamedObject("src_subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-
-  jemit.startObject();
-  jemit.printKVPair("start", "0");
-  jemit.printKVPair("end", "0");
-  jemit.printKVPair("step", "1");
-  jemit.printKVPair("tile", "1");
-  jemit.endObject();
-
-  jemit.endList(); // ranges
-  jemit.endObject(); // src_subset*/
-
-  // jemit.printKVPair("dst_subset", "null", /*stringify=*/false);
 
   jemit.endObject(); // attributes
   jemit.endObject(); // data
@@ -1166,23 +1099,11 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
   jemit.printKVPair("type", "Stream");
 
   jemit.startNamedObject("attributes");
-
-  // TODO: Print the values you can derive
-  // jemit.startNamedList("offset");
-  // jemit.endList(); // offset
-
-  // jemit.printKVPair("buffer_size", "1");
   jemit.printKVPair("dtype", "int32");
-  // jemit.startNamedList("shape");
-  // jemit.endList(); // shape
-
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
-  // jemit.startNamedObject("location");
-  // jemit.endObject(); // location
-
-  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+  printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
   jemit.endObject();
@@ -1204,23 +1125,11 @@ LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
   jemit.printKVPair("type", "Stream");
 
   jemit.startNamedObject("attributes");
-
-  // TODO: Print the values you can derive
-  // jemit.startNamedList("offset");
-  // jemit.endList(); // offset
-
-  // jemit.printKVPair("buffer_size", "1");
   jemit.printKVPair("dtype", "int32");
-  // jemit.startNamedList("shape");
-  // jemit.endList(); // shape
-
   jemit.printKVPair("transient", "true", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
-  // jemit.startNamedObject("location");
-  // jemit.endObject(); // location
-
-  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+  printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
   jemit.endObject();
@@ -1382,27 +1291,7 @@ LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
   jemit.startNamedObject("data");
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
-
-  /*jemit.printKVPair("volume", 1);
-  jemit.printKVPair("num_accesses", 1);
-  */
   jemit.printKVPair("data", access.getName());
-
-  /*jemit.startNamedObject("subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-  jemit.endList();   // ranges
-  jemit.endObject(); // subset
-  */
-
-  /*jemit.startNamedObject("src_subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-
-  jemit.endList();   // ranges
-  jemit.endObject(); // src_subset
-  */
-
   jemit.endObject(); // attributes
   jemit.endObject(); // data
   jemit.endObject(); // attributes
@@ -1436,63 +1325,6 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
 
   jemit.printKVPair("volume", 1);
   jemit.printKVPair("num_accesses", 1);
-
-  /*if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
-    jemit.printKVPair("data", aNode.getName());
-  } else {
-    return failure();
-  }*/
-
-  /*jemit.startNamedObject("subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-
-  if(ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()){
-    for(Attribute sym : syms.getValue()){
-      if (StringAttr sym_str = sym.cast<StringAttr>()) {
-        jemit.startObject();
-        jemit.printKVPair("start", sym_str.getValue());
-        jemit.printKVPair("end", sym_str.getValue());
-        jemit.printKVPair("step", 1);
-        jemit.printKVPair("tile", 1);
-        jemit.endObject();
-      } else {
-        return failure();
-      }
-    }
-  } else {
-    return failure();
-  }
-
-  jemit.endList(); // ranges
-  jemit.endObject(); // subset
-  */
-
-  /*jemit.startNamedObject("src_subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-
-  if(ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()){
-    for(Attribute sym : syms.getValue()){
-      if (StringAttr sym_str = sym.cast<StringAttr>()) {
-        jemit.startObject();
-        jemit.printKVPair("start", sym_str.getValue());
-        jemit.printKVPair("end", sym_str.getValue());
-        jemit.printKVPair("step", 1);
-        jemit.printKVPair("tile", 1);
-        jemit.endObject();
-      } else {
-        return failure();
-      }
-    }
-  } else {
-    return failure();
-  }
-
-  jemit.endList(); // ranges
-  jemit.endObject(); // src_subset
-  */
-
   jemit.endObject(); // attributes
   jemit.endObject(); // data
   jemit.endObject(); // attributes
