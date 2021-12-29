@@ -6,7 +6,9 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
-using namespace mlir;
+namespace mlir {
+namespace sdir {
+namespace emitter {
 
 struct JsonEmitter {
   explicit JsonEmitter(raw_ostream &os);
@@ -61,5 +63,9 @@ private:
   // Tracks if there was an erronous printing
   bool error;
 };
+
+} // namespace emitter
+} // namespace sdir
+} // namespace mlir
 
 #endif // SDIR_JsonEmitter_H

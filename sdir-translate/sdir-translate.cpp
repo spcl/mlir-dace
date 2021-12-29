@@ -7,7 +7,7 @@
 
 int main(int argc, char **argv) {
   mlir::registerAllTranslations();
-  registerToSDFGTranslation();
+  mlir::sdir::translation::registerToSDFGTranslation();
 
   return mlir::failed(
       mlir::mlirTranslateMain(argc, argv, "MLIR-DaCe Translation Tool"));

@@ -4,8 +4,11 @@
 #include "SDIR/Dialect/Dialect.h"
 #include "SDIR/Translate/JsonEmitter.h"
 
-using namespace mlir;
-using namespace sdir;
+using namespace mlir::sdir::emitter;
+
+namespace mlir {
+namespace sdir {
+namespace translation {
 
 void registerToSDFGTranslation();
 
@@ -47,5 +50,7 @@ LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit);
 StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit);
 
 inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
-
+} // namespace translation
+} // namespace sdir
+} // namespace mlir
 #endif // SDIR_Translation_H

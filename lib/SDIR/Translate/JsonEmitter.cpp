@@ -3,6 +3,8 @@
 #include "mlir/IR/Types.h"
 
 using namespace mlir;
+using namespace sdir;
+using namespace emitter;
 
 JsonEmitter::JsonEmitter(raw_ostream &os) : os(os) {
   indentation = 0;

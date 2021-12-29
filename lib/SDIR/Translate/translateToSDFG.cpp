@@ -4,13 +4,15 @@
 
 using namespace mlir;
 using namespace sdir;
+using namespace emitter;
+using namespace translation;
 
 //===----------------------------------------------------------------------===//
 // TranslateToSDFG
 //===----------------------------------------------------------------------===//
 
 // NOTE: Prefer calling the specific translating functions instead
-LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
+LogicalResult translation::translateToSDFG(Operation &op, JsonEmitter &jemit) {
   if (SDFGNode node = dyn_cast<SDFGNode>(op))
     return translateSDFGToSDFG(node, jemit);
 
@@ -95,7 +97,8 @@ LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit) {
 // ModuleOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateModuleToSDFG(ModuleOp &op,
+                                                 JsonEmitter &jemit) {
   SDIRDialect::resetIDGenerator();
 
   for (Operation &oper : op.body().getOps())
@@ -291,7 +294,8 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   return success();
 }
 
-LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
+LogicalResult translation::translateSDFGToSDFG(SDFGNode &op,
+                                               JsonEmitter &jemit) {
   if (!op.isNested()) {
     jemit.startObject();
 
@@ -346,7 +350,8 @@ LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 // StateNode
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit) {
+LogicalResult translation::translateStateToSDFG(StateNode &op,
+                                                JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
   jemit.printKVPair("label", op.sym_name());
@@ -497,7 +502,8 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   return failure();
 }
 
-LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
+LogicalResult translation::translateTaskletToSDFG(TaskletNode &op,
+                                                  JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "Tasklet");
   jemit.printKVPair("label", op.sym_name());
@@ -598,7 +604,7 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
 // MapNode
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit) {
+LogicalResult translation::translateMapToSDFG(MapNode &op, JsonEmitter &jemit) {
   // MapEntry
   jemit.startObject();
   jemit.printKVPair("type", "MapEntry");
@@ -645,7 +651,8 @@ LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit) {
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateConsumeToSDFG(ConsumeNode &op, JsonEmitter &jemit) {
+LogicalResult translation::translateConsumeToSDFG(ConsumeNode &op,
+                                                  JsonEmitter &jemit) {
   // ConsumeEntry
   jemit.startObject();
   jemit.printKVPair("type", "ConsumeEntry");
@@ -681,7 +688,7 @@ LogicalResult translateConsumeToSDFG(ConsumeNode &op, JsonEmitter &jemit) {
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "Edge");
 
@@ -777,7 +784,8 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   return success();
 }
 
-LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateAllocToSDFG(AllocOp &op,
+                                                JsonEmitter &jemit) {
   if (op.getType().getShape().size() == 0)
     return printScalar(op, jemit);
 
@@ -829,8 +837,8 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
 // AllocTransientOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
-                                            JsonEmitter &jemit) {
+LogicalResult translation::translateAllocTransientToSDFG(AllocTransientOp &op,
+                                                         JsonEmitter &jemit) {
   AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
@@ -866,7 +874,8 @@ LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateGetAccessToSDFG(GetAccessOp &op,
+                                                    JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "AccessNode");
   jemit.printKVPair("label", op.getName());
@@ -894,7 +903,7 @@ LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit) {
 // LoadOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit) {
   // TODO: Implement translateLoadToSDFG
   return success();
 }
@@ -903,7 +912,8 @@ LogicalResult translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit) {
 // StoreOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateStoreToSDFG(StoreOp &op,
+                                                JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "MultiConnectorEdge");
 
@@ -1015,7 +1025,7 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
 // CopyOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "MultiConnectorEdge");
 
@@ -1062,7 +1072,8 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
 // MemletCastOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateMemletCastToSDFG(MemletCastOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateMemletCastToSDFG(MemletCastOp &op,
+                                                     JsonEmitter &jemit) {
   // TODO: Implement translateMemletCastToSDFG
   return success();
 }
@@ -1071,7 +1082,8 @@ LogicalResult translateMemletCastToSDFG(MemletCastOp &op, JsonEmitter &jemit) {
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateViewCastToSDFG(ViewCastOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateViewCastToSDFG(ViewCastOp &op,
+                                                   JsonEmitter &jemit) {
   // TODO: Implement translateViewCastToSDFG
   return success();
 }
@@ -1080,7 +1092,8 @@ LogicalResult translateViewCastToSDFG(ViewCastOp &op, JsonEmitter &jemit) {
 // SubviewOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateSubviewToSDFG(SubviewOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateSubviewToSDFG(SubviewOp &op,
+                                                  JsonEmitter &jemit) {
   // TODO: Implement translateSubviewToSDFG
   return success();
 }
@@ -1089,8 +1102,8 @@ LogicalResult translateSubviewToSDFG(SubviewOp &op, JsonEmitter &jemit) {
 // AllocStreamOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
-                                         JsonEmitter &jemit) {
+LogicalResult translation::translateAllocStreamToSDFG(AllocStreamOp &op,
+                                                      JsonEmitter &jemit) {
   AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
@@ -1126,8 +1139,9 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
 // AllocTransientStreamOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
-                                                  JsonEmitter &jemit) {
+LogicalResult
+translation::translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
+                                                 JsonEmitter &jemit) {
   AsmState state(op.getParentSDFG());
   std::string name;
   llvm::raw_string_ostream nameStream(name);
@@ -1163,7 +1177,8 @@ LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
 // StreamPopOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateStreamPopToSDFG(StreamPopOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateStreamPopToSDFG(StreamPopOp &op,
+                                                    JsonEmitter &jemit) {
   // TODO: Implement translateStreamPopToSDFG
   return success();
 }
@@ -1172,7 +1187,8 @@ LogicalResult translateStreamPopToSDFG(StreamPopOp &op, JsonEmitter &jemit) {
 // StreamPushOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateStreamPushToSDFG(StreamPushOp &op,
+                                                     JsonEmitter &jemit) {
   // TODO: Implement translateStreamPushToSDFG
   return success();
 }
@@ -1181,8 +1197,8 @@ LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit) {
 // StreamLengthOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
-                                          JsonEmitter &jemit) {
+LogicalResult translation::translateStreamLengthToSDFG(StreamLengthOp &op,
+                                                       JsonEmitter &jemit) {
   // TODO: Implement translateStreamLengthToSDFG
   return success();
 }
@@ -1380,7 +1396,8 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   return success();
 }
 
-LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateCallToSDFG(sdir::CallOp &op,
+                                               JsonEmitter &jemit) {
   if (op.callsTasklet()) {
     TaskletNode task = op.getTasklet();
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -1426,7 +1443,8 @@ LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateLibCallToSDFG(LibCallOp &op,
+                                                  JsonEmitter &jemit) {
   // TODO: Implement translateLibCallToSDFG
   return success();
 }
@@ -1435,8 +1453,8 @@ LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit) {
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op,
-                                         JsonEmitter &jemit) {
+LogicalResult translation::translateAllocSymbolToSDFG(AllocSymbolOp &op,
+                                                      JsonEmitter &jemit) {
   jemit.printKVPair(op.sym(), "int64");
   return success();
 }
@@ -1445,7 +1463,8 @@ LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op,
 // SymbolExprOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit) {
+LogicalResult translation::translateSymbolExprToSDFG(SymOp &op,
+                                                     JsonEmitter &jemit) {
   // TODO: Implement translateSymbolExprToSDFG
   return success();
 }
@@ -1454,7 +1473,8 @@ LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit) {
 // Translate type
 //===----------------------------------------------------------------------===//
 
-StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit) {
+StringRef translation::translateTypeToSDFG(Type &t, Location &loc,
+                                           JsonEmitter &jemit) {
   if (t.isF64())
     return "float64";
 
@@ -1482,7 +1502,7 @@ StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit) {
 // Print debuginfo
 //===----------------------------------------------------------------------===//
 
-inline void printDebuginfo(Operation &op, JsonEmitter &jemit) {
+inline void translation::printDebuginfo(Operation &op, JsonEmitter &jemit) {
   std::string loc;
   llvm::raw_string_ostream locStream(loc);
   op.getLoc().print(locStream);

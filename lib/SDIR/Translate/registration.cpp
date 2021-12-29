@@ -6,23 +6,24 @@
 // SDFG registration
 //===----------------------------------------------------------------------===//
 
-void registerToSDFGTranslation() {
+void mlir::sdir::translation::registerToSDFGTranslation() {
   mlir::TranslateFromMLIRRegistration registration(
       "mlir-to-sdfg",
       [](mlir::ModuleOp module, llvm::raw_ostream &output) {
-        JsonEmitter jemit(output);
+        mlir::sdir::emitter::JsonEmitter jemit(output);
 
-        LogicalResult res = translateModuleToSDFG(module, jemit);
-        LogicalResult jRes = jemit.finish();
+        mlir::LogicalResult res =
+            mlir::sdir::translation::translateModuleToSDFG(module, jemit);
+        mlir::LogicalResult jRes = jemit.finish();
         if (jRes.failed()) {
           emitError(module.getLoc(), "Invalid JSON generated");
-          return failure();
+          return mlir::failure();
         }
 
         if (res.failed())
-          return failure();
+          return mlir::failure();
 
-        return success();
+        return mlir::success();
       },
       [](mlir::DialectRegistry &registry) {
         registry.insert<mlir::sdir::SDIRDialect>();
