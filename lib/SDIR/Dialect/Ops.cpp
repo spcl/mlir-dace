@@ -1,4 +1,3 @@
-
 #include "SDIR/Dialect/Dialect.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
