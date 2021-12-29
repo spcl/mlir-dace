@@ -600,7 +600,6 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
     bArg.printAsOperand(nameStream, state);
     name.erase(0, 1); // Remove %-sign
     jemit.printKVPair(name, "null", /*stringify=*/false);
-    // bArg.getType().print(jemit.ostream());
   }
 
   jemit.endObject(); // in_connectors
@@ -790,6 +789,7 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
+  printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
 
@@ -852,7 +852,7 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   // jemit.startNamedObject("location");
   // jemit.endObject(); // location
 
-  // jemit.printKVPair("debuginfo", "null", /*stringify=*/false);
+  printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
   jemit.endObject();
@@ -1621,4 +1621,16 @@ bool containsAttr(Operation &op, StringRef attrName) {
     if (attr.first.strref() == attrName)
       return true;
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Print debuginfo
+//===----------------------------------------------------------------------===//
+
+void printDebuginfo(Operation &op, JsonEmitter &jemit) {
+  std::string loc;
+  llvm::raw_string_ostream locStream(loc);
+  op.getLoc().print(locStream);
+  remove(loc.begin(), loc.end(), '\"');
+  jemit.printKVPair("debuginfo", loc);
 }
