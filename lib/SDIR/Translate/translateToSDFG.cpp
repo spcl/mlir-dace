@@ -127,7 +127,6 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Scalar");
 
   jemit.startNamedObject("attributes");
-  jemit.printKVPair("allow_conflicts", "false", /*stringify=*/false);
 
   Type type = op.getType();
   Location loc = op.getLoc();
@@ -258,27 +257,6 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
-
-  jemit.startNamedObject("init_code");
-  jemit.startNamedObject("frame");
-  jemit.printKVPair("string_data", "");
-  jemit.printKVPair("language", "CPP");
-  jemit.endObject(); // frame
-  jemit.endObject(); // init_code
-
-  jemit.startNamedObject("exit_code");
-  jemit.startNamedObject("frame");
-  jemit.printKVPair("string_data", "");
-  jemit.printKVPair("language", "CPP");
-  jemit.endObject(); // frame
-  jemit.endObject(); // exit_code
-
-  jemit.startNamedObject("global_code");
-  jemit.startNamedObject("frame");
-  jemit.printKVPair("string_data", "");
-  jemit.printKVPair("language", "CPP");
-  jemit.endObject(); // frame
-  jemit.endObject(); // global_code
 
   jemit.printKVPair("name", op.sym_name());
   jemit.endObject(); // attributes
@@ -786,8 +764,10 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   jemit.endList(); // shape
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  jemit.printKVPair("storage", "Default");
-  jemit.printKVPair("lifetime", "Scope");
+  if (!(*op).hasAttr("storage"))
+    jemit.printKVPair("storage", "Default");
+  if (!(*op).hasAttr("lifetime"))
+    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -816,13 +796,6 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   jemit.printInt(1);
   jemit.endList(); // strides
 
-  jemit.startNamedList("offset");
-  for (unsigned i = 0; i < shape.size(); ++i) {
-    jemit.startEntry();
-    jemit.printInt(0);
-  }
-  jemit.endList(); // offset
-
   Type element = op.getType().getElementType();
   Location loc = op.getLoc();
   StringRef dtype = translateTypeToSDFG(element, loc, jemit);
@@ -840,8 +813,10 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
   jemit.endList(); // shape
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  jemit.printKVPair("storage", "Default");
-  jemit.printKVPair("lifetime", "Scope");
+  if (!(*op).hasAttr("storage"))
+    jemit.printKVPair("storage", "Default");
+  if (!(*op).hasAttr("lifetime"))
+    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -875,8 +850,10 @@ LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
     return failure();
 
   jemit.printKVPair("transient", "true", /*stringify=*/false);
-  jemit.printKVPair("storage", "Default");
-  jemit.printKVPair("lifetime", "Scope");
+  if (!(*op).hasAttr("storage"))
+    jemit.printKVPair("storage", "Default");
+  if (!(*op).hasAttr("lifetime"))
+    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -894,8 +871,10 @@ LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("label", op.getName());
 
   jemit.startNamedObject("attributes");
-  jemit.printKVPair("access", "ReadWrite");
-  jemit.printKVPair("setzero", "false", /*stringify=*/false);
+  if (!(*op).hasAttr("access"))
+    jemit.printKVPair("access", "ReadWrite");
+  if (!(*op).hasAttr("setzero"))
+    jemit.printKVPair("setzero", "false", /*stringify=*/false);
   jemit.printKVPair("data", op.getName());
   jemit.startNamedObject("in_connectors");
   jemit.endObject(); // in_connectors
@@ -933,7 +912,6 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   jemit.printKVPair("volume", 1);
-  jemit.printKVPair("num_accesses", 1);
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
@@ -1113,7 +1091,7 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
 
   jemit.startNamedObject("attributes");
 
-  Type type = op.getType();
+  Type type = op.getType().getElementType();
   Location loc = op.getLoc();
   StringRef dtype = translateTypeToSDFG(type, loc, jemit);
 
@@ -1123,8 +1101,10 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
     return failure();
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  jemit.printKVPair("storage", "Default");
-  jemit.printKVPair("lifetime", "Scope");
+  if (!(*op).hasAttr("storage"))
+    jemit.printKVPair("storage", "Default");
+  if (!(*op).hasAttr("lifetime"))
+    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -1147,10 +1127,21 @@ LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
   jemit.printKVPair("type", "Stream");
 
   jemit.startNamedObject("attributes");
-  jemit.printKVPair("dtype", "int32");
+
+  Type type = op.getType().getElementType();
+  Location loc = op.getLoc();
+  StringRef dtype = translateTypeToSDFG(type, loc, jemit);
+
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
+    return failure();
+
   jemit.printKVPair("transient", "true", /*stringify=*/false);
-  jemit.printKVPair("storage", "Default");
-  jemit.printKVPair("lifetime", "Scope");
+  if (!(*op).hasAttr("storage"))
+    jemit.printKVPair("storage", "Default");
+  if (!(*op).hasAttr("lifetime"))
+    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -1201,7 +1192,6 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   jemit.startNamedObject("attributes");
 
   jemit.printKVPair("volume", 1);
-  jemit.printKVPair("num_accesses", 1);
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
@@ -1349,7 +1339,6 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   jemit.startNamedObject("attributes");
 
   jemit.printKVPair("volume", 1);
-  jemit.printKVPair("num_accesses", 1);
   jemit.endObject(); // attributes
   jemit.endObject(); // data
   jemit.endObject(); // attributes
