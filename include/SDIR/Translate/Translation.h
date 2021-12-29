@@ -12,7 +12,6 @@ namespace translation {
 
 void registerToSDFGTranslation();
 
-LogicalResult translateToSDFG(Operation &op, JsonEmitter &jemit);
 LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit);
 LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit);
 LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit);

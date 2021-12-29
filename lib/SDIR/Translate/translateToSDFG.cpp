@@ -8,92 +8,6 @@ using namespace emitter;
 using namespace translation;
 
 //===----------------------------------------------------------------------===//
-// TranslateToSDFG
-//===----------------------------------------------------------------------===//
-
-// NOTE: Prefer calling the specific translating functions instead
-LogicalResult translation::translateToSDFG(Operation &op, JsonEmitter &jemit) {
-  if (SDFGNode node = dyn_cast<SDFGNode>(op))
-    return translateSDFGToSDFG(node, jemit);
-
-  if (StateNode node = dyn_cast<StateNode>(op))
-    return translateStateToSDFG(node, jemit);
-
-  if (TaskletNode node = dyn_cast<TaskletNode>(op))
-    return translateTaskletToSDFG(node, jemit);
-
-  if (MapNode node = dyn_cast<MapNode>(op))
-    return translateMapToSDFG(node, jemit);
-
-  if (ConsumeNode node = dyn_cast<ConsumeNode>(op))
-    return translateConsumeToSDFG(node, jemit);
-
-  if (EdgeOp Op = dyn_cast<EdgeOp>(op))
-    return translateEdgeToSDFG(Op, jemit);
-
-  if (AllocOp Op = dyn_cast<AllocOp>(op))
-    return translateAllocToSDFG(Op, jemit);
-
-  if (AllocTransientOp Op = dyn_cast<AllocTransientOp>(op))
-    return translateAllocTransientToSDFG(Op, jemit);
-
-  if (GetAccessOp Op = dyn_cast<GetAccessOp>(op))
-    return translateGetAccessToSDFG(Op, jemit);
-
-  if (LoadOp Op = dyn_cast<LoadOp>(op))
-    return translateLoadToSDFG(Op, jemit);
-
-  if (StoreOp Op = dyn_cast<StoreOp>(op))
-    return translateStoreToSDFG(Op, jemit);
-
-  if (CopyOp Op = dyn_cast<CopyOp>(op))
-    return translateCopyToSDFG(Op, jemit);
-
-  if (MemletCastOp Op = dyn_cast<MemletCastOp>(op))
-    return translateMemletCastToSDFG(Op, jemit);
-
-  if (ViewCastOp Op = dyn_cast<ViewCastOp>(op))
-    return translateViewCastToSDFG(Op, jemit);
-
-  if (SubviewOp Op = dyn_cast<SubviewOp>(op))
-    return translateSubviewToSDFG(Op, jemit);
-
-  if (AllocStreamOp Op = dyn_cast<AllocStreamOp>(op))
-    return translateAllocStreamToSDFG(Op, jemit);
-
-  if (AllocTransientStreamOp Op = dyn_cast<AllocTransientStreamOp>(op))
-    return translateAllocTransientStreamToSDFG(Op, jemit);
-
-  if (StreamPopOp Op = dyn_cast<StreamPopOp>(op))
-    return translateStreamPopToSDFG(Op, jemit);
-
-  if (StreamPushOp Op = dyn_cast<StreamPushOp>(op))
-    return translateStreamPushToSDFG(Op, jemit);
-
-  if (StreamLengthOp Op = dyn_cast<StreamLengthOp>(op))
-    return translateStreamLengthToSDFG(Op, jemit);
-
-  if (sdir::CallOp Op = dyn_cast<sdir::CallOp>(op))
-    return translateCallToSDFG(Op, jemit);
-
-  if (LibCallOp Op = dyn_cast<LibCallOp>(op))
-    return translateLibCallToSDFG(Op, jemit);
-
-  if (AllocSymbolOp Op = dyn_cast<AllocSymbolOp>(op))
-    return translateAllocSymbolToSDFG(Op, jemit);
-
-  if (SymOp Op = dyn_cast<SymOp>(op))
-    return translateSymbolExprToSDFG(Op, jemit);
-
-  // TODO: Implement FuncOp
-  if (FuncOp Op = dyn_cast<FuncOp>(op))
-    return success();
-
-  mlir::emitError(op.getLoc(), "Unsupported Operation");
-  return failure();
-}
-
-//===----------------------------------------------------------------------===//
 // ModuleOp
 //===----------------------------------------------------------------------===//
 
@@ -213,38 +127,38 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("_arrays");
 
   for (AllocOp alloc : op.body().getOps<AllocOp>())
-    if (translateToSDFG(*alloc, jemit).failed())
+    if (translateAllocToSDFG(alloc, jemit).failed())
       return failure();
 
   for (AllocTransientOp alloc : op.body().getOps<AllocTransientOp>())
-    if (translateToSDFG(*alloc, jemit).failed())
+    if (translateAllocTransientToSDFG(alloc, jemit).failed())
       return failure();
 
   for (AllocStreamOp alloc : op.body().getOps<AllocStreamOp>())
-    if (translateToSDFG(*alloc, jemit).failed())
+    if (translateAllocStreamToSDFG(alloc, jemit).failed())
       return failure();
 
   for (AllocTransientStreamOp alloc :
        op.body().getOps<AllocTransientStreamOp>())
-    if (translateToSDFG(*alloc, jemit).failed())
+    if (translateAllocTransientStreamToSDFG(alloc, jemit).failed())
       return failure();
 
   for (StateNode state : op.body().getOps<StateNode>()) {
     for (AllocOp allocOper : state.body().getOps<AllocOp>())
-      if (translateToSDFG(*allocOper, jemit).failed())
+      if (translateAllocToSDFG(allocOper, jemit).failed())
         return failure();
 
     for (AllocTransientOp allocOper : state.body().getOps<AllocTransientOp>())
-      if (translateToSDFG(*allocOper, jemit).failed())
+      if (translateAllocTransientToSDFG(allocOper, jemit).failed())
         return failure();
 
     for (AllocStreamOp allocOper : state.body().getOps<AllocStreamOp>())
-      if (translateToSDFG(*allocOper, jemit).failed())
+      if (translateAllocStreamToSDFG(allocOper, jemit).failed())
         return failure();
 
     for (AllocTransientStreamOp allocOper :
          state.body().getOps<AllocTransientStreamOp>())
-      if (translateToSDFG(*allocOper, jemit).failed())
+      if (translateAllocTransientStreamToSDFG(allocOper, jemit).failed())
         return failure();
   }
 
@@ -253,7 +167,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("symbols");
   for (Operation &oper : op.body().getOps()) {
     if (AllocSymbolOp alloc = dyn_cast<AllocSymbolOp>(oper))
-      if (translateToSDFG(*alloc, jemit).failed())
+      if (translateAllocSymbolToSDFG(alloc, jemit).failed())
         return failure();
   }
 
@@ -283,7 +197,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   for (Operation &oper : op.body().getOps())
     if (EdgeOp edge = dyn_cast<EdgeOp>(oper))
-      if (translateToSDFG(*edge, jemit).failed())
+      if (translateEdgeToSDFG(edge, jemit).failed())
         return failure();
 
   jemit.endList(); // edges
@@ -407,15 +321,15 @@ LogicalResult translation::translateStateToSDFG(StateNode &op,
 
   for (Operation &oper : op.body().getOps()) {
     if (CopyOp edge = dyn_cast<CopyOp>(oper))
-      if (translateToSDFG(*edge, jemit).failed())
+      if (translateCopyToSDFG(edge, jemit).failed())
         return failure();
 
     if (StoreOp edge = dyn_cast<StoreOp>(oper))
-      if (translateToSDFG(*edge, jemit).failed())
+      if (translateStoreToSDFG(edge, jemit).failed())
         return failure();
 
     if (sdir::CallOp edge = dyn_cast<sdir::CallOp>(oper))
-      if (translateToSDFG(*edge, jemit).failed())
+      if (translateCallToSDFG(edge, jemit).failed())
         return failure();
   }
 
