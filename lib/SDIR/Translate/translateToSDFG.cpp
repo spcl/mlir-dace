@@ -825,8 +825,8 @@ LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
   Type element = op.getType().getElementType();
   Location loc = op.getLoc();
-
   StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
   else
@@ -864,7 +864,16 @@ LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
-  jemit.printKVPair("dtype", "int32");
+
+  Type element = op.getType().getElementType();
+  Location loc = op.getLoc();
+  StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
+    return failure();
+
   jemit.printKVPair("transient", "true", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
@@ -906,6 +915,7 @@ LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateLoadToSDFG
   return success();
 }
 
@@ -1065,6 +1075,7 @@ LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateMemletCastToSDFG(MemletCastOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateMemletCastToSDFG
   return success();
 }
 
@@ -1073,6 +1084,7 @@ LogicalResult translateMemletCastToSDFG(MemletCastOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateViewCastToSDFG(ViewCastOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateViewCastToSDFG
   return success();
 }
 
@@ -1081,6 +1093,7 @@ LogicalResult translateViewCastToSDFG(ViewCastOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateSubviewToSDFG(SubviewOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateSubviewToSDFG
   return success();
 }
 
@@ -1099,7 +1112,16 @@ LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op,
   jemit.printKVPair("type", "Stream");
 
   jemit.startNamedObject("attributes");
-  jemit.printKVPair("dtype", "int32");
+
+  Type type = op.getType();
+  Location loc = op.getLoc();
+  StringRef dtype = translateTypeToSDFG(type, loc, jemit);
+
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
+    return failure();
+
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   jemit.printKVPair("storage", "Default");
   jemit.printKVPair("lifetime", "Scope");
@@ -1141,6 +1163,7 @@ LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateStreamPopToSDFG(StreamPopOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateStreamPopToSDFG
   return success();
 }
 
@@ -1149,6 +1172,7 @@ LogicalResult translateStreamPopToSDFG(StreamPopOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateStreamPushToSDFG
   return success();
 }
 
@@ -1158,6 +1182,7 @@ LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit) {
 
 LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
                                           JsonEmitter &jemit) {
+  // TODO: Implement translateStreamLengthToSDFG
   return success();
 }
 
@@ -1394,6 +1419,7 @@ LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateLibCallToSDFG
   return success();
 }
 
@@ -1412,6 +1438,7 @@ LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op,
 //===----------------------------------------------------------------------===//
 
 LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit) {
+  // TODO: Implement translateSymbolExprToSDFG
   return success();
 }
 
