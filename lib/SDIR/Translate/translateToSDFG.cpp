@@ -911,6 +911,17 @@ LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
+  jemit.startNamedList("strides");
+  ArrayRef<int64_t> shape = op.arr().getType().cast<MemletType>().getIntegers();
+  for (int i = shape.size() - 1; i > 0; --i) {
+    jemit.startEntry();
+    jemit.printInt(shape[i]);
+  }
+
+  jemit.startEntry();
+  jemit.printInt(1);
+  jemit.endList(); // strides
+
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
   } else {
@@ -1188,6 +1199,18 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   jemit.startNamedObject("data");
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
+
+  jemit.startNamedList("strides");
+  ArrayRef<int64_t> shape =
+      load.arr().getType().cast<MemletType>().getIntegers();
+  for (int i = shape.size() - 1; i > 0; --i) {
+    jemit.startEntry();
+    jemit.printInt(shape[i]);
+  }
+
+  jemit.startEntry();
+  jemit.printInt(1);
+  jemit.endList(); // strides
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
