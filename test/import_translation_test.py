@@ -39,7 +39,7 @@ def check_import(path):
 anyFailed = False
 
 for testPath in glob(folderPath + "/**/*.mlir", recursive=True):
-    shortPath = testPath.replace(folderPath, "")
+    shortPath = "test" + testPath.replace(folderPath, "")
 
     os.sys.stderr = open(os.devnull, 'w')
     testResult = check_import(testPath)
