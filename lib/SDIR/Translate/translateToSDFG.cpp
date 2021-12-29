@@ -534,6 +534,9 @@ LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit) {
 
   AsmState state(op);
 
+  // Try to lift the body of the tasklet
+  // If lifting fails (body is complex) then emit MLIR code directly
+  // liftToPython() emits automatically emits the generated python code
   if (liftToPython(op, jemit).failed()) {
     std::string code = "module {\\n func @mlir_entry(";
 
