@@ -10,16 +10,18 @@ folderPath = os.path.abspath(os.path.dirname(__file__))
 
 
 def check_import(path):
+    xfail = False
+
     with open(path) as f:
         if 'XFAIL' in f.read():
-            return 0
+            xfail = True
 
     result = subprocess.run(
         [folderPath + '/../build/bin/sdir-translate', '--mlir-to-sdfg', path],
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL)
 
-    if (result.returncode != 0):
+    if (result.returncode != xfail):
         return 1
 
     translated = result.stdout.decode('utf-8')
