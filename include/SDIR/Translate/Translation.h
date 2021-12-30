@@ -12,42 +12,39 @@ namespace translation {
 
 void registerToSDFGTranslation();
 
-LogicalResult translateModuleToSDFG(ModuleOp &op, JsonEmitter &jemit);
-LogicalResult translateSDFGToSDFG(SDFGNode &op, JsonEmitter &jemit);
-LogicalResult translateStateToSDFG(StateNode &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(ModuleOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(SDFGNode &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(StateNode &op, JsonEmitter &jemit);
 
-LogicalResult translateTaskletToSDFG(TaskletNode &op, JsonEmitter &jemit);
-LogicalResult translateMapToSDFG(MapNode &op, JsonEmitter &jemit);
-LogicalResult translateConsumeToSDFG(ConsumeNode &op, JsonEmitter &jemit);
-LogicalResult translateEdgeToSDFG(EdgeOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(TaskletNode &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(MapNode &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(ConsumeNode &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(EdgeOp &op, JsonEmitter &jemit);
 
-LogicalResult translateAllocToSDFG(AllocOp &op, JsonEmitter &jemit);
-LogicalResult translateAllocTransientToSDFG(AllocTransientOp &op,
-                                            JsonEmitter &jemit);
-LogicalResult translateGetAccessToSDFG(GetAccessOp &op, JsonEmitter &jemit);
-LogicalResult translateLoadToSDFG(LoadOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(AllocOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(AllocTransientOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(GetAccessOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(LoadOp &op, JsonEmitter &jemit);
 
-LogicalResult translateStoreToSDFG(StoreOp &op, JsonEmitter &jemit);
-LogicalResult translateCopyToSDFG(CopyOp &op, JsonEmitter &jemit);
-LogicalResult translateMemletCastToSDFG(MemletCastOp &op, JsonEmitter &jemit);
-LogicalResult translateViewCastToSDFG(ViewCastOp &op, JsonEmitter &jemit);
-LogicalResult translateSubviewToSDFG(SubviewOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(StoreOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(CopyOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(MemletCastOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(ViewCastOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(SubviewOp &op, JsonEmitter &jemit);
 
-LogicalResult translateAllocStreamToSDFG(AllocStreamOp &op, JsonEmitter &jemit);
-LogicalResult translateAllocTransientStreamToSDFG(AllocTransientStreamOp &op,
-                                                  JsonEmitter &jemit);
-LogicalResult translateStreamPopToSDFG(StreamPopOp &op, JsonEmitter &jemit);
-LogicalResult translateStreamPushToSDFG(StreamPushOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(AllocStreamOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(AllocTransientStreamOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(StreamPopOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(StreamPushOp &op, JsonEmitter &jemit);
 
-LogicalResult translateStreamLengthToSDFG(StreamLengthOp &op,
-                                          JsonEmitter &jemit);
-LogicalResult translateCallToSDFG(sdir::CallOp &op, JsonEmitter &jemit);
-LogicalResult translateLibCallToSDFG(LibCallOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(StreamLengthOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(sdir::CallOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(LibCallOp &op, JsonEmitter &jemit);
 
-LogicalResult translateAllocSymbolToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
-LogicalResult translateSymbolExprToSDFG(SymOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
+LogicalResult translateToSDFG(SymOp &op, JsonEmitter &jemit);
+
 StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit);
-
 inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
 } // namespace translation
 } // namespace sdir

@@ -13,7 +13,7 @@ void mlir::sdir::translation::registerToSDFGTranslation() {
         mlir::sdir::emitter::JsonEmitter jemit(output);
 
         mlir::LogicalResult res =
-            mlir::sdir::translation::translateModuleToSDFG(module, jemit);
+            mlir::sdir::translation::translateToSDFG(module, jemit);
         mlir::LogicalResult jRes = jemit.finish();
         if (jRes.failed()) {
           emitError(module.getLoc(), "Invalid JSON generated");
