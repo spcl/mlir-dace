@@ -910,6 +910,8 @@ LogicalResult translation::translateStoreToSDFG(StoreOp &op,
   jemit.endObject(); // data
   jemit.endObject(); // attributes
 
+  // Get the ID of the tasklet if this StoreOp represents
+  // a tasklet -> access node edge
   if (sdir::CallOp call = dyn_cast<sdir::CallOp>(op.val().getDefiningOp())) {
     TaskletNode aNode = call.getTasklet();
     jemit.printKVPair("src", aNode.ID());
