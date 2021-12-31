@@ -793,8 +793,6 @@ LogicalResult translation::translateToSDFG(GetAccessOp &op,
   jemit.startNamedObject("attributes");
   if (!(*op).hasAttr("access"))
     jemit.printKVPair("access", "ReadWrite");
-  if (!(*op).hasAttr("setzero"))
-    jemit.printKVPair("setzero", "false", /*stringify=*/false);
   jemit.printKVPair("data", op.getName());
   jemit.startNamedObject("in_connectors");
   jemit.endObject(); // in_connectors
