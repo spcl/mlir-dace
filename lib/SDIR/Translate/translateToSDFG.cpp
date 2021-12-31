@@ -346,8 +346,10 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   Operation *firstOp = nullptr;
 
   for (Operation &oper : op.body().getOps()) {
-    if (numOps >= 2)
+    if (numOps >= 2) {
+      emitRemark(op.getLoc(), "No lifting to python possible");
       return failure();
+    }
     if (numOps == 0)
       firstOp = &oper;
     ++numOps;
@@ -410,6 +412,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
+  emitRemark(op.getLoc(), "No lifting to python possible");
   return failure();
 }
 
