@@ -32,6 +32,7 @@ def check_import(path):
     try:
         translated_json = json.loads(translated)
         sdfg = SDFG.from_json(translated_json)
+        sdfg.validate()
         sdfg.save(filename=os.devnull)
         return 0
     except:
