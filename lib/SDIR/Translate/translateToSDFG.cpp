@@ -242,8 +242,14 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   jemit.endObject(); // in_connectors
 
   jemit.startNamedObject("out_connectors");
-  // TODO: Print out_connectors
-  jemit.printKVPair("__return", "null", /*stringify=*/false);
+  // TODO: Implement multiple return values
+  if (op.getNumResults() == 1) {
+    jemit.printKVPair("__return", "null", /*stringify=*/false);
+  } else if (op.getNumResults() > 1) {
+    emitError(op.getLoc(), "Multiple return values not implemented yet");
+    return failure();
+  }
+
   jemit.endObject(); // out_connectors
 
   jemit.startNamedObject("sdfg");
@@ -503,8 +509,13 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
   jemit.endObject(); // in_connectors
 
   jemit.startNamedObject("out_connectors");
-  // TODO: print out_connectors
-  jemit.printKVPair("__out", "null", /*stringify=*/false);
+  // TODO: Implement multiple return values
+  if (op.getNumResults() == 1) {
+    jemit.printKVPair("__out", "null", /*stringify=*/false);
+  } else if (op.getNumResults() > 1) {
+    emitError(op.getLoc(), "Multiple return values not implemented yet");
+    return failure();
+  }
   jemit.endObject(); // out_connectors
 
   jemit.endObject(); // attributes
@@ -911,6 +922,7 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   if (sdir::CallOp call = dyn_cast<sdir::CallOp>(op.val().getDefiningOp())) {
     TaskletNode aNode = call.getTasklet();
     jemit.printKVPair("src", aNode.ID());
+    // TODO: Implement multiple return values
     jemit.printKVPair("src_connector", "__out");
   } else if (arith::ConstantOp con =
                  dyn_cast<arith::ConstantOp>(op.val().getDefiningOp())) {
@@ -1288,6 +1300,7 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   jemit.endObject(); // attributes
 
   jemit.printKVPair("src", taskSrc.ID());
+  // TODO: Implement multiple return values
   jemit.printKVPair("src_connector", "__out");
 
   jemit.printKVPair("dst", taskDest.ID());
