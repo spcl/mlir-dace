@@ -41,7 +41,7 @@ def check_import(path):
 
 anyFailed = False
 
-for testPath in glob(folderPath + "/**/*.mlir", recursive=True):
+for testPath in glob(folderPath + "/SDIR/Translate/**/*.mlir", recursive=True):
     shortPath = "test" + testPath.replace(folderPath, "")
 
     os.sys.stdout = open(os.devnull, 'w')
