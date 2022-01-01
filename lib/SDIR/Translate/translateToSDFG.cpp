@@ -223,6 +223,7 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("id", op.ID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", op.sym_name());
 
   if (!(*op).hasAttr("instrument"))
     jemit.printKVPair("instrument", "No_Instrumentation");
@@ -939,13 +940,20 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.endObject(); // data
   jemit.endObject(); // attributes
 
-  // Get the ID of the tasklet if this StoreOp represents
-  // a tasklet -> access node edge
+  // Get the ID of the tasklet/SDFG if this StoreOp represents
+  // a tasklet/nested SDFG -> access node edge
   if (sdir::CallOp call = dyn_cast<sdir::CallOp>(op.val().getDefiningOp())) {
-    TaskletNode aNode = call.getTasklet();
-    jemit.printKVPair("src", aNode.ID());
-    // TODO: Implement multiple return values
-    jemit.printKVPair("src_connector", "__out");
+    if (call.callsTasklet()) {
+      TaskletNode aNode = call.getTasklet();
+      jemit.printKVPair("src", aNode.ID());
+      // TODO: Implement multiple return values
+      jemit.printKVPair("src_connector", "__out");
+    } else {
+      SDFGNode aNode = call.getSDFG();
+      jemit.printKVPair("src", aNode.ID());
+      // TODO: Implement multiple return values
+      jemit.printKVPair("src_connector", "__return");
+    }
   } else {
     mlir::emitError(op.getLoc(), "Value must be result of TaskletNode");
     return failure();
