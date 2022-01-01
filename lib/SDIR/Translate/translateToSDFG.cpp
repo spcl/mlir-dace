@@ -767,6 +767,9 @@ LogicalResult translation::translateToSDFG(AllocTransientOp &op,
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
+  // replace %-sign with underscore
+  name.erase(0, 1);
+  name.insert(0, 1, '_');
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Array");
@@ -924,12 +927,8 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
     jemit.printKVPair("src", aNode.ID());
     // TODO: Implement multiple return values
     jemit.printKVPair("src_connector", "__out");
-  } else if (arith::ConstantOp con =
-                 dyn_cast<arith::ConstantOp>(op.val().getDefiningOp())) {
-    // TODO: Add constants
   } else {
-    mlir::emitError(op.getLoc(),
-                    "Value must be result of TaskletNode or ConstantOp");
+    mlir::emitError(op.getLoc(), "Value must be result of TaskletNode");
     return failure();
   }
 
@@ -1030,6 +1029,9 @@ LogicalResult translation::translateToSDFG(AllocStreamOp &op,
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
+  // replace %-sign with underscore
+  name.erase(0, 1);
+  name.insert(0, 1, '_');
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
@@ -1067,6 +1069,9 @@ LogicalResult translation::translateToSDFG(AllocTransientStreamOp &op,
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
+  // replace %-sign with underscore
+  name.erase(0, 1);
+  name.insert(0, 1, '_');
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
@@ -1332,12 +1337,9 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
           return failure();
-      } else if (arith::ConstantOp con =
-                     dyn_cast<arith::ConstantOp>(val.getDefiningOp())) {
-        // TODO: Add constants
       } else {
         mlir::emitError(op.getLoc(), "Operands must be results of GetAccessOp, "
-                                     "LoadOp, TaskletNode or ConstantOp");
+                                     "LoadOp or TaskletNode");
         return failure();
       }
     }
@@ -1350,9 +1352,7 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
         if (printAccessSDFGEdge(acc, sdfg, i, jemit).failed())
           return failure();
       } else {
-        mlir::emitError(op.getLoc(),
-                        "Operands must be results of GetAccessOp, LoadOp, "
-                        "TaskletNode or ConstantOp");
+        mlir::emitError(op.getLoc(), "Operands must be results of GetAccessOp");
         return failure();
       }
     }
@@ -1423,9 +1423,19 @@ StringRef translation::translateTypeToSDFG(Type &t, Location &loc,
 //===----------------------------------------------------------------------===//
 
 inline void translation::printDebuginfo(Operation &op, JsonEmitter &jemit) {
-  std::string loc;
+  /*std::string loc;
   llvm::raw_string_ostream locStream(loc);
   op.getLoc().print(locStream);
   remove(loc.begin(), loc.end(), '\"');
-  jemit.printKVPair("debuginfo", loc);
+  jemit.printKVPair("debuginfo", loc);*/
+
+  /*jemit.startNamedObject("debuginfo");
+  jemit.printKVPair("type", "DebugInfo");
+  jemit.printKVPair("start_line", 1);
+  jemit.printKVPair("end_line", 1);
+  jemit.printKVPair("start_column", 1);
+  jemit.printKVPair("end_column", 1);
+  jemit.printKVPair("filename", 1);
+
+  jemit.endObject(); // debuginfo*/
 }

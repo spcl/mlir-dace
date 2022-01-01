@@ -868,6 +868,9 @@ std::string AllocOp::getName() {
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   (*this)->getResult(0).printAsOperand(nameStream, state);
+  // replace %-sign with underscore
+  name.erase(0, 1);
+  name.insert(0, 1, '_');
 
   return name;
 }
@@ -1022,6 +1025,9 @@ std::string GetAccessOp::getName() {
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   arr().printAsOperand(nameStream, state);
+  // replace %-sign with underscore
+  name.erase(0, 1);
+  name.insert(0, 1, '_');
 
   return name;
 }
