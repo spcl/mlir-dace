@@ -410,6 +410,9 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     } else if (arith::ConstantIntOp iop =
                    dyn_cast<arith::ConstantIntOp>(firstOp)) {
       val = std::to_string(iop.value());
+    } else if (arith::ConstantIndexOp iop =
+                   dyn_cast<arith::ConstantIndexOp>(firstOp)) {
+      val = std::to_string(iop.value());
     }
 
     std::string entry = "__out = dace." + type.str() + "(" + val + ")";
