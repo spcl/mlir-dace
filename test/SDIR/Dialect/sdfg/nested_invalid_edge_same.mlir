@@ -15,7 +15,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
             }
             // CHECK: sdir.edge
             // CHECK-SAME: [[STATE2]] -> [[STATE0]]
-            sdir.edge{assign=["i = 1"], condition=""} @state_2 -> @state_0
+            sdir.edge{assign=["i: 1"], condition=""} @state_2 -> @state_0
         }
     }
 } 

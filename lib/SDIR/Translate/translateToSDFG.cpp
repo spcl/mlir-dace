@@ -748,6 +748,13 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
   }
   jemit.endList(); // shape
 
+  jemit.startNamedList("offset");
+  for (int64_t s : shape) {
+    jemit.startEntry();
+    jemit.printInt(0);
+  }
+  jemit.endList(); // offset
+
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   if (!(*op).hasAttr("storage"))
     jemit.printKVPair("storage", "Default");
