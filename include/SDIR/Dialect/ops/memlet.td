@@ -47,7 +47,7 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
         ```
     }];
 
-    let arguments = (ins Variadic<AnyInteger>:$params);
+    let arguments = (ins Variadic<Index>:$params);
     let results = (outs SDIR_ArrayType:$res);
 
     let extraClassDeclaration = [{

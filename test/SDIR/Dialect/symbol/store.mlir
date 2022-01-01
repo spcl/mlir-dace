@@ -11,8 +11,13 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     sdir.state @state_0 {
         // CHECK-NEXT: sdir.alloc_symbol("N")
         sdir.alloc_symbol("N")
-        // CHECK-NEXT: [[NAME1:%[a-zA-Z0-9_]*]]
-        %1 = arith.constant 1 : i32
+        // CHECK: sdir.tasklet @one
+        sdir.tasklet @one() -> i32{
+            %1 = arith.constant 1 : i32
+            sdir.return %1 : i32
+        }
+        // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdir.call @one()
+        %1 = sdir.call @one() : () -> i32
         // CHECK-NEXT: [[NAMEa:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
         // CHECK-SAME: !sdir.array<12x12xi32> -> !sdir.memlet<12x12xi32>
         %a = sdir.get_access %A : !sdir.array<12x12xi32> -> !sdir.memlet<12x12xi32>

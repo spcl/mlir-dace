@@ -31,7 +31,11 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
             %isZero = arith.cmpi "eq", %length, %0 : i32
             return %isZero : i1
         }
-        %0 = arith.constant 0 : index
+        // CHECK: sdir.tasklet @zero
+        sdir.tasklet @zero() -> index{
+            %0 = arith.constant 0 : index
+            sdir.return %0 : index
+        }
         // CHECK: sdir.consume
         // CHECK-DAG: num_pes = 5
         // CHECK-DAG: condition = @empty
@@ -41,7 +45,10 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         sdir.consume{num_pes=5, condition=@empty} (%a : !sdir.stream<i32>) -> (pe: %p, elem: %e) {
             // CHECK-NEXT: [[NAMEres:%[a-zA-Z0-9_]*]] = sdir.call @add_one([[NAMEe]])
             %res = sdir.call @add_one(%e) : (i32) -> i32
+            // CHECK-NEXT: [[NAMEzero:%[a-zA-Z0-9_]*]] = sdir.call @zero()
+            %0 = sdir.call @zero() : () -> index
             // CHECK-NEXT: sdir.store {wcr = "add"} [[NAMEres]], [[NAMEc]]
+            // CHECK-SAME: [[NAMEzero]]
             sdir.store{wcr="add"} %res, %c[%0] : i32 -> !sdir.memlet<6xi32>
         }
     }

@@ -206,6 +206,11 @@ LogicalResult verify(SDFGNode op) {
              << ") must match the type of the corresponding argument in "
              << "function signature(" << fnInputTypes[i] << ')';
 
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
+
   return success();
 }
 
@@ -305,7 +310,15 @@ static void print(OpAsmPrinter &p, StateNode op) {
   p.printRegion(op.body());
 }
 
-LogicalResult verify(StateNode op) { return success(); }
+LogicalResult verify(StateNode op) {
+  // Verify that no other dialect is used in the body
+  // Except func operations
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
+      return op.emitOpError("does not support other dialects");
+
+  return success();
+}
 
 void StateNode::setID(unsigned id) {
   Builder builder(*this);
@@ -565,6 +578,11 @@ LogicalResult verify(MapNode op) {
     return op.emitOpError("failed to verify that size of "
                           "steps matches size of arguments");
 
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
+
   return success();
 }
 
@@ -662,6 +680,11 @@ LogicalResult verify(ConsumeNode op) {
   if (op.num_pes().hasValue() && op.num_pes().getValue().isNonPositive())
     return op.emitOpError("failed to verify that number of "
                           "processing elements is at least one");
+
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
 
   return success();
 }
@@ -783,11 +806,6 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  /*if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
-                             result.operands))
-    return failure();*/
-
   if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
@@ -867,8 +885,7 @@ static ParseResult parseAllocTransientOp(OpAsmParser &parser,
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -1351,8 +1368,7 @@ static ParseResult parseAllocStreamOp(OpAsmParser &parser,
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -1402,8 +1418,7 @@ static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser,
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
