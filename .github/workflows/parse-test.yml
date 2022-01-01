@@ -45,7 +45,7 @@ jobs:
         ninja
         cd ../test/SDIR
         succ=0
-        for filename in $(find * -name '*.mlir'); do
+        for filename in $(find test/SDIR/Dialect/* -name '*.mlir'); do
             if grep -q XFAIL "$filename"; then
                 if ../../build/bin/sdir-opt $filename &> /dev/null; then
                     echo "$filename Xpassed!"
