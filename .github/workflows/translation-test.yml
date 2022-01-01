@@ -21,6 +21,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install ninja-build
+        pip install dace
 
     - name: Load MLIR cache
       id: mlir-cache
