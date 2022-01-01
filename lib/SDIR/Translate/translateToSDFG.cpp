@@ -872,6 +872,15 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.startNamedList("ranges");
 
   if (ArrayAttr syms = op->getAttr("indices").cast<ArrayAttr>()) {
+    if (syms.getValue().size() == 0) {
+      jemit.startObject();
+      jemit.printKVPair("start", 0);
+      jemit.printKVPair("end", 0);
+      jemit.printKVPair("step", 1);
+      jemit.printKVPair("tile", 1);
+      jemit.endObject();
+    }
+
     for (Attribute sym : syms.getValue()) {
       if (StringAttr sym_str = sym.cast<StringAttr>()) {
         jemit.startObject();
