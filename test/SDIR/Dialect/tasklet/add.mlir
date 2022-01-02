@@ -13,7 +13,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
             // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]]
             // CHECK-SAME: [[NAMEA]] 
             // CHECK-SAME: [[NAMEB]]
-            %c = addi %a, %b : i32
+            %c = arith.addi %a, %b : i32
             // CHECK-NEXT: sdir.return [[NAMEC]]
             sdir.return %c : i32
         }

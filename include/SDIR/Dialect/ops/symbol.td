@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 def SDIR_AllocSymbolOp : SDIR_Op<"alloc_symbol", [
-	ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
+	ParentOneOf<["SDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
     let summary = "symbol creation operation";
     let description = [{
@@ -45,7 +45,7 @@ def SDIR_SymOp : SDIR_Op<"sym">{
     }];
 
     let arguments = (ins StrAttr:$expr);
-    let results = (outs AnyInteger:$res);
+    let results = (outs AnyTypeOf<[AnyInteger, Index]>:$res);
 }
 
 #endif // SDIR_SymbolOps

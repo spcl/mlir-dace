@@ -27,7 +27,7 @@ void SDIRDialect::initialize() {
 // SDIR Types
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseDimensionList(DialectAsmParser &parser, Type &elemType,
+static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
                                       SmallVector<StringAttr> &symbols,
                                       SmallVector<int64_t> &integers,
                                       SmallVector<bool> &shape) {
@@ -80,7 +80,7 @@ static ParseResult parseDimensionList(DialectAsmParser &parser, Type &elemType,
   return failure();
 }
 
-static void printDimensionList(DialectAsmPrinter &printer, Type &elemType,
+static void printDimensionList(AsmPrinter &printer, Type &elemType,
                                ArrayRef<StringAttr> &symbols,
                                ArrayRef<int64_t> &integers,
                                ArrayRef<bool> &shape) {
@@ -111,7 +111,7 @@ Type SDIRDialect::parseType(DialectAsmParser &parser) const {
 
   Type genType;
   OptionalParseResult parseResult =
-      generatedTypeParser(getContext(), parser, mnemonic, genType);
+      generatedTypeParser(parser, mnemonic, genType);
   if (parseResult.hasValue())
     return genType;
 

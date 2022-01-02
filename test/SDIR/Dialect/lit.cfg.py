@@ -16,7 +16,7 @@ from lit.llvm.subst import FindTool
 # Configuration file for the 'lit' test runner.
 
 # name: The name of this test suite.
-config.name = 'SDIR'
+config.name = 'SDIR-OPT'
 
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
@@ -32,15 +32,16 @@ config.test_exec_root = os.path.join(config.sdir_obj_root, 'test')
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%shlibext', config.llvm_shlib_ext))
 
-llvm_config.with_system_environment(
-    ['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP'])
+llvm_config.with_system_environment(['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP'])
 
 llvm_config.use_default_substitutions()
 
 # excludes: A list of directories to exclude from the testsuite. The 'Inputs'
 # subdirectories contain auxiliary inputs for various tests in their parent
 # directories.
-config.excludes = ['Inputs', 'Examples', 'CMakeLists.txt', 'README.txt', 'LICENSE.txt']
+config.excludes = [
+    'Inputs', 'Examples', 'CMakeLists.txt', 'README.txt', 'LICENSE.txt'
+]
 
 # test_source_root: The root path where tests are located.
 config.test_source_root = os.path.dirname(__file__)
@@ -53,8 +54,6 @@ config.sdir_tools_dir = os.path.join(config.sdir_obj_root, 'bin')
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 tool_dirs = [config.sdir_tools_dir, config.llvm_tools_dir]
-tools = [
-    'sdir-opt',
-]
+tools = ['sdir-opt']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)

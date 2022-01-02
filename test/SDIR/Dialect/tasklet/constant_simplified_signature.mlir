@@ -9,7 +9,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-SAME: @get_zero
         sdir.tasklet @get_zero() {
             // CHECK-NEXT: [[NAME:%[a-zA-Z0-9_]*]]
-            %c = constant 0 : i32
+            %c = arith.constant 0 : i32
             // CHECK-NEXT: sdir.return [[NAME]]
             sdir.return %c : i32
         }

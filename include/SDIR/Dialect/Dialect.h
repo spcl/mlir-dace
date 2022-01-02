@@ -1,6 +1,7 @@
 #ifndef SDIR_DIALECT_DIALECT_H
 #define SDIR_DIALECT_DIALECT_H
 
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/Interfaces/CallInterfaces.h"

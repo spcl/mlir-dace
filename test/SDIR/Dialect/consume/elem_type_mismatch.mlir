@@ -21,18 +21,22 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         %c = sdir.get_access %C : !sdir.array<6xi64> -> !sdir.memlet<6xi64>
         // CHECK: sdir.tasklet @add_one
         sdir.tasklet @add_one(%x: i64) -> i64{
-            %1 = constant 1 : i64
-            %res = addi %x, %1 : i64
+            %1 = arith.constant 1 : i64
+            %res = arith.addi %x, %1 : i64
             sdir.return %res : i64
         }
         // CHECK: builtin.func @empty
         builtin.func @empty(%x: !sdir.stream<i32>) -> i1{
-            %0 = constant 0 : i32
+            %0 = arith.constant 0 : i32
             %length = sdir.stream_length %x : !sdir.stream<i32> -> i32
-            %isZero = cmpi "eq", %length, %0 : i32
+            %isZero = arith.cmpi "eq", %length, %0 : i32
             return %isZero : i1
         }
-        %0 = constant 0 : index
+        // CHECK: sdir.tasklet @zero
+        sdir.tasklet @zero() -> index{
+            %0 = arith.constant 0 : index
+            sdir.return %0 : index
+        }
         // CHECK: sdir.consume
         // CHECK-DAG: num_pes = 5
         // CHECK-DAG: condition = @empty
@@ -42,7 +46,10 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         sdir.consume{num_pes=5, condition=@empty} (%a : !sdir.stream<i32>) -> (pe: %p, elem: %e) {
             // CHECK-NEXT: [[NAMEres:%[a-zA-Z0-9_]*]] = sdir.call @add_one([[NAMEe]])
             %res = sdir.call @add_one(%e) : (i64) -> i64
+            // CHECK-NEXT: [[NAMEzero:%[a-zA-Z0-9_]*]] = sdir.call @zero()
+            %0 = sdir.call @zero() : () -> index
             // CHECK-NEXT: sdir.store {wcr = "add"} [[NAMEres]], [[NAMEc]]
+            // CHECK-SAME: [[NAMEzero]]
             sdir.store{wcr="add"} %res, %c[%0] : i64 -> !sdir.memlet<6xi64>
         }
     }

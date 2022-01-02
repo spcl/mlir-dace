@@ -20,8 +20,15 @@ def SDIR_StateNode : SDIR_Op<"state", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name);
-    let regions = (region SizedRegion<1>:$region);
+    let arguments = (ins 
+        I32Attr:$ID,
+        SymbolNameAttr:$sym_name
+    );
+    let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        void setID(unsigned id);
+    }];
 }
 
 #endif // SDIR_StateNode

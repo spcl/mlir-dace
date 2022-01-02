@@ -18,7 +18,13 @@ def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
         ```
     }];
 
+    let arguments = (ins Variadic<Index>:$params);
     let results = (outs SDIR_StreamArrayType);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+        bool isInState();
+    }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -38,7 +44,13 @@ def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
         ```
     }];
 
+    let arguments = (ins Variadic<Index>:$params);
     let results = (outs SDIR_StreamArrayType);
+
+    let extraClassDeclaration = [{
+        SDFGNode getParentSDFG();
+        bool isInState();
+    }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -85,7 +97,7 @@ def SDIR_StreamPushOp : SDIR_Op<"stream_push", [
         ```mlir
         sdir.state @state_0 {
             ...
-            %1 = constant 1 : i32
+            %1 = arith.constant 1 : i32
             sdir.stream_push %1, %A : i32 -> !sdir.stream<i32>
             ...
         }

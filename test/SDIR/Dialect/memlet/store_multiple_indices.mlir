@@ -9,10 +9,20 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {
-        // CHECK-NEXT: [[NAME0:%[a-zA-Z0-9_]*]]
-        %0 = constant 0 : index
-        // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]]
-        %1 = constant 1 : i32
+        // CHECK: sdir.tasklet @zero
+        sdir.tasklet @zero() -> index{
+            %0 = arith.constant 0 : index
+            sdir.return %0 : index
+        }
+        // CHECK: sdir.tasklet @one
+        sdir.tasklet @one() -> i32{
+            %1 = arith.constant 1 : i32
+            sdir.return %1 : i32
+        }
+        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdir.call @zero()
+        %0 = sdir.call @zero() : () -> index
+        // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]] = sdir.call @one()
+        %1 = sdir.call @one() : () -> i32
         // CHECK-NEXT: [[NAMEB:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
         // CHECK-SAME: !sdir.array<56x45xi32> -> !sdir.memlet<56x45xi32>
         %a = sdir.get_access %A : !sdir.array<56x45xi32> -> !sdir.memlet<56x45xi32>

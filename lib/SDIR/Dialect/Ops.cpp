@@ -1,4 +1,6 @@
 #include "SDIR/Dialect/Dialect.h"
+#include "SDIR/Utils/Sanitizer.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
@@ -121,6 +123,10 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   StringAttr sym_nameAttr;
   if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
     return failure();
@@ -171,7 +177,7 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, SDFGNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"sym_name", "type"});
+                          /*elidedAttrs=*/{"ID", "sym_name", "type"});
   p << ' ';
   p.printSymbolName(op.sym_name());
 
@@ -180,7 +186,7 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
                                                /*isVariadic=*/false,
                                                op.getType().getResults());
 
-  p.printRegion(op.region(), /*printEntryBlockArgs=*/false,
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false, /*printEmptyBlock=*/true);
 }
 
@@ -201,6 +207,11 @@ LogicalResult verify(SDFGNode op) {
              << ") must match the type of the corresponding argument in "
              << "function signature(" << fnInputTypes[i] << ')';
 
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
+
   return success();
 }
 
@@ -219,6 +230,54 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+unsigned SDFGNode::getIndexOfState(StateNode &node) {
+  unsigned state_idx = 0;
+
+  for (Operation &op : body().getOps()) {
+    if (StateNode state = dyn_cast<StateNode>(op)) {
+      if (state.sym_name() == node.sym_name())
+        return state_idx;
+
+      ++state_idx;
+    }
+  }
+
+  return -1;
+}
+
+StateNode SDFGNode::getStateByIndex(unsigned idx) {
+  unsigned state_idx = 0;
+
+  for (Operation &op : body().getOps()) {
+    if (StateNode state = dyn_cast<StateNode>(op)) {
+      if (state_idx == idx)
+        return state;
+
+      ++state_idx;
+    }
+  }
+
+  return nullptr;
+}
+
+StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
+  Operation *op = lookupSymbol(symRef);
+  return dyn_cast<StateNode>(op);
+}
+
+bool SDFGNode::isNested() {
+  Operation *parent = getOperation()->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(parent))
+    return true;
+  return false;
+}
+
+void SDFGNode::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
+}
+
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//
@@ -226,6 +285,10 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
+
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
 
   StringAttr sym_nameAttr;
   if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
@@ -242,13 +305,27 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
 }
 
 static void print(OpAsmPrinter &p, StateNode op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym_name"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
   p << ' ';
   p.printSymbolName(op.sym_name());
-  p.printRegion(op.region());
+  p.printRegion(op.body());
 }
 
-LogicalResult verify(StateNode op) { return success(); }
+LogicalResult verify(StateNode op) {
+  // Verify that no other dialect is used in the body
+  // Except func operations
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
+      return op.emitOpError("does not support other dialects");
+
+  return success();
+}
+
+void StateNode::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
+}
 
 //===----------------------------------------------------------------------===//
 // TaskletNode
@@ -256,6 +333,13 @@ LogicalResult verify(StateNode op) { return success(); }
 
 static ParseResult parseTaskletNode(OpAsmParser &parser,
                                     OperationState &result) {
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
                           ArrayRef<Type> results,
                           function_like_impl::VariadicFlag, std::string &) {
@@ -269,9 +353,23 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 
 static void print(OpAsmPrinter &p, TaskletNode op) {
   FunctionType fnType = op.getType();
-  function_like_impl::printFunctionLikeOp(p, op, fnType.getInputs(),
-                                          /*isVariadic=*/false,
-                                          fnType.getResults());
+  ArrayRef<Type> argTypes = fnType.getInputs();
+  ArrayRef<Type> resultTypes = fnType.getResults();
+  bool isVariadic = false;
+  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+
+  p << ' ';
+  p.printSymbolName(op.sym_name());
+
+  function_like_impl::printFunctionSignature(p, op, argTypes, isVariadic,
+                                             resultTypes);
+  function_like_impl::printFunctionAttributes(
+      p, op, argTypes.size(), resultTypes.size(), {"ID", visibilityAttrName});
+  // Print the body if this is not an external function.
+  Region &body = op->getRegion(0);
+  if (!body.empty())
+    p.printRegion(body, /*printEntryBlockArgs=*/false,
+                  /*printBlockTerminators=*/true);
 }
 
 LogicalResult verify(TaskletNode op) {
@@ -386,6 +484,12 @@ TaskletNode TaskletNode::clone() {
   return clone(mapper);
 }
 
+void TaskletNode::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
+}
+
 //===----------------------------------------------------------------------===//
 // MapNode
 //===----------------------------------------------------------------------===//
@@ -393,6 +497,10 @@ TaskletNode TaskletNode::clone() {
 static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   Builder &builder = parser.getBuilder();
   IndexType indexType = builder.getIndexType();
+
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("entryID", intAttr);
 
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -428,12 +536,15 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
+  intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("exitID", intAttr);
   return success();
 }
 
 static void print(OpAsmPrinter &p, MapNode op) {
-  printOptionalAttrDictNoNumList(p, op->getAttrs(),
-                                 {"lowerBounds", "upperBounds", "steps"});
+  printOptionalAttrDictNoNumList(
+      p, op->getAttrs(),
+      {"entryID", "exitID", "lowerBounds", "upperBounds", "steps"});
 
   p << " (" << op.getBody()->getArguments() << ") = (";
 
@@ -449,7 +560,7 @@ static void print(OpAsmPrinter &p, MapNode op) {
 
   p << ")";
 
-  p.printRegion(op.region(), /*printEntryBlockArgs=*/false,
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
@@ -468,17 +579,34 @@ LogicalResult verify(MapNode op) {
     return op.emitOpError("failed to verify that size of "
                           "steps matches size of arguments");
 
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
+
   return success();
 }
 
 bool MapNode::isDefinedOutsideOfLoop(Value value) {
-  return !region().isAncestor(value.getParentRegion());
+  return !body().isAncestor(value.getParentRegion());
 }
 
-Region &MapNode::getLoopBody() { return region(); }
+Region &MapNode::getLoopBody() { return body(); }
 
 LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
+}
+
+void MapNode::setEntryID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  entryIDAttr(intAttr);
+}
+
+void MapNode::setExitID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  exitIDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -487,6 +615,10 @@ LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
 
 static ParseResult parseConsumeNode(OpAsmParser &parser,
                                     OperationState &result) {
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("entryID", intAttr);
+
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -530,15 +662,18 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
+  intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("exitID", intAttr);
   return success();
 }
 
 static void print(OpAsmPrinter &p, ConsumeNode op) {
-  p.printOptionalAttrDict(op->getAttrs());
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{"entryID", "exitID"});
   p << " (" << op.stream() << " : " << op.stream().getType() << ")";
   p << " -> (pe: " << op.getBody()->getArgument(0);
   p << ", elem: " << op.getBody()->getArgument(1) << ")";
-  p.printRegion(op.region(), /*printEntryBlockArgs=*/false,
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
@@ -546,6 +681,11 @@ LogicalResult verify(ConsumeNode op) {
   if (op.num_pes().hasValue() && op.num_pes().getValue().isNonPositive())
     return op.emitOpError("failed to verify that number of "
                           "processing elements is at least one");
+
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
 
   return success();
 }
@@ -575,13 +715,25 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 bool ConsumeNode::isDefinedOutsideOfLoop(Value value) {
-  return !region().isAncestor(value.getParentRegion());
+  return !body().isAncestor(value.getParentRegion());
 }
 
-Region &ConsumeNode::getLoopBody() { return region(); }
+Region &ConsumeNode::getLoopBody() { return body(); }
 
 LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
   return failure();
+}
+
+void ConsumeNode::setEntryID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  entryIDAttr(intAttr);
+}
+
+void ConsumeNode::setExitID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  exitIDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -655,8 +807,7 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -690,6 +841,39 @@ LogicalResult verify(AllocOp op) {
   return success();
 }
 
+SDFGNode AllocOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation *sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
+bool AllocOp::isInState() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
+}
+
+std::string AllocOp::getName() {
+  if ((*this)->hasAttr("name")) {
+    Attribute nameAttr = (*this)->getAttr("name");
+    if (StringAttr name = nameAttr.cast<StringAttr>())
+      return name.getValue().str();
+  }
+
+  AsmState state(getParentSDFG());
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  (*this)->getResult(0).printAsOperand(nameStream, state);
+  utils::sanitizeName(name);
+
+  return name;
+}
+
 //===----------------------------------------------------------------------===//
 // AllocTransientOp
 //===----------------------------------------------------------------------===//
@@ -703,8 +887,7 @@ static ParseResult parseAllocTransientOp(OpAsmParser &parser,
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -738,12 +921,33 @@ LogicalResult verify(AllocTransientOp op) {
   return success();
 }
 
+SDFGNode AllocTransientOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation *sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
+bool AllocTransientOp::isInState() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseGetAccessOp(OpAsmParser &parser,
                                     OperationState &result) {
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  result.addAttribute("ID", intAttr);
+
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -770,7 +974,7 @@ static ParseResult parseGetAccessOp(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, GetAccessOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
   p << ' ' << op.arr();
   p << " : ";
   p << ArrayRef<Type>(op.arr().getType());
@@ -803,6 +1007,32 @@ LogicalResult verify(GetAccessOp op) {
                           "derived type of 'stream_array'");
 
   return success();
+}
+
+SDFGNode GetAccessOp::getParentSDFG() {
+  Operation *sdfg = (*this)->getParentOp()->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
+std::string GetAccessOp::getName() {
+  Operation *alloc = arr().getDefiningOp();
+
+  if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
+    return allocArr.getName();
+
+  AsmState state(getParentSDFG());
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  arr().printAsOperand(nameStream, state);
+  utils::sanitizeName(name);
+
+  return name;
+}
+
+void GetAccessOp::setID(unsigned id) {
+  Builder builder(*this);
+  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
+  IDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1141,8 +1371,7 @@ static ParseResult parseAllocStreamOp(OpAsmParser &parser,
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -1162,6 +1391,23 @@ static void print(OpAsmPrinter &p, AllocStreamOp op) {
 
 LogicalResult verify(AllocStreamOp op) { return success(); }
 
+SDFGNode AllocStreamOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation *sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
+bool AllocStreamOp::isInState() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // AllocTransientStreamOp
 //===----------------------------------------------------------------------===//
@@ -1175,8 +1421,7 @@ static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser,
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
-  // IDEA: Try multiple integer types before failing
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getI32Type(),
+  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
                              result.operands))
     return failure();
 
@@ -1195,6 +1440,23 @@ static void print(OpAsmPrinter &p, AllocTransientStreamOp op) {
 }
 
 LogicalResult verify(AllocTransientStreamOp op) { return success(); }
+
+SDFGNode AllocTransientStreamOp::getParentSDFG() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
+    return sdfg;
+
+  Operation *sdfg = sdfgOrState->getParentOp();
+  return dyn_cast<SDFGNode>(sdfg);
+}
+
+bool AllocTransientStreamOp::isInState() {
+  Operation *sdfgOrState = (*this)->getParentOp();
+  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
+    return true;
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 // StreamPopOp
@@ -1365,7 +1627,7 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, ReturnOp op) {
+static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
   p.printOptionalAttrDict(op->getAttrs());
   if (!op.input().empty()) {
     p << ' ' << op.input();
@@ -1374,7 +1636,7 @@ static void print(OpAsmPrinter &p, ReturnOp op) {
   }
 }
 
-LogicalResult verify(ReturnOp op) { return success(); }
+LogicalResult verify(sdir::ReturnOp op) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // CallOp
@@ -1408,7 +1670,7 @@ static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, CallOp op) {
+static void print(OpAsmPrinter &p, sdir::CallOp op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
   p << ' ';
   p.printAttributeWithoutType(op.calleeAttr());
@@ -1418,9 +1680,10 @@ static void print(OpAsmPrinter &p, CallOp op) {
                         op.getOperation()->getResultTypes());
 }
 
-LogicalResult verify(CallOp op) { return success(); }
+LogicalResult verify(sdir::CallOp op) { return success(); }
 
-LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult
+sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the callee attribute was specified.
   FlatSymbolRefAttr fnAttr =
       (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
@@ -1460,6 +1723,32 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
   return success();
 }
+
+StateNode sdir::CallOp::getParentState() {
+  Operation *stateOrMapConsume = (*this)->getParentOp();
+
+  if (StateNode state = dyn_cast<StateNode>(stateOrMapConsume))
+    return state;
+
+  Operation *state = stateOrMapConsume->getParentOp();
+  return dyn_cast<StateNode>(state);
+}
+
+TaskletNode sdir::CallOp::getTasklet() {
+  StateNode state = getParentState();
+  Operation *task = state.lookupSymbol(callee());
+  TaskletNode tasklet = dyn_cast<TaskletNode>(task);
+  return tasklet;
+}
+
+SDFGNode sdir::CallOp::getSDFG() {
+  StateNode state = getParentState();
+  Operation *op = state.lookupSymbol(callee());
+  SDFGNode sdfg = dyn_cast<SDFGNode>(op);
+  return sdfg;
+}
+
+bool sdir::CallOp::callsTasklet() { return getTasklet() != nullptr; }
 
 //===----------------------------------------------------------------------===//
 // LibCallOp

@@ -24,12 +24,19 @@ def SDIR_ConsumeNode : SDIR_Op<"consume", [
     }];
 
     let arguments = (ins
+        I32Attr:$entryID,
+        I32Attr:$exitID,
         OptionalAttr<APIntAttr>:$num_pes, 
         OptionalAttr<FlatSymbolRefAttr>:$condition,
         SDIR_StreamType:$stream
     );
 
-    let regions = (region SizedRegion<1>:$region);
+    let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        void setEntryID(unsigned id);
+        void setExitID(unsigned id);
+    }];
 }
 
 #endif // SDIR_ConsumeNode

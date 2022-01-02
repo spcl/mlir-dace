@@ -16,14 +16,18 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
 
         ```mlir
         sdir.tasklet @add(%a: i32, %b: i32) -> i32{
-            %c = addi %a, %b, : i32
+            %c = arith.addi %a, %b, : i32
             sdir.return %c
         }
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, TypeAttr:$type, 
-                        OptionalAttr<StrAttr>:$sym_visibility);
+    let arguments = (ins
+        I32Attr:$ID,
+        SymbolNameAttr:$sym_name, 
+        TypeAttr:$type, 
+        OptionalAttr<StrAttr>:$sym_visibility
+    );
     let regions = (region AnyRegion:$body);
 
     let builders = [OpBuilder<(ins
@@ -48,6 +52,7 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         TaskletNode clone();
 
         void cloneInto(TaskletNode dest, BlockAndValueMapping &mapper);
+        void setID(unsigned id);
 
         //===------------------------------------------------------------------===//
         // CallableOpInterface

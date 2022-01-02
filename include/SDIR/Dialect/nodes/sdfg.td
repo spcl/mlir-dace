@@ -24,11 +24,21 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
         ```
     }];
 
-    let arguments = (ins SymbolNameAttr:$sym_name, FlatSymbolRefAttr:$entry, 
-                        TypeAttr:$type);
-    let regions = (region SizedRegion<1>:$region);
+    let arguments = (ins 
+        I32Attr:$ID,
+        SymbolNameAttr:$sym_name, 
+        FlatSymbolRefAttr:$entry, 
+        TypeAttr:$type
+    );
+    let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
+        unsigned getIndexOfState(StateNode &node);
+        StateNode getStateByIndex(unsigned idx);
+        StateNode getStateBySymRef(StringRef symRef);
+        bool isNested();
+        void setID(unsigned id);
+        
         //===------------------------------------------------------------------===//
         // CallableOpInterface
         //===------------------------------------------------------------------===//

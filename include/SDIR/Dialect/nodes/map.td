@@ -22,13 +22,20 @@ def SDIR_MapNode : SDIR_Op<"map", [
     }];
 
     let arguments = (ins 
+        I32Attr:$entryID,
+        I32Attr:$exitID,
         Variadic<Index>:$ranges,
         ArrayAttr:$lowerBounds,
         ArrayAttr:$upperBounds,
         ArrayAttr:$steps
     );
 
-    let regions = (region SizedRegion<1>:$region);
+    let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        void setEntryID(unsigned id);
+        void setExitID(unsigned id);
+    }];
 }
 
 #endif // SDIR_MapNode
