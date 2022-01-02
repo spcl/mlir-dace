@@ -46,7 +46,9 @@ LogicalResult translateToSDFG(SymOp &op, JsonEmitter &jemit);
 
 StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit);
 inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
+
 } // namespace translation
 } // namespace sdir
 } // namespace mlir
+
 #endif // SDIR_Translation_H

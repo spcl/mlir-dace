@@ -10,4 +10,5 @@ add_mlir_translation_library(
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRTranslation
+  SDIR_UTILS
 )

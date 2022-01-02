@@ -1,4 +1,5 @@
 #include "SDIR/Translate/Translation.h"
+#include "SDIR/Utils/Sanitizer.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
 
@@ -244,6 +245,7 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("out_connectors");
   // TODO: Implement multiple return values
+  // Takes the form __return_%d
   if (op.getNumResults() == 1) {
     jemit.printKVPair("__return", "null", /*stringify=*/false);
   } else if (op.getNumResults() > 1) {
@@ -514,6 +516,7 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
 
   jemit.startNamedObject("out_connectors");
   // TODO: Implement multiple return values
+  // Takes the form __out_%d
   if (op.getNumResults() == 1) {
     jemit.printKVPair("__out", "null", /*stringify=*/false);
   } else if (op.getNumResults() > 1) {
@@ -749,12 +752,14 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
   }
   jemit.endList(); // shape
 
-  jemit.startNamedList("offset");
-  for (int64_t s : shape) {
-    jemit.startEntry();
-    jemit.printInt(0);
+  if (!(*op).hasAttr("offset")) {
+    jemit.startNamedList("offset");
+    for (int64_t s : shape) {
+      jemit.startEntry();
+      jemit.printInt(0);
+    }
+    jemit.endList(); // offset
   }
-  jemit.endList(); // offset
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
   if (!(*op).hasAttr("storage"))
@@ -778,9 +783,7 @@ LogicalResult translation::translateToSDFG(AllocTransientOp &op,
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
-  // replace %-sign with underscore
-  name.erase(0, 1);
-  name.insert(0, 1, '_');
+  utils::sanitizeName(name);
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Array");
@@ -947,11 +950,13 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
       TaskletNode aNode = call.getTasklet();
       jemit.printKVPair("src", aNode.ID());
       // TODO: Implement multiple return values
+      // Takes the form __out_%d
       jemit.printKVPair("src_connector", "__out");
     } else {
       SDFGNode aNode = call.getSDFG();
       jemit.printKVPair("src", aNode.ID());
       // TODO: Implement multiple return values
+      // Takes the form __return_%d
       jemit.printKVPair("src_connector", "__return");
     }
   } else {
@@ -1056,9 +1061,7 @@ LogicalResult translation::translateToSDFG(AllocStreamOp &op,
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
-  // replace %-sign with underscore
-  name.erase(0, 1);
-  name.insert(0, 1, '_');
+  utils::sanitizeName(name);
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
@@ -1096,9 +1099,7 @@ LogicalResult translation::translateToSDFG(AllocTransientStreamOp &op,
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   op->getResult(0).printAsOperand(nameStream, state);
-  // replace %-sign with underscore
-  name.erase(0, 1);
-  name.insert(0, 1, '_');
+  utils::sanitizeName(name);
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
@@ -1333,6 +1334,7 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
 
   jemit.printKVPair("src", taskSrc.ID());
   // TODO: Implement multiple return values
+  // Takes the form __out_%d
   jemit.printKVPair("src_connector", "__out");
 
   jemit.printKVPair("dst", taskDest.ID());
