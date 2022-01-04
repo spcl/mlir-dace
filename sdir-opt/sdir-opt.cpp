@@ -5,11 +5,14 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
+#include "SDIR/Conversion/SAMToSDIR/Passes.h"
 #include "SDIR/Dialect/Dialect.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
-  // TODO: Register SDIR passes here.
+
+  // Register SDIR passes
+  mlir::sdir::conversion::registerSAMToSDIRPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::sdir::SDIRDialect>();
