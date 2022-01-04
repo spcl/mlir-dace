@@ -1,3 +1,4 @@
+# TODO: Move this test to LIT
 name: Parse Test
 
 on:   
@@ -29,6 +30,7 @@ jobs:
         path: llvm-project/build
         key: ${{ runner.os }}-mlir-commit
     
+    # TODO: Prevent building in multiple workflows
     - name: Build MLIR
       if: steps.mlir-cache.outputs.cache-hit != 'true'
       run: |

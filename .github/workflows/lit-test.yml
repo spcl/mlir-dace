@@ -29,6 +29,7 @@ jobs:
         path: llvm-project/build
         key: ${{ runner.os }}-mlir-commit
     
+    # TODO: Prevent building in multiple workflows
     - name: Build MLIR
       if: steps.mlir-cache.outputs.cache-hit != 'true'
       run: |
@@ -42,7 +43,6 @@ jobs:
         mkdir build
         cd build
         cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
-        ninja
         ninja check-sdir-opt
 
       

@@ -78,6 +78,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printAttributes(
       op->getAttrs(),
       /*elidedAttrs=*/{"ID", "entry", "sym_name", "type", "arg_names"});
+  jemit.printKVPair("name", op.sym_name());
 
   jemit.startNamedObject("constants_prop");
   for (StateNode state : op.body().getOps<StateNode>())
@@ -172,11 +173,6 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   }
 
   jemit.endObject(); // symbols
-
-  if (!(*op).hasAttr("instrument"))
-    jemit.printKVPair("instrument", "No_Instrumentation");
-
-  jemit.printKVPair("name", op.sym_name());
   jemit.endObject(); // attributes
 
   jemit.startNamedList("nodes");
@@ -226,12 +222,6 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.printKVPair("label", op.sym_name());
 
-  if (!(*op).hasAttr("instrument"))
-    jemit.printKVPair("instrument", "No_Instrumentation");
-
-  if (!(*op).hasAttr("schedule"))
-    jemit.printKVPair("schedule", "Default");
-
   jemit.startNamedObject("in_connectors");
   for (BlockArgument bArg : op.getArguments()) {
     AsmState state(op);
@@ -279,9 +269,6 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
-  if (!(*op).hasAttr("instrument"))
-    jemit.printKVPair("instrument", "No_Instrumentation");
-
   jemit.endObject(); // attributes
 
   jemit.startNamedList("nodes");
@@ -437,9 +424,6 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
   jemit.startNamedObject("attributes");
   jemit.printKVPair("label", op.sym_name());
 
-  if (!(*op).hasAttr("instrument"))
-    jemit.printKVPair("instrument", "No_Instrumentation");
-
   jemit.startNamedObject("code");
 
   AsmState state(op);
@@ -542,10 +526,6 @@ LogicalResult translation::translateToSDFG(MapNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "MapEntry");
 
   jemit.startNamedObject("attributes");
-  if (!(*op).hasAttr("instrument"))
-    jemit.printKVPair("instrument", "No_Instrumentation");
-  if (!(*op).hasAttr("schedule"))
-    jemit.printKVPair("schedule", "Default");
 
   jemit.startNamedList("params");
   AsmState state(op);
@@ -590,11 +570,6 @@ LogicalResult translation::translateToSDFG(ConsumeNode &op,
   jemit.printKVPair("type", "ConsumeEntry");
 
   jemit.startNamedObject("attributes");
-  if (!(*op).hasAttr("instrument"))
-    jemit.printKVPair("instrument", "No_Instrumentation");
-  if (!(*op).hasAttr("schedule"))
-    jemit.printKVPair("schedule", "Default");
-
   jemit.endObject(); // attributes
   jemit.printKVPair("id", op.entryID(), /*stringify=*/false);
   jemit.printKVPair("scope_exit", op.exitID());
@@ -704,10 +679,6 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   jemit.endList(); // shape
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  if (!(*op).hasAttr("storage"))
-    jemit.printKVPair("storage", "Default");
-  if (!(*op).hasAttr("lifetime"))
-    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -752,20 +723,7 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
   }
   jemit.endList(); // shape
 
-  if (!(*op).hasAttr("offset")) {
-    jemit.startNamedList("offset");
-    for (int64_t s : shape) {
-      jemit.startEntry();
-      jemit.printInt(0);
-    }
-    jemit.endList(); // offset
-  }
-
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  if (!(*op).hasAttr("storage"))
-    jemit.printKVPair("storage", "Default");
-  if (!(*op).hasAttr("lifetime"))
-    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -800,10 +758,6 @@ LogicalResult translation::translateToSDFG(AllocTransientOp &op,
     return failure();
 
   jemit.printKVPair("transient", "true", /*stringify=*/false);
-  if (!(*op).hasAttr("storage"))
-    jemit.printKVPair("storage", "Default");
-  if (!(*op).hasAttr("lifetime"))
-    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -822,8 +776,6 @@ LogicalResult translation::translateToSDFG(GetAccessOp &op,
   jemit.printKVPair("label", op.getName());
 
   jemit.startNamedObject("attributes");
-  if (!(*op).hasAttr("access"))
-    jemit.printKVPair("access", "ReadWrite");
   jemit.printKVPair("data", op.getName());
   jemit.startNamedObject("in_connectors");
   jemit.endObject(); // in_connectors
@@ -1078,10 +1030,6 @@ LogicalResult translation::translateToSDFG(AllocStreamOp &op,
     return failure();
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  if (!(*op).hasAttr("storage"))
-    jemit.printKVPair("storage", "Default");
-  if (!(*op).hasAttr("lifetime"))
-    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -1116,10 +1064,6 @@ LogicalResult translation::translateToSDFG(AllocTransientStreamOp &op,
     return failure();
 
   jemit.printKVPair("transient", "true", /*stringify=*/false);
-  if (!(*op).hasAttr("storage"))
-    jemit.printKVPair("storage", "Default");
-  if (!(*op).hasAttr("lifetime"))
-    jemit.printKVPair("lifetime", "Scope");
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
