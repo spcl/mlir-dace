@@ -9,7 +9,7 @@ def SAMToSDIRPass : Pass<"convert-to-sdir", "ModuleOp"> {
   let constructor = "mlir::sdir::conversion::createSAMToSDIRPass()";
 
   // TODO: Add dialects
-  //let dependentDialects = [""];
+  let dependentDialects = ["mlir::sdir::SDIRDialect"];
 }
 
 #endif // SDIR_Conversion_ToSDIR

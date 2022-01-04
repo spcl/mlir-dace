@@ -1,6 +1,7 @@
 #ifndef SDIR_Conversion_SAMToSDIR_PassDetail_H
 #define SDIR_Conversion_SAMToSDIR_PassDetail_H
 
+#include "SDIR/Dialect/Dialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
