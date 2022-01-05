@@ -5,7 +5,7 @@ include "mlir/Pass/PassBase.td"
 include "SDIR/Dialect/Dialect.td"
 
 def SAMToSDIRPass : Pass<"convert-to-sdir", "ModuleOp"> {
-  let summary = "Convert SCF, Arith, Memref dialect to SDIR dialect";
+  let summary = "Convert SCF, Arith and Memref dialect to SDIR dialect";
   let constructor = "mlir::sdir::conversion::createSAMToSDIRPass()";
 
   // TODO: Add dialects
