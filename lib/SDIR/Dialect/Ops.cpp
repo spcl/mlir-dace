@@ -119,6 +119,23 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
+SDFGNode SDFGNode::create(Location loc) {
+  TypeRange begin;
+  TypeRange end;
+  FunctionType ft = FunctionType::get(loc->getContext(), begin, end);
+  return create(loc, ft);
+}
+
+SDFGNode SDFGNode::create(Location loc, FunctionType ft) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  // TODO: write name generator
+  SDFGNode::build(builder, state, 0, "sdfg", "state_0", ft);
+  SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
+  sdfg.addEntryBlock();
+  return sdfg;
+}
+
 static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -281,6 +298,15 @@ void SDFGNode::setID(unsigned id) {
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//
+
+StateNode StateNode::create(Location loc) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StateNode::build(builder, state, 0, "state_0");
+  StateNode stateNode = cast<StateNode>(Operation::create(state));
+  stateNode.getRegion().emplaceBlock();
+  return stateNode;
+}
 
 static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

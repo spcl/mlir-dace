@@ -33,6 +33,8 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
+        static SDFGNode create(Location location);
+        static SDFGNode create(Location location, FunctionType type);
         unsigned getIndexOfState(StateNode &node);
         StateNode getStateByIndex(unsigned idx);
         StateNode getStateBySymRef(StringRef symRef);

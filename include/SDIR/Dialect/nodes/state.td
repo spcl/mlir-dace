@@ -27,6 +27,7 @@ def SDIR_StateNode : SDIR_Op<"state", [
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
+        static StateNode create(Location location);
         void setID(unsigned id);
     }];
 }

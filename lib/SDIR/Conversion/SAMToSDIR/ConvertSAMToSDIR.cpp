@@ -12,8 +12,21 @@ struct SAMToSDIRPass : public SAMToSDIRPassBase<SAMToSDIRPass> {
 } // namespace
 
 void SAMToSDIRPass::runOnOperation() {
-  ModuleOp m = getOperation();
-  m.getRegion().getBlocks().front().clear();
+  ModuleOp module = getOperation();
+
+  if (module.body().getBlocks().size() > 1) {
+    return signalPassFailure();
+  }
+
+  // Build SDFG
+  SDFGNode sdfg = SDFGNode::create(module.getLoc());
+  StateNode statenode = StateNode::create(module.getLoc());
+  sdfg.body().getBlocks().front().push_front(statenode);
+
+  // Replace block content with SDFG
+  Block &moduleBlock = module.body().getBlocks().front();
+  moduleBlock.clear();
+  moduleBlock.push_front(sdfg);
 }
 
 std::unique_ptr<Pass> conversion::createSAMToSDIRPass() {
