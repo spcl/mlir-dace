@@ -210,8 +210,8 @@ void JsonEmitter::printAttributes(ArrayRef<NamedAttribute> arr,
                                                 elidedAttrs.end());
 
   for (NamedAttribute attr : arr) {
-    if (elidedAttrsSet.contains(attr.first.strref()))
+    if (elidedAttrsSet.contains(attr.getName().strref()))
       continue;
-    printKVPair(attr.first.strref(), attr.second);
+    printKVPair(attr.getName().strref(), attr.getValue());
   }
 }

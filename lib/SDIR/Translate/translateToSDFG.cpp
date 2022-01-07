@@ -386,7 +386,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   }
 
   if (arith::ConstantOp oper = dyn_cast<arith::ConstantOp>(firstOp)) {
-    Type t = oper.value().getType();
+    Type t = oper.getType();
     Location loc = oper.getLoc();
     StringRef type = translateTypeToSDFG(t, loc, jemit);
     std::string val;
