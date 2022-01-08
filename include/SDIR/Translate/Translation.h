@@ -6,9 +6,7 @@
 
 using namespace mlir::sdir::emitter;
 
-namespace mlir {
-namespace sdir {
-namespace translation {
+namespace mlir::sdir::translation {
 
 void registerToSDFGTranslation();
 
@@ -47,8 +45,6 @@ LogicalResult translateToSDFG(SymOp &op, JsonEmitter &jemit);
 StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit);
 inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
 
-} // namespace translation
-} // namespace sdir
-} // namespace mlir
+} // namespace mlir::sdir::translation
 
 #endif // SDIR_Translation_H

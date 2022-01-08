@@ -1,5 +1,5 @@
 #include "SDIR/Dialect/Dialect.h"
-#include "SDIR/Utils/Sanitizer.h"
+#include "SDIR/Utils/Utils.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -129,8 +129,8 @@ SDFGNode SDFGNode::create(Location loc) {
 SDFGNode SDFGNode::create(Location loc, FunctionType ft) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  // TODO: write name generator
-  SDFGNode::build(builder, state, 0, "sdfg", "state_0", ft);
+  SDFGNode::build(builder, state, 0, utils::generateName("sdfg"), "state_0",
+                  ft);
   SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
   sdfg.addEntryBlock();
   return sdfg;
@@ -141,7 +141,7 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
   StringAttr sym_nameAttr;
@@ -247,6 +247,12 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+void SDFGNode::addState(StateNode &node, bool isEntry) {
+  body().getBlocks().front().push_back(node);
+  if (isEntry)
+    entryAttr(SymbolRefAttr::get(getContext(), node.sym_name()));
+}
+
 unsigned SDFGNode::getIndexOfState(StateNode &node) {
   unsigned state_idx = 0;
 
@@ -313,7 +319,7 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
   StringAttr sym_nameAttr;
@@ -363,7 +369,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
     return failure();
 
   IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
   auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
@@ -531,7 +537,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   IndexType indexType = builder.getIndexType();
 
   IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("entryID", intAttr);
 
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -568,7 +574,7 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
-  intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  intAttr = parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("exitID", intAttr);
   return success();
 }
@@ -648,7 +654,7 @@ void MapNode::setExitID(unsigned id) {
 static ParseResult parseConsumeNode(OpAsmParser &parser,
                                     OperationState &result) {
   IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("entryID", intAttr);
 
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -694,7 +700,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
-  intAttr = parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+  intAttr = parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("exitID", intAttr);
   return success();
 }
@@ -977,7 +983,7 @@ bool AllocTransientOp::isInState() {
 static ParseResult parseGetAccessOp(OpAsmParser &parser,
                                     OperationState &result) {
   IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(SDIRDialect::getNextID());
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
   if (parser.parseOptionalAttrDict(result.attributes))

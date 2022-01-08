@@ -15,14 +15,6 @@ def SDIR_Dialect : Dialect{
     let summary = "A high-level dialect for representing SDFGs.";
     let description = [{A high-level dialect for representing SDFGs.}];
     let cppNamespace = "::mlir::sdir";
-    let extraClassDeclaration = [{
-        private:
-            inline static int nextNodeID = 0;
-
-        public:
-            inline static int getNextID(){ return nextNodeID++; }
-            inline static void resetIDGenerator(){ nextNodeID = 0; }
-    }];
 }
 
 //===----------------------------------------------------------------------===//

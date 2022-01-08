@@ -1,5 +1,5 @@
 #include "SDIR/Translate/Translation.h"
-#include "SDIR/Utils/Sanitizer.h"
+#include "SDIR/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
 
@@ -13,7 +13,7 @@ using namespace translation;
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
-  SDIRDialect::resetIDGenerator();
+  utils::resetIDGenerator();
 
   for (Operation &oper : op.body().getOps())
     if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper))
@@ -71,7 +71,7 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
 
 LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "SDFG");
-  jemit.printKVPair("sdfg_list_id", SDIRDialect::getNextID(),
+  jemit.printKVPair("sdfg_list_id", utils::generateID(),
                     /*stringify=*/false);
 
   jemit.startNamedObject("attributes");

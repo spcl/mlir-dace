@@ -3,14 +3,10 @@
 
 #include <string>
 
-namespace mlir {
-namespace sdir {
-namespace utils {
+namespace mlir::sdir::utils {
 
 void sanitizeName(std::string &name);
 
-} // namespace utils
-} // namespace sdir
-} // namespace mlir
+}
 
 #endif // SDIR_Utils_Sanitizer_H

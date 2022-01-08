@@ -3,9 +3,7 @@
 
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace sdir {
-namespace conversion {
+namespace mlir::sdir::conversion {
 
 std::unique_ptr<Pass> createSAMToSDIRPass();
 
@@ -17,8 +15,6 @@ std::unique_ptr<Pass> createSAMToSDIRPass();
 #define GEN_PASS_REGISTRATION
 #include "SDIR/Conversion/SAMToSDIR/Passes.h.inc"
 
-} // namespace conversion
-} // namespace sdir
-} // namespace mlir
+} // namespace mlir::sdir::conversion
 
 #endif // SDIR_Conversion_SAMToSDIR_H
