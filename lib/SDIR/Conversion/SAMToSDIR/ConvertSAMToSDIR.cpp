@@ -17,23 +17,11 @@ struct SDIRTarget : public ConversionTarget {
     // if it only contains a single SDFGNode or is empty
     // TODO: Add checks
     addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
-      Region::OpIterator b = op.getOps().begin();
-      Region::OpIterator e = op.getOps().end();
       return true;
       //(op.getOps().empty() || !op.getOps<SDFGNode>().empty());
     });
     // All other operations are illegal
     // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
-  }
-};
-
-class SCFForConversion : public OpRewritePattern<scf::ForOp> {
-public:
-  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(scf::ForOp op,
-                                PatternRewriter &rewriter) const override {
-    return failure();
   }
 };
 
@@ -47,18 +35,36 @@ public:
     StateNode state = StateNode::create(op.getLoc());
     sdfg.addState(state, /*isEntry=*/true);
 
-    /*TaskletNode::create(op.getLoc(), "tsklt", op.getType(),
-                        ArrayRef<NamedAttribute>());*/
+    TaskletNode task = TaskletNode::create(op.getLoc(), op.getType());
+    task.body().takeBody(op.body());
+    state.addOp(*task);
 
     rewriter.insert(sdfg);
     rewriter.eraseOp(op);
-
     return success();
   }
 };
 
+class TaskletTerminator : public OpRewritePattern<mlir::ReturnOp> {
+public:
+  using OpRewritePattern<mlir::ReturnOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::ReturnOp op,
+                                PatternRewriter &rewriter) const override {
+    if (TaskletNode tn = dyn_cast<TaskletNode>(op->getParentOp())) {
+      sdir::ReturnOp ret =
+          sdir::ReturnOp::create(op.getLoc(), op.getOperands());
+      rewriter.insert(ret);
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns) {
-  patterns.add<FuncToSDFG, SCFForConversion>(patterns.getContext());
+  patterns.add<FuncToSDFG, TaskletTerminator>(patterns.getContext());
 }
 
 namespace {
@@ -77,16 +83,6 @@ void SAMToSDIRPass::runOnOperation() {
   SDIRTarget target(getContext());
   if (failed(applyPartialConversion(module, target, std::move(patterns))))
     signalPassFailure();
-
-  // Build SDFG
-  /*SDFGNode sdfg = SDFGNode::create(module.getLoc());
-  StateNode statenode = StateNode::create(module.getLoc());
-  sdfg.body().getBlocks().front().push_front(statenode);
-
-  // Replace block content with SDFG
-  Block &moduleBlock = module.body().getBlocks().front();
-  moduleBlock.clear();
-  moduleBlock.push_front(sdfg);*/
 }
 
 std::unique_ptr<Pass> conversion::createSAMToSDIRPass() {

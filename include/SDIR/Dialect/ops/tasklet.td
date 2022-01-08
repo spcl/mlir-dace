@@ -26,6 +26,10 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
     }];
 
     let arguments = (ins Variadic<AnyType>:$input);
+
+    let extraClassDeclaration = [{
+        static sdir::ReturnOp create(Location loc, mlir::ValueRange input);
+    }];
 }
 
 //===----------------------------------------------------------------------===//

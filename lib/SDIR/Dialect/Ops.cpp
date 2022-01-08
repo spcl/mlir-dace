@@ -129,8 +129,8 @@ SDFGNode SDFGNode::create(Location loc) {
 SDFGNode SDFGNode::create(Location loc, FunctionType ft) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  SDFGNode::build(builder, state, 0, utils::generateName("sdfg"), "state_0",
-                  ft);
+  build(builder, state, utils::generateID(), utils::generateName("sdfg"),
+        "state_0", ft);
   SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
   sdfg.addEntryBlock();
   return sdfg;
@@ -308,7 +308,7 @@ void SDFGNode::setID(unsigned id) {
 StateNode StateNode::create(Location loc) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  StateNode::build(builder, state, 0, "state_0");
+  build(builder, state, utils::generateID(), utils::generateName("state"));
   StateNode stateNode = cast<StateNode>(Operation::create(state));
   stateNode.getRegion().emplaceBlock();
   return stateNode;
@@ -351,6 +351,10 @@ LogicalResult verify(StateNode op) {
       return op.emitOpError("does not support other dialects");
 
   return success();
+}
+
+void StateNode::addOp(Operation &op) {
+  body().getBlocks().front().push_back(&op);
 }
 
 void StateNode::setID(unsigned id) {
@@ -422,6 +426,16 @@ LogicalResult verify(TaskletNode op) {
              << "function signature(" << fnInputTypes[i] << ')';
 
   return success();
+}
+
+TaskletNode TaskletNode::create(Location location, FunctionType type) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  build(builder, state, utils::generateID(), utils::generateName("task"), type,
+        builder.getStringAttr("private"));
+  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+  task.addEntryBlock();
+  return task;
 }
 
 TaskletNode TaskletNode::create(Location location, StringRef name,
@@ -1675,6 +1689,13 @@ static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
 }
 
 LogicalResult verify(sdir::ReturnOp op) { return success(); }
+
+sdir::ReturnOp sdir::ReturnOp::create(Location loc, mlir::ValueRange input) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  sdir::ReturnOp::build(builder, state, input);
+  return cast<sdir::ReturnOp>(Operation::create(state));
+}
 
 //===----------------------------------------------------------------------===//
 // CallOp
