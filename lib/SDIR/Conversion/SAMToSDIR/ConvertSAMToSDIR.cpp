@@ -15,14 +15,15 @@ struct SDIRTarget : public ConversionTarget {
     addLegalDialect<SDIRDialect>();
     // Implicit top level module operation is legal
     // if it only contains a single SDFGNode or is empty
-    // All other operations are illegal
-    markUnknownOpDynamicallyLegal([](Operation *op) {
-      if (ModuleOp modop = dyn_cast<ModuleOp>(op)) {
-        return modop.body().getBlocks().size() == 1 &&
-               (modop.getOps().empty() || !modop.getOps<SDFGNode>().empty());
-      }
-      return false;
+    // TODO: Add checks
+    addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
+      Region::OpIterator b = op.getOps().begin();
+      Region::OpIterator e = op.getOps().end();
+      return true;
+      //(op.getOps().empty() || !op.getOps<SDFGNode>().empty());
     });
+    // All other operations are illegal
+    // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -42,12 +43,17 @@ public:
 
   LogicalResult matchAndRewrite(FuncOp op,
                                 PatternRewriter &rewriter) const override {
-    SDFGNode sdfg = SDFGNode::create(op.getLoc());
-    StateNode statenode = StateNode::create(op.getLoc());
-    sdfg.body().getBlocks().front().push_front(statenode);
+    SDFGNode sdfg = SDFGNode::create(op.getLoc(), op.getType());
+    StateNode state = StateNode::create(op.getLoc());
+    sdfg.addState(state, /*isEntry=*/true);
 
-    // rewriter.replaceOpWithNewOp<SDFGNode>(op, sdfg);
-    return failure();
+    /*TaskletNode::create(op.getLoc(), "tsklt", op.getType(),
+                        ArrayRef<NamedAttribute>());*/
+
+    rewriter.insert(sdfg);
+    rewriter.eraseOp(op);
+
+    return success();
   }
 };
 
