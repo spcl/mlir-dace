@@ -126,6 +126,32 @@ SDFGNode SDFGNode::create(Location loc) {
   return create(loc, ft);
 }
 
+SDFGNode SDFGNode::create(Location loc, SmallVector<AllocOp> allocs) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  SmallVector<Attribute> alloc_names;
+  for (AllocOp alloc : allocs) {
+    alloc_names.push_back(alloc.nameAttr());
+  }
+
+  ArrayAttr arg_names = ArrayAttr::get(loc->getContext(), alloc_names);
+  state.addAttribute("arg_names", arg_names);
+
+  TypeRange begin;
+  TypeRange end;
+  FunctionType ft = FunctionType::get(loc->getContext(), begin, end);
+  build(builder, state, utils::generateID(), utils::generateName("sdfg"),
+        "state_0", ft);
+  SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
+  sdfg.addEntryBlock();
+
+  for (AllocOp alloc : allocs) {
+    sdfg.body().getBlocks().front().push_back(alloc);
+  }
+  return sdfg;
+}
+
 SDFGNode SDFGNode::create(Location loc, FunctionType ft) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -251,6 +277,10 @@ void SDFGNode::addState(StateNode &node, bool isEntry) {
   body().getBlocks().front().push_back(node);
   if (isEntry)
     entryAttr(SymbolRefAttr::get(getContext(), node.sym_name()));
+}
+
+void SDFGNode::addAlloc(AllocOp &alloc) {
+  body().getBlocks().front().push_front(alloc);
 }
 
 unsigned SDFGNode::getIndexOfState(StateNode &node) {
@@ -893,6 +923,16 @@ LogicalResult verify(AllocOp op) {
   return success();
 }
 
+AllocOp AllocOp::create(Location loc, Type res) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StringAttr name =
+      StringAttr::get(loc->getContext(), utils::generateName("arr"));
+  ValueRange val = ValueRange();
+  build(builder, state, res, val, name);
+  return cast<AllocOp>(Operation::create(state));
+}
+
 SDFGNode AllocOp::getParentSDFG() {
   Operation *sdfgOrState = (*this)->getParentOp();
 
@@ -993,6 +1033,19 @@ bool AllocTransientOp::isInState() {
 //===----------------------------------------------------------------------===//
 // GetAccessOp
 //===----------------------------------------------------------------------===//
+
+GetAccessOp GetAccessOp::create(Location loc, AllocOp arr) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  ArrayType art = arr.getType().cast<ArrayType>();
+  MemletType mem =
+      MemletType::get(loc->getContext(), art.getElementType(), art.getSymbols(),
+                      art.getIntegers(), art.getShape());
+
+  build(builder, state, mem, utils::generateID(), arr);
+  return cast<GetAccessOp>(Operation::create(state));
+}
 
 static ParseResult parseGetAccessOp(OpAsmParser &parser,
                                     OperationState &result) {
@@ -1693,13 +1746,22 @@ LogicalResult verify(sdir::ReturnOp op) { return success(); }
 sdir::ReturnOp sdir::ReturnOp::create(Location loc, mlir::ValueRange input) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  sdir::ReturnOp::build(builder, state, input);
+  build(builder, state, input);
   return cast<sdir::ReturnOp>(Operation::create(state));
 }
 
 //===----------------------------------------------------------------------===//
 // CallOp
 //===----------------------------------------------------------------------===//
+
+sdir::CallOp sdir::CallOp::create(Location loc, TaskletNode task,
+                                  ValueRange operands) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  TypeRange tr = TypeRange(task.getCallableResults());
+  build(builder, state, tr, task.sym_name(), operands);
+  return cast<sdir::CallOp>(Operation::create(state));
+}
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

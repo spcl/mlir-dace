@@ -31,13 +31,53 @@ public:
 
   LogicalResult matchAndRewrite(FuncOp op,
                                 PatternRewriter &rewriter) const override {
-    SDFGNode sdfg = SDFGNode::create(op.getLoc(), op.getType());
-    StateNode state = StateNode::create(op.getLoc());
+    Location loc = op.getLoc();
+
+    SmallVector<AllocOp> allocs;
+    SmallVector<GetAccessOp> access;
+
+    for (BlockArgument arg : op.getArguments()) {
+      Type t = arg.getType();
+      SmallVector<int64_t> ints;
+      SmallVector<bool> shape;
+
+      /*if (MemRefType mrt = t.dyn_cast<MemRefType>()) {
+        t = mrt.getElementType();
+
+        for (int64_t dim : mrt.getShape()) {
+          ints.push_back(dim);
+          shape.push_back(true);
+        }
+      }*/
+
+      ArrayType art = ArrayType::get(loc->getContext(), t, {}, ints, shape);
+      AllocOp alloc = AllocOp::create(loc, art);
+      allocs.push_back(alloc);
+
+      GetAccessOp acc = GetAccessOp::create(loc, alloc);
+      access.push_back(acc);
+    }
+
+    SDFGNode sdfg = SDFGNode::create(loc, allocs);
+    StateNode state = StateNode::create(loc);
     sdfg.addState(state, /*isEntry=*/true);
 
-    TaskletNode task = TaskletNode::create(op.getLoc(), op.getType());
+    TaskletNode task = TaskletNode::create(loc, op.getType());
     task.body().takeBody(op.body());
     state.addOp(*task);
+
+    for (GetAccessOp acc : access) {
+      state.addOp(*acc);
+    }
+
+    SmallVector<Value> accessV;
+    for (GetAccessOp acc : access) {
+      accessV.push_back(acc);
+    }
+    ValueRange vr = ValueRange(accessV);
+    // TODO: Add loads before
+    // sdir::CallOp call = sdir::CallOp::create(loc, task, vr);
+    //  state.addOp(*call);
 
     rewriter.insert(sdfg);
     rewriter.eraseOp(op);

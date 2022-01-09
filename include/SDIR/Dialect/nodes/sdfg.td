@@ -34,8 +34,10 @@ def SDIR_SDFGNode : SDIR_Op<"sdfg", [
 
     let extraClassDeclaration = [{
         static SDFGNode create(Location location);
+        static SDFGNode create(Location location, SmallVector<AllocOp> allocs);
         static SDFGNode create(Location location, FunctionType type);
         void addState(StateNode &node, bool isEntry = false);
+        void addAlloc(AllocOp &alloc);
         unsigned getIndexOfState(StateNode &node);
         StateNode getStateByIndex(unsigned idx);
         StateNode getStateBySymRef(StringRef symRef);

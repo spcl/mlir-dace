@@ -59,6 +59,7 @@ def SDIR_CallOp : SDIR_Op<"call", [
     let results = (outs Variadic<AnyType>);
 
     let extraClassDeclaration = [{
+        static sdir::CallOp create(Location loc, TaskletNode task, ValueRange operands);
         StateNode getParentState();
         TaskletNode getTasklet();
         SDFGNode getSDFG();

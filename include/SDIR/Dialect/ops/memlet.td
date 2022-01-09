@@ -18,10 +18,14 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
         ```
     }];
 
-    let arguments = (ins Variadic<Index>:$params);
+    let arguments = (ins 
+        Variadic<Index>:$params,
+        OptionalAttr<StrAttr>:$name
+    );
     let results = (outs SDIR_ArrayType:$res);
 
     let extraClassDeclaration = [{
+        static AllocOp create(Location loc, Type res);
         SDFGNode getParentSDFG();
         bool isInState();
         std::string getName();
