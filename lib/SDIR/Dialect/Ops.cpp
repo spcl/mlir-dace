@@ -489,6 +489,24 @@ TaskletNode TaskletNode::create(Location location, int64_t constant) {
   return task;
 }
 
+TaskletNode TaskletNode::create(Location location, arith::ConstantOp constant) {
+  arith::ConstantOp constOp = constant.clone();
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  FunctionType ft =
+      FunctionType::get(location->getContext(), {}, {constOp.getType()});
+
+  build(builder, state, utils::generateID(), utils::generateName("task"), ft,
+        builder.getStringAttr("private"));
+  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+
+  task.addEntryBlock();
+  task.body().getBlocks().front().push_back(constOp);
+  sdir::ReturnOp ret = sdir::ReturnOp::create(location, {constOp});
+  task.body().getBlocks().front().push_back(ret);
+  return task;
+}
+
 TaskletNode TaskletNode::create(Location location, StringRef name,
                                 FunctionType type,
                                 ArrayRef<NamedAttribute> attrs) {
