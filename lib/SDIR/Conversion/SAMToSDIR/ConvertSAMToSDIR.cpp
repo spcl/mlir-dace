@@ -93,7 +93,7 @@ public:
       loadV.push_back(load);
     }
     ValueRange vr = ValueRange(loadV);*/
-    sdir::CallOp call = sdir::CallOp::create(loc, task, {});
+    sdir::CallOp call = sdir::CallOp::create(loc, task, sdfg.getArguments());
     state.addOp(*call);
 
     rewriter.insert(sdfg);
