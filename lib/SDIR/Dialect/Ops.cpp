@@ -120,9 +120,7 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 //===----------------------------------------------------------------------===//
 
 SDFGNode SDFGNode::create(Location loc) {
-  TypeRange begin;
-  TypeRange end;
-  FunctionType ft = FunctionType::get(loc->getContext(), begin, end);
+  FunctionType ft = FunctionType::get(loc->getContext(), {}, {});
   return create(loc, ft);
 }
 
@@ -381,8 +379,11 @@ LogicalResult verify(StateNode op) {
   return success();
 }
 
-void StateNode::addOp(Operation &op) {
-  body().getBlocks().front().push_back(&op);
+void StateNode::addOp(Operation &op, bool toFront) {
+  if (toFront)
+    body().getBlocks().front().push_front(&op);
+  else
+    body().getBlocks().front().push_back(&op);
 }
 
 void StateNode::setID(unsigned id) {

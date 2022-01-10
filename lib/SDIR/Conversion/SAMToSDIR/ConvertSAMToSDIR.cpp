@@ -33,7 +33,7 @@ public:
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    SmallVector<AllocOp> allocs;
+    /*SmallVector<AllocOp> allocs;
     SmallVector<GetAccessOp> access;
     SmallVector<LoadOp> loads;
     TaskletNode zeroTask = TaskletNode::create(loc, 0);
@@ -51,7 +51,7 @@ public:
           ints.push_back(dim);
           shape.push_back(true);
         }
-      }*/
+      }
 
       ArrayType art = ArrayType::get(loc->getContext(), t, {}, ints, shape);
       AllocOp alloc = AllocOp::create(loc, art);
@@ -67,9 +67,9 @@ public:
       ValueRange vr = ValueRange(idxV);
       LoadOp load = LoadOp::create(loc, acc, vr);
       loads.push_back(load);
-    }
+    }*/
 
-    SDFGNode sdfg = SDFGNode::create(loc, allocs);
+    SDFGNode sdfg = SDFGNode::create(loc, op.getType());
     StateNode state = StateNode::create(loc);
     sdfg.addState(state, /*isEntry=*/true);
 
@@ -77,7 +77,7 @@ public:
     task.body().takeBody(op.body());
     state.addOp(*task);
 
-    for (GetAccessOp acc : access) {
+    /*for (GetAccessOp acc : access) {
       state.addOp(*acc);
     }
 
@@ -92,8 +92,8 @@ public:
     for (LoadOp load : loads) {
       loadV.push_back(load);
     }
-    ValueRange vr = ValueRange(loadV);
-    sdir::CallOp call = sdir::CallOp::create(loc, task, vr);
+    ValueRange vr = ValueRange(loadV);*/
+    sdir::CallOp call = sdir::CallOp::create(loc, task, {});
     state.addOp(*call);
 
     rewriter.insert(sdfg);
@@ -120,8 +120,75 @@ public:
   }
 };
 
+class ConstantPromotion : public OpRewritePattern<arith::ConstantOp> {
+public:
+  using OpRewritePattern<arith::ConstantOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::ConstantOp op,
+                                PatternRewriter &rewriter) const override {
+
+    if (TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp())) {
+      StateNode state = cast<StateNode>(task->getParentOp());
+      TaskletNode taskC = TaskletNode::create(op.getLoc(), op);
+      sdir::CallOp callC = sdir::CallOp::create(op.getLoc(), taskC, {});
+      state.addOp(*callC, /*toFront=*/true);
+      state.addOp(*taskC, /*toFront=*/true);
+
+      unsigned numArgs = task.getNumArguments();
+      task.insertArgument(numArgs, op.getType(), {});
+
+      for (sdir::CallOp callOp : state.getOps<sdir::CallOp>()) {
+        if (callOp.callee() == task.sym_name()) {
+          SmallVector<Value> operands;
+          for (Value v : callOp.getOperands())
+            operands.push_back(v);
+          operands.push_back(callC.getResult(0));
+          ValueRange vr = ValueRange(operands);
+          callOp->setOperands(vr);
+        }
+      }
+
+      rewriter.replaceOp(op, {task.getArgument(numArgs)});
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+// TODO: This Pattern doesn't get called
+class TaskletReordering : public OpRewritePattern<TaskletNode> {
+public:
+  using OpRewritePattern<TaskletNode>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TaskletNode op,
+                                PatternRewriter &rewriter) const override {
+    StateNode state = cast<StateNode>(op->getParentOp());
+    Operation *prev =
+        state.body().getBlocks().front().findAncestorOpInBlock(*op);
+    op.emitError("here");
+    if (TaskletNode task = dyn_cast<TaskletNode>(prev))
+      return failure();
+
+    rewriter.eraseOp(op);
+    rewriter.eraseOp(prev);
+
+    rewriter.insert(prev);
+    rewriter.insert(op);
+
+    return success();
+  }
+};
+
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns) {
-  patterns.add<FuncToSDFG, TaskletTerminator>(patterns.getContext());
+  // clang-format off
+  patterns.add<
+    FuncToSDFG, 
+    TaskletTerminator,
+    ConstantPromotion, 
+    TaskletReordering
+  >(patterns.getContext());
+  // clang-format on
 }
 
 namespace {

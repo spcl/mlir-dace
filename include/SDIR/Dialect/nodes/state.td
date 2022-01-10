@@ -28,7 +28,7 @@ def SDIR_StateNode : SDIR_Op<"state", [
 
     let extraClassDeclaration = [{
         static StateNode create(Location location);
-        void addOp(Operation &op);
+        void addOp(Operation &op, bool toFront = false);
         void setID(unsigned id);
     }];
 }
