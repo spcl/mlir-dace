@@ -138,9 +138,7 @@ SDFGNode SDFGNode::create(Location loc, SmallVector<AllocOp> allocs) {
   ArrayAttr arg_names = ArrayAttr::get(loc->getContext(), alloc_names);
   state.addAttribute("arg_names", arg_names);
 
-  TypeRange begin;
-  TypeRange end;
-  FunctionType ft = FunctionType::get(loc->getContext(), begin, end);
+  FunctionType ft = FunctionType::get(loc->getContext(), {}, {});
   build(builder, state, utils::generateID(), utils::generateName("sdfg"),
         "state_0", ft);
   SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
@@ -465,6 +463,29 @@ TaskletNode TaskletNode::create(Location location, FunctionType type) {
         builder.getStringAttr("private"));
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
   task.addEntryBlock();
+  return task;
+}
+
+TaskletNode TaskletNode::create(Location location, int64_t constant) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+
+  FunctionType ft =
+      FunctionType::get(location->getContext(), {}, {builder.getIndexType()});
+
+  build(builder, state, utils::generateID(), utils::generateName("task"), ft,
+        builder.getStringAttr("private"));
+  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+  task.addEntryBlock();
+
+  OperationState state2(location, arith::ConstantIndexOp::getOperationName());
+  arith::ConstantIndexOp::build(builder, state2, constant);
+  arith::ConstantIndexOp constOp =
+      cast<arith::ConstantIndexOp>(Operation::create(state2));
+  task.body().getBlocks().front().push_back(constOp);
+
+  sdir::ReturnOp ret = sdir::ReturnOp::create(location, {constOp});
+  task.body().getBlocks().front().push_back(ret);
   return task;
 }
 
@@ -1114,6 +1135,77 @@ LogicalResult verify(GetAccessOp op) {
   return success();
 }
 
+Type GetAccessOp::getAllocType() {
+  Operation *alloc = arr().getDefiningOp();
+  if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
+    return allocArr.getType();
+
+  if (AllocTransientOp allocArr = dyn_cast<AllocTransientOp>(alloc))
+    return allocArr.getType();
+
+  if (AllocStreamOp allocArr = dyn_cast<AllocStreamOp>(alloc))
+    return allocArr.getType();
+
+  if (AllocTransientStreamOp allocArr = dyn_cast<AllocTransientStreamOp>(alloc))
+    return allocArr.getType();
+
+  return nullptr;
+}
+
+ArrayRef<StringAttr> GetAccessOp::getSymbols() {
+  Type t = getAllocType();
+
+  if (ArrayType arr = t.dyn_cast<ArrayType>())
+    return arr.getSymbols();
+
+  if (MemletType arr = t.dyn_cast<MemletType>())
+    return arr.getSymbols();
+
+  if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+    return arr.getSymbols();
+
+  if (StreamType arr = t.dyn_cast<StreamType>())
+    return arr.getSymbols();
+
+  return {};
+}
+
+ArrayRef<int64_t> GetAccessOp::getIntegers() {
+  Type t = getAllocType();
+
+  if (ArrayType arr = t.dyn_cast<ArrayType>())
+    return arr.getIntegers();
+
+  if (MemletType arr = t.dyn_cast<MemletType>())
+    return arr.getIntegers();
+
+  if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+    return arr.getIntegers();
+
+  if (StreamType arr = t.dyn_cast<StreamType>())
+    return arr.getIntegers();
+
+  return {};
+}
+
+ArrayRef<bool> GetAccessOp::getShape() {
+  Type t = getAllocType();
+
+  if (ArrayType arr = t.dyn_cast<ArrayType>())
+    return arr.getShape();
+
+  if (MemletType arr = t.dyn_cast<MemletType>())
+    return arr.getShape();
+
+  if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+    return arr.getShape();
+
+  if (StreamType arr = t.dyn_cast<StreamType>())
+    return arr.getShape();
+
+  return {};
+}
+
 SDFGNode GetAccessOp::getParentSDFG() {
   Operation *sdfg = (*this)->getParentOp()->getParentOp();
   return dyn_cast<SDFGNode>(sdfg);
@@ -1143,6 +1235,32 @@ void GetAccessOp::setID(unsigned id) {
 //===----------------------------------------------------------------------===//
 // LoadOp
 //===----------------------------------------------------------------------===//
+
+LoadOp LoadOp::create(Location loc, GetAccessOp acc, ValueRange indices) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  Type t = acc.getAllocType();
+
+  if (ArrayType arr = t.dyn_cast<ArrayType>())
+    t = arr.getElementType();
+
+  else if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+    t = arr.getElementType();
+
+  SmallVector<Attribute> numList;
+  for (size_t i = 0; i < indices.size(); ++i) {
+    numList.push_back(builder.getUI32IntegerAttr(i));
+  }
+  ArrayAttr numArr = builder.getArrayAttr(numList);
+  state.addAttribute("indices_numList", numArr);
+
+  SmallVector<Attribute> attrList;
+  ArrayAttr attrArr = builder.getArrayAttr(attrList);
+  state.addAttribute("indices", attrArr);
+
+  build(builder, state, t, indices, acc);
+  return cast<LoadOp>(Operation::create(state));
+}
 
 static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

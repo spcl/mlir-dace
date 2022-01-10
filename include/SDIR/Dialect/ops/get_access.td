@@ -26,6 +26,10 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
 
     let extraClassDeclaration = [{
         static GetAccessOp create(Location loc, AllocOp arr);
+        Type getAllocType();
+        ArrayRef<StringAttr> getSymbols();
+        ArrayRef<int64_t> getIntegers();
+        ArrayRef<bool> getShape();
         SDFGNode getParentSDFG();
         std::string getName();
         void setID(unsigned id);

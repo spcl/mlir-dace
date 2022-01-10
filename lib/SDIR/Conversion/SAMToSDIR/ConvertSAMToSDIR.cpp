@@ -35,6 +35,9 @@ public:
 
     SmallVector<AllocOp> allocs;
     SmallVector<GetAccessOp> access;
+    SmallVector<LoadOp> loads;
+    TaskletNode zeroTask = TaskletNode::create(loc, 0);
+    sdir::CallOp zeroCall = sdir::CallOp::create(loc, zeroTask, {});
 
     for (BlockArgument arg : op.getArguments()) {
       Type t = arg.getType();
@@ -56,6 +59,14 @@ public:
 
       GetAccessOp acc = GetAccessOp::create(loc, alloc);
       access.push_back(acc);
+
+      SmallVector<Value> idxV;
+      for (size_t i = 0; i < shape.size(); ++i) {
+        idxV.push_back(zeroCall.getResult(0));
+      }
+      ValueRange vr = ValueRange(idxV);
+      LoadOp load = LoadOp::create(loc, acc, vr);
+      loads.push_back(load);
     }
 
     SDFGNode sdfg = SDFGNode::create(loc, allocs);
@@ -70,14 +81,20 @@ public:
       state.addOp(*acc);
     }
 
-    SmallVector<Value> accessV;
-    for (GetAccessOp acc : access) {
-      accessV.push_back(acc);
+    state.addOp(*zeroTask);
+    state.addOp(*zeroCall);
+
+    for (LoadOp load : loads) {
+      state.addOp(*load);
     }
-    ValueRange vr = ValueRange(accessV);
-    // TODO: Add loads before
-    // sdir::CallOp call = sdir::CallOp::create(loc, task, vr);
-    //  state.addOp(*call);
+
+    SmallVector<Value> loadV;
+    for (LoadOp load : loads) {
+      loadV.push_back(load);
+    }
+    ValueRange vr = ValueRange(loadV);
+    sdir::CallOp call = sdir::CallOp::create(loc, task, vr);
+    state.addOp(*call);
 
     rewriter.insert(sdfg);
     rewriter.eraseOp(op);

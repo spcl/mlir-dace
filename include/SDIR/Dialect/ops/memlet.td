@@ -86,6 +86,10 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 
     let arguments = (ins Variadic<Index>:$indices, SDIR_MemletType:$arr);
     let results = (outs AnyType:$res);
+
+    let extraClassDeclaration = [{
+        static LoadOp create(Location loc, GetAccessOp acc, ValueRange indices);
+    }];
 }
 
 
