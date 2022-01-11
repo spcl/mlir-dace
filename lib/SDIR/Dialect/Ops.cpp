@@ -372,10 +372,12 @@ static void print(OpAsmPrinter &p, StateNode op) {
 LogicalResult verify(StateNode op) {
   // Verify that no other dialect is used in the body
   // Except func operations
+  // NOTE: Commented out for debugging only
+  /*
   for (Operation &oper : op.body().getOps())
     if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
       return op.emitOpError("does not support other dialects");
-
+*/
   return success();
 }
 

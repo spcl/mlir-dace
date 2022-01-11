@@ -2,7 +2,9 @@
 #define SDIR_TaskletNode
 
 def SDIR_TaskletNode : SDIR_Op<"tasklet", [
-    HasParent<"StateNode">,
+    // NOTE: For debugging only
+    ParentOneOf<["StateNode", "FuncOp"]>,
+    //HasParent<"StateNode">,
     AffineScope, 
     AutomaticAllocationScope, 
     CallableOpInterface, 
