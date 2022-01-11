@@ -1,5 +1,6 @@
 #include "SDIR/Dialect/Dialect.h"
 #include "SDIR/Utils/Utils.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -119,12 +120,13 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-SDFGNode SDFGNode::create(Location loc) {
-  FunctionType ft = FunctionType::get(loc->getContext(), {}, {});
-  return create(loc, ft);
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
+  FunctionType ft = rewriter.getFunctionType({}, {});
+  return create(rewriter, loc, ft);
 }
 
-SDFGNode SDFGNode::create(Location loc, SmallVector<AllocOp> allocs) {
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
+                          SmallVector<AllocOp> allocs) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
 
@@ -133,28 +135,32 @@ SDFGNode SDFGNode::create(Location loc, SmallVector<AllocOp> allocs) {
     alloc_names.push_back(alloc.nameAttr());
   }
 
-  ArrayAttr arg_names = ArrayAttr::get(loc->getContext(), alloc_names);
+  ArrayAttr arg_names = rewriter.getArrayAttr(alloc_names);
   state.addAttribute("arg_names", arg_names);
 
-  FunctionType ft = FunctionType::get(loc->getContext(), {}, {});
+  FunctionType ft = rewriter.getFunctionType({}, {});
   build(builder, state, utils::generateID(), utils::generateName("sdfg"),
         "state_0", ft);
-  SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
-  sdfg.addEntryBlock();
+  SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
+  rewriter.createBlock(&sdfg.getRegion());
 
+  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+  rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
   for (AllocOp alloc : allocs) {
-    sdfg.body().getBlocks().front().push_back(alloc);
+    rewriter.insert(alloc);
   }
+  rewriter.restoreInsertionPoint(ip);
   return sdfg;
 }
 
-SDFGNode SDFGNode::create(Location loc, FunctionType ft) {
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
+                          FunctionType ft) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName("sdfg"),
         "state_0", ft);
-  SDFGNode sdfg = cast<SDFGNode>(Operation::create(state));
-  sdfg.addEntryBlock();
+  SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
+  rewriter.createBlock(&sdfg.getRegion(), {}, ft.getInputs());
   return sdfg;
 }
 
@@ -269,14 +275,8 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-void SDFGNode::addState(StateNode &node, bool isEntry) {
-  body().getBlocks().front().push_back(node);
-  if (isEntry)
-    entryAttr(SymbolRefAttr::get(getContext(), node.sym_name()));
-}
-
-void SDFGNode::addAlloc(AllocOp &alloc) {
-  body().getBlocks().front().push_front(alloc);
+void SDFGNode::addEntryState(StateNode &node) {
+  entryAttr(SymbolRefAttr::get(getContext(), node.sym_name()));
 }
 
 unsigned SDFGNode::getIndexOfState(StateNode &node) {
@@ -331,12 +331,12 @@ void SDFGNode::setID(unsigned id) {
 // StateNode
 //===----------------------------------------------------------------------===//
 
-StateNode StateNode::create(Location loc) {
+StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName("state"));
-  StateNode stateNode = cast<StateNode>(Operation::create(state));
-  stateNode.getRegion().emplaceBlock();
+  StateNode stateNode = cast<StateNode>(rewriter.createOperation(state));
+  rewriter.createBlock(&stateNode.getRegion());
   return stateNode;
 }
 
@@ -377,13 +377,6 @@ LogicalResult verify(StateNode op) {
       return op.emitOpError("does not support other dialects");
 
   return success();
-}
-
-void StateNode::addOp(Operation &op, bool toFront) {
-  if (toFront)
-    body().getBlocks().front().push_front(&op);
-  else
-    body().getBlocks().front().push_back(&op);
 }
 
 void StateNode::setID(unsigned id) {
@@ -457,54 +450,53 @@ LogicalResult verify(TaskletNode op) {
   return success();
 }
 
-TaskletNode TaskletNode::create(Location location, FunctionType type) {
+TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+                                FunctionType type) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName("task"), type,
         builder.getStringAttr("private"));
-  TaskletNode task = cast<TaskletNode>(Operation::create(state));
-  task.addEntryBlock();
+  TaskletNode task = cast<TaskletNode>(rewriter.createOperation(state));
+  rewriter.createBlock(&task.getRegion(), {}, type.getInputs());
   return task;
 }
 
-TaskletNode TaskletNode::create(Location location, int64_t constant) {
+TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+                                int64_t constant) {
   OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
 
-  FunctionType ft =
-      FunctionType::get(location->getContext(), {}, {builder.getIndexType()});
-
-  build(builder, state, utils::generateID(), utils::generateName("task"), ft,
-        builder.getStringAttr("private"));
-  TaskletNode task = cast<TaskletNode>(Operation::create(state));
-  task.addEntryBlock();
+  FunctionType ft = rewriter.getFunctionType({}, {rewriter.getIndexType()});
+  TaskletNode task = create(rewriter, location, ft);
 
   OperationState state2(location, arith::ConstantIndexOp::getOperationName());
   arith::ConstantIndexOp::build(builder, state2, constant);
   arith::ConstantIndexOp constOp =
-      cast<arith::ConstantIndexOp>(Operation::create(state2));
-  task.body().getBlocks().front().push_back(constOp);
+      cast<arith::ConstantIndexOp>(rewriter.createOperation(state2));
 
-  sdir::ReturnOp ret = sdir::ReturnOp::create(location, {constOp});
-  task.body().getBlocks().front().push_back(ret);
+  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+  rewriter.setInsertionPointToEnd(&task.body().getBlocks().front());
+  rewriter.insert(constOp);
+
+  sdir::ReturnOp ret = sdir::ReturnOp::create(rewriter, location, {constOp});
+  rewriter.insert(ret);
+  rewriter.restoreInsertionPoint(ip);
   return task;
 }
 
-TaskletNode TaskletNode::create(Location location, arith::ConstantOp constant) {
+TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+                                arith::ConstantOp constant) {
   arith::ConstantOp constOp = constant.clone();
   OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
-  FunctionType ft =
-      FunctionType::get(location->getContext(), {}, {constOp.getType()});
 
-  build(builder, state, utils::generateID(), utils::generateName("task"), ft,
-        builder.getStringAttr("private"));
-  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+  FunctionType ft = rewriter.getFunctionType({}, {constOp.getType()});
+  TaskletNode task = create(rewriter, location, ft);
 
-  task.addEntryBlock();
-  task.body().getBlocks().front().push_back(constOp);
-  sdir::ReturnOp ret = sdir::ReturnOp::create(location, {constOp});
-  task.body().getBlocks().front().push_back(ret);
+  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+  rewriter.setInsertionPointToEnd(&task.body().getBlocks().front());
+  rewriter.insert(constOp);
+  sdir::ReturnOp ret = sdir::ReturnOp::create(rewriter, location, {constOp});
+  rewriter.insert(ret);
+  rewriter.restoreInsertionPoint(ip);
   return task;
 }
 
@@ -963,14 +955,12 @@ LogicalResult verify(AllocOp op) {
   return success();
 }
 
-AllocOp AllocOp::create(Location loc, Type res) {
+AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  StringAttr name =
-      StringAttr::get(loc->getContext(), utils::generateName("arr"));
-  ValueRange val = ValueRange();
-  build(builder, state, res, val, name);
-  return cast<AllocOp>(Operation::create(state));
+  StringAttr name = rewriter.getStringAttr(utils::generateName("arr"));
+  build(builder, state, res, {}, name);
+  return cast<AllocOp>(rewriter.createOperation(state));
 }
 
 SDFGNode AllocOp::getParentSDFG() {
@@ -1074,7 +1064,8 @@ bool AllocTransientOp::isInState() {
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
-GetAccessOp GetAccessOp::create(Location loc, AllocOp arr) {
+GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc,
+                                AllocOp arr) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
 
@@ -1084,7 +1075,7 @@ GetAccessOp GetAccessOp::create(Location loc, AllocOp arr) {
                       art.getIntegers(), art.getShape());
 
   build(builder, state, mem, utils::generateID(), arr);
-  return cast<GetAccessOp>(Operation::create(state));
+  return cast<GetAccessOp>(rewriter.createOperation(state));
 }
 
 static ParseResult parseGetAccessOp(OpAsmParser &parser,
@@ -1255,10 +1246,15 @@ void GetAccessOp::setID(unsigned id) {
 // LoadOp
 //===----------------------------------------------------------------------===//
 
-LoadOp LoadOp::create(Location loc, GetAccessOp acc, ValueRange indices) {
+LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, GetAccessOp acc,
+                      ValueRange indices) {
+  return create(rewriter, loc, acc.getAllocType(), acc, indices);
+}
+
+LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
+                      Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  Type t = acc.getAllocType();
 
   if (ArrayType arr = t.dyn_cast<ArrayType>())
     t = arr.getElementType();
@@ -1270,15 +1266,15 @@ LoadOp LoadOp::create(Location loc, GetAccessOp acc, ValueRange indices) {
   for (size_t i = 0; i < indices.size(); ++i) {
     numList.push_back(builder.getUI32IntegerAttr(i));
   }
-  ArrayAttr numArr = builder.getArrayAttr(numList);
+  ArrayAttr numArr = rewriter.getArrayAttr(numList);
   state.addAttribute("indices_numList", numArr);
 
   SmallVector<Attribute> attrList;
-  ArrayAttr attrArr = builder.getArrayAttr(attrList);
+  ArrayAttr attrArr = rewriter.getArrayAttr(attrList);
   state.addAttribute("indices", attrArr);
 
-  build(builder, state, t, indices, acc);
-  return cast<LoadOp>(Operation::create(state));
+  build(builder, state, t, indices, mem);
+  return cast<LoadOp>(rewriter.createOperation(state));
 }
 
 static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
@@ -1880,24 +1876,25 @@ static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
 
 LogicalResult verify(sdir::ReturnOp op) { return success(); }
 
-sdir::ReturnOp sdir::ReturnOp::create(Location loc, mlir::ValueRange input) {
+sdir::ReturnOp sdir::ReturnOp::create(PatternRewriter &rewriter, Location loc,
+                                      mlir::ValueRange input) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, input);
-  return cast<sdir::ReturnOp>(Operation::create(state));
+  return cast<sdir::ReturnOp>(rewriter.createOperation(state));
 }
 
 //===----------------------------------------------------------------------===//
 // CallOp
 //===----------------------------------------------------------------------===//
 
-sdir::CallOp sdir::CallOp::create(Location loc, TaskletNode task,
-                                  ValueRange operands) {
+sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
+                                  TaskletNode task, ValueRange operands) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   TypeRange tr = TypeRange(task.getCallableResults());
   build(builder, state, tr, task.sym_name(), operands);
-  return cast<sdir::CallOp>(Operation::create(state));
+  return cast<sdir::CallOp>(rewriter.createOperation(state));
 }
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {

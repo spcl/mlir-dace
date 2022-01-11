@@ -28,7 +28,7 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
     let arguments = (ins Variadic<AnyType>:$input);
 
     let extraClassDeclaration = [{
-        static sdir::ReturnOp create(Location loc, mlir::ValueRange input);
+        static sdir::ReturnOp create(PatternRewriter &rewriter, Location loc, mlir::ValueRange input);
     }];
 }
 
@@ -59,7 +59,7 @@ def SDIR_CallOp : SDIR_Op<"call", [
     let results = (outs Variadic<AnyType>);
 
     let extraClassDeclaration = [{
-        static sdir::CallOp create(Location loc, TaskletNode task, ValueRange operands);
+        static sdir::CallOp create(PatternRewriter &rewriter, Location loc, TaskletNode task, ValueRange operands);
         StateNode getParentState();
         TaskletNode getTasklet();
         SDFGNode getSDFG();

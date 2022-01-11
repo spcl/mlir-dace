@@ -25,7 +25,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
     let results = (outs SDIR_ArrayType:$res);
 
     let extraClassDeclaration = [{
-        static AllocOp create(Location loc, Type res);
+        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res);
         SDFGNode getParentSDFG();
         bool isInState();
         std::string getName();
@@ -88,7 +88,8 @@ def SDIR_LoadOp : SDIR_Op<"load", [
     let results = (outs AnyType:$res);
 
     let extraClassDeclaration = [{
-        static LoadOp create(Location loc, GetAccessOp acc, ValueRange indices);
+        static LoadOp create(PatternRewriter &rewriter, Location loc, GetAccessOp acc, ValueRange indices);
+        static LoadOp create(PatternRewriter &rewriter, Location loc, Type t, Value mem, ValueRange indices);
     }];
 }
 

@@ -3,6 +3,7 @@
 #include "SDIR/Dialect/Dialect.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 
 using namespace mlir;
@@ -33,70 +34,18 @@ public:
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    /*SmallVector<AllocOp> allocs;
-    SmallVector<GetAccessOp> access;
-    SmallVector<LoadOp> loads;
-    TaskletNode zeroTask = TaskletNode::create(loc, 0);
-    sdir::CallOp zeroCall = sdir::CallOp::create(loc, zeroTask, {});
+    SDFGNode sdfg = SDFGNode::create(rewriter, loc, op.getType());
+    StateNode state = StateNode::create(rewriter, loc);
+    sdfg.addEntryState(state);
 
-    for (BlockArgument arg : op.getArguments()) {
-      Type t = arg.getType();
-      SmallVector<int64_t> ints;
-      SmallVector<bool> shape;
+    TaskletNode task = TaskletNode::create(rewriter, loc, op.getType());
 
-      /*if (MemRefType mrt = t.dyn_cast<MemRefType>()) {
-        t = mrt.getElementType();
-
-        for (int64_t dim : mrt.getShape()) {
-          ints.push_back(dim);
-          shape.push_back(true);
-        }
-      }
-
-      ArrayType art = ArrayType::get(loc->getContext(), t, {}, ints, shape);
-      AllocOp alloc = AllocOp::create(loc, art);
-      allocs.push_back(alloc);
-
-      GetAccessOp acc = GetAccessOp::create(loc, alloc);
-      access.push_back(acc);
-
-      SmallVector<Value> idxV;
-      for (size_t i = 0; i < shape.size(); ++i) {
-        idxV.push_back(zeroCall.getResult(0));
-      }
-      ValueRange vr = ValueRange(idxV);
-      LoadOp load = LoadOp::create(loc, acc, vr);
-      loads.push_back(load);
-    }*/
-
-    SDFGNode sdfg = SDFGNode::create(loc, op.getType());
-    StateNode state = StateNode::create(loc);
-    sdfg.addState(state, /*isEntry=*/true);
-
-    TaskletNode task = TaskletNode::create(loc, op.getType());
+    // TODO: Use rewriter
+    // rewriter.cloneRegionBefore(&op.body(), &task.body(), task.body());
     task.body().takeBody(op.body());
-    state.addOp(*task);
 
-    /*for (GetAccessOp acc : access) {
-      state.addOp(*acc);
-    }
+    // sdir::CallOp::create(rewriter, loc, task, sdfg.getArguments());
 
-    state.addOp(*zeroTask);
-    state.addOp(*zeroCall);
-
-    for (LoadOp load : loads) {
-      state.addOp(*load);
-    }
-
-    SmallVector<Value> loadV;
-    for (LoadOp load : loads) {
-      loadV.push_back(load);
-    }
-    ValueRange vr = ValueRange(loadV);*/
-    sdir::CallOp call = sdir::CallOp::create(loc, task, sdfg.getArguments());
-    state.addOp(*call);
-
-    rewriter.insert(sdfg);
     rewriter.eraseOp(op);
     return success();
   }
@@ -109,9 +58,7 @@ public:
   LogicalResult matchAndRewrite(mlir::ReturnOp op,
                                 PatternRewriter &rewriter) const override {
     if (TaskletNode tn = dyn_cast<TaskletNode>(op->getParentOp())) {
-      sdir::ReturnOp ret =
-          sdir::ReturnOp::create(op.getLoc(), op.getOperands());
-      rewriter.insert(ret);
+      sdir::ReturnOp::create(rewriter, op.getLoc(), op.getOperands());
       rewriter.eraseOp(op);
       return success();
     }
@@ -129,10 +76,11 @@ public:
 
     if (TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp())) {
       StateNode state = cast<StateNode>(task->getParentOp());
-      TaskletNode taskC = TaskletNode::create(op.getLoc(), op);
-      sdir::CallOp callC = sdir::CallOp::create(op.getLoc(), taskC, {});
-      state.addOp(*callC, /*toFront=*/true);
-      state.addOp(*taskC, /*toFront=*/true);
+      TaskletNode taskC = TaskletNode::create(rewriter, op.getLoc(), op);
+      sdir::CallOp callC =
+          sdir::CallOp::create(rewriter, op.getLoc(), taskC, {});
+      // state.addOp(*callC, /*toFront=*/true);
+      // state.addOp(*taskC, /*toFront=*/true);
 
       unsigned numArgs = task.getNumArguments();
       task.insertArgument(numArgs, op.getType(), {});
@@ -166,7 +114,6 @@ public:
     StateNode state = cast<StateNode>(op->getParentOp());
     Operation *prev =
         state.body().getBlocks().front().findAncestorOpInBlock(*op);
-    op.emitError("here");
     if (TaskletNode task = dyn_cast<TaskletNode>(prev))
       return failure();
 
@@ -180,15 +127,63 @@ public:
   }
 };
 
+class MemrefLoadToSDIR : public OpRewritePattern<memref::LoadOp> {
+public:
+  using OpRewritePattern<memref::LoadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::LoadOp op,
+                                PatternRewriter &rewriter) const override {
+    if (TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp())) {
+      Location loc = op.getLoc();
+      StateNode state = cast<StateNode>(task->getParentOp());
+      Type elT = op.getMemRefType().getElementType();
+
+      SmallVector<int64_t> ints;
+      SmallVector<bool> shape;
+
+      for (int64_t dim : op.getMemRefType().getShape()) {
+        ints.push_back(dim);
+        shape.push_back(true);
+      }
+
+      MemletType mem = MemletType::get(loc.getContext(), elT, {}, ints, shape);
+
+      // Replace tasklet type
+      unsigned argIdx;
+      for (BlockArgument a : task.getArguments()) {
+        for (Operation *b : a.getUsers()) {
+          if (b == op.getOperation()) {
+            argIdx = a.getArgNumber();
+            break;
+          }
+        }
+      }
+
+      rewriter.eraseOp(op);
+      unsigned numArgs = task.getNumArguments();
+      task.insertArgument(numArgs, mem, {});
+      // task.eraseArgument(argIdx);
+      LoadOp load = LoadOp::create(rewriter, loc, elT,
+                                   task.getArgument(numArgs), op.indices());
+      // state.addOp(*load);
+
+      // Replace all memref.load/store referencing this memref with sdir
+
+      // rewriter.replaceOp(op, {task.getArgument(numArgs)});
+      return success();
+    }
+    return failure();
+  }
+};
+
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns) {
-  // clang-format off
-  patterns.add<
-    FuncToSDFG, 
-    TaskletTerminator,
-    ConstantPromotion, 
-    TaskletReordering
-  >(patterns.getContext());
-  // clang-format on
+  MLIRContext *ctxt = patterns.getContext();
+
+  patterns.add<FuncToSDFG>(ctxt);
+  patterns.add<TaskletTerminator>(ctxt);
+  // patterns.add<ConstantPromotion>(ctxt);
+  //  patterns.add<TaskletReordering>(ctxt);
+  //  patterns.add<MemrefLoadToSDIR>(ctxt);
 }
 
 namespace {

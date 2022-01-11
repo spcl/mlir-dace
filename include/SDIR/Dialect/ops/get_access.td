@@ -25,7 +25,7 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
     let results = (outs AnyTypeOf<[SDIR_MemletType, SDIR_StreamType]>:$res);
 
     let extraClassDeclaration = [{
-        static GetAccessOp create(Location loc, AllocOp arr);
+        static GetAccessOp create(PatternRewriter &rewriter, Location loc, AllocOp arr);
         Type getAllocType();
         ArrayRef<StringAttr> getSymbols();
         ArrayRef<int64_t> getIntegers();
