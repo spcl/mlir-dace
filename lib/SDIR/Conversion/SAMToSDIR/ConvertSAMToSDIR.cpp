@@ -50,24 +50,6 @@ public:
   }
 };
 
-// Helper function. Recursively converting region types
-void convertRec(Region &region, TypeConverter &converter,
-                ConversionPatternRewriter &rewriter) {
-  FailureOr<Block *> res = rewriter.convertRegionTypes(&region, converter);
-
-  // hasValue() is inaccessible
-  if (res.getPointer() == nullptr)
-    return;
-
-  Block *b = res.getValue();
-  for (Operation &op : b->getOperations()) {
-    MutableArrayRef<Region> regions = op.getRegions();
-    for (size_t i = 0; i < regions.size(); ++i) {
-      convertRec(regions[i], converter, rewriter);
-    }
-  }
-}
-
 class FuncToSDFG : public OpConversionPattern<FuncOp> {
 public:
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -89,7 +71,6 @@ public:
       return failure();
 
     FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
-
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
     StateNode state = StateNode::create(rewriter, op.getLoc());
 
@@ -98,10 +79,23 @@ public:
           SymbolRefAttr::get(op.getLoc().getContext(), state.sym_name()));
     });
 
-    rewriter.updateRootInPlace(state,
-                               [&] { state.body().takeBody(op.body()); });
+    rewriter.cloneRegionBefore(op.body(), state.body(), state.body().begin());
 
-    convertRec(sdfg.body(), *getTypeConverter(), rewriter);
+    // hasValue() is inaccessable
+    if (rewriter.convertRegionTypes(&state.body(), *getTypeConverter())
+            .getPointer() == nullptr) {
+      return failure();
+    }
+
+    for (unsigned i = 0; i < state.body().getBlocks().front().getNumArguments();
+         ++i) {
+      rewriter.replaceUsesOfBlockArgument(
+          state.body().getBlocks().front().getArgument(i), sdfg.getArgument(i));
+    }
+
+    // NOTE: Consider using rewriter
+    state.body().getBlocks().front().eraseArguments(
+        [](BlockArgument ba) { return true; });
 
     rewriter.eraseOp(op);
     return success();
@@ -124,6 +118,12 @@ public:
     if (op->getDialect()->getNamespace() == "arith" ||
         op->getDialect()->getNamespace() == "math") {
       if (TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp())) {
+        // Operation already in a tasklet
+        return failure();
+      }
+
+      // NOTE: For debugging only
+      if (scf::ForOp task = dyn_cast<scf::ForOp>(op->getParentOp())) {
         // Operation already in a tasklet
         return failure();
       }

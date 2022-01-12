@@ -299,9 +299,7 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName("state"));
-  StateNode stateNode = cast<StateNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&stateNode.getRegion(), {});
-  return stateNode;
+  return cast<StateNode>(rewriter.createOperation(state));
 }
 
 static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
