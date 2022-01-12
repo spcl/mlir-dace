@@ -79,13 +79,12 @@ public:
           SymbolRefAttr::get(op.getLoc().getContext(), state.sym_name()));
     });
 
-    rewriter.cloneRegionBefore(op.body(), state.body(), state.body().begin());
+    rewriter.inlineRegionBefore(op.body(), state.body(), state.body().begin());
 
     // hasValue() is inaccessable
     if (rewriter.convertRegionTypes(&state.body(), *getTypeConverter())
-            .getPointer() == nullptr) {
+            .getPointer() == nullptr)
       return failure();
-    }
 
     for (unsigned i = 0; i < state.body().getBlocks().front().getNumArguments();
          ++i) {
@@ -113,11 +112,6 @@ public:
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (mlir::ReturnOp rop = dyn_cast<mlir::ReturnOp>(op)) {
-      rewriter.eraseOp(op);
-      return success();
-    }
-
     // TODO: Check if there is a proper way of doing this
     if (op->getDialect()->getNamespace() == "arith" ||
         op->getDialect()->getNamespace() == "math") {
@@ -160,6 +154,17 @@ public:
   }
 };
 
+class EraseReturn : public OpRewritePattern<mlir::ReturnOp> {
+public:
+  using OpRewritePattern<mlir::ReturnOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::ReturnOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 class MemrefLoadToSDIR : public OpConversionPattern<memref::LoadOp> {
 public:
   using OpConversionPattern<memref::LoadOp>::OpConversionPattern;
@@ -193,10 +198,11 @@ public:
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
+  patterns.add<EraseReturn>(ctxt);
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(1, ctxt);
-  patterns.add<MemrefLoadToSDIR>(converter, ctxt);
-  patterns.add<MemrefStoreToSDIR>(converter, ctxt);
+  // patterns.add<MemrefLoadToSDIR>(converter, ctxt);
+  // patterns.add<MemrefStoreToSDIR>(converter, ctxt);
 }
 
 namespace {
