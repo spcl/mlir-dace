@@ -23,6 +23,10 @@ def SDIR_AllocSymbolOp : SDIR_Op<"alloc_symbol", [
     }];
 
     let arguments = (ins StrAttr:$sym);
+
+    let extraClassDeclaration = [{
+        static AllocSymbolOp create(PatternRewriter &rewriter, Location loc, StringRef sym);
+    }];
 }
 
 //===----------------------------------------------------------------------===//

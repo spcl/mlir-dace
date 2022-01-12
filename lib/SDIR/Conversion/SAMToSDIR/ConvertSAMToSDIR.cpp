@@ -115,13 +115,13 @@ public:
     // TODO: Check if there is a proper way of doing this
     if (op->getDialect()->getNamespace() == "arith" ||
         op->getDialect()->getNamespace() == "math") {
-      if (TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp())) {
+      if (isa<TaskletNode>(op->getParentOp())) {
         // Operation already in a tasklet
         return failure();
       }
 
       // NOTE: For debugging only
-      if (scf::ForOp task = dyn_cast<scf::ForOp>(op->getParentOp())) {
+      if (isa<scf::ForOp>(op->getParentOp())) {
         // Operation already in a tasklet
         return failure();
       }
@@ -154,14 +154,20 @@ public:
   }
 };
 
-class EraseReturn : public OpRewritePattern<mlir::ReturnOp> {
+class EraseTerminators : public RewritePattern {
 public:
-  using OpRewritePattern<mlir::ReturnOp>::OpRewritePattern;
+  EraseTerminators(PatternBenefit benefit, MLIRContext *context)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
-  LogicalResult matchAndRewrite(mlir::ReturnOp op,
+  LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
+
+    if (isa<mlir::ReturnOp>(op) || isa<scf::YieldOp>(op)) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    return failure();
   }
 };
 
@@ -195,14 +201,79 @@ public:
   }
 };
 
+class SCFForToSDIR : public OpRewritePattern<scf::ForOp> {
+public:
+  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForOp op,
+                                PatternRewriter &rewriter) const override {
+
+    FunctionType ft = rewriter.getFunctionType(
+        {
+            rewriter.getIndexType(), // lower bound
+            rewriter.getIndexType(), // upper bound
+            rewriter.getIndexType()  // step bound
+        },
+        {});
+
+    SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
+    AllocSymbolOp::create(rewriter, op.getLoc(), "idx");
+
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+
+    StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
+    rewriter.createBlock(&init.body());
+
+    rewriter.updateRootInPlace(sdfg, [&] {
+      sdfg.entryAttr(
+          SymbolRefAttr::get(op.getLoc().getContext(), init.sym_name()));
+    });
+
+    rewriter.restoreInsertionPoint(ip);
+    StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
+    rewriter.createBlock(&guard.body());
+
+    rewriter.restoreInsertionPoint(ip);
+    StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
+
+    rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
+                                body.body().begin());
+
+    rewriter.restoreInsertionPoint(ip);
+    StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
+    rewriter.createBlock(&exit.body());
+
+    rewriter.restoreInsertionPoint(ip);
+
+    ArrayAttr initArr = rewriter.getStrArrayAttr({"idx: arg0"});
+    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr);
+
+    StringAttr guardStr = rewriter.getStringAttr("idx < arg1");
+    EdgeOp::create(rewriter, op.getLoc(), guard, body, guardStr);
+
+    ArrayAttr bodyArr = rewriter.getStrArrayAttr({"idx: idx + arg2"});
+    EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr);
+
+    StringAttr exitStr = rewriter.getStringAttr("not(idx < arg1)");
+    EdgeOp::create(rewriter, op.getLoc(), guard, exit, exitStr);
+
+    rewriter.setInsertionPointAfter(sdfg);
+    sdir::CallOp::create(rewriter, op.getLoc(), sdfg, op.getOperands());
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
-  patterns.add<EraseReturn>(ctxt);
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(1, ctxt);
-  // patterns.add<MemrefLoadToSDIR>(converter, ctxt);
-  // patterns.add<MemrefStoreToSDIR>(converter, ctxt);
+  patterns.add<EraseTerminators>(1, ctxt);
+  patterns.add<MemrefLoadToSDIR>(converter, ctxt);
+  patterns.add<MemrefStoreToSDIR>(converter, ctxt);
+  patterns.add<SCFForToSDIR>(ctxt);
 }
 
 namespace {

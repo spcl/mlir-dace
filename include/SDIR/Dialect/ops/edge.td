@@ -24,6 +24,13 @@ def SDIR_EdgeOp : SDIR_Op<"edge", [
                         OptionalAttr<TypedArrayAttrBase<StrAttr, 
                                     "assignment array">>:$assign, 
                         OptionalAttr<StrAttr>:$condition);
+
+    let extraClassDeclaration = [{
+        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to);
+        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, ArrayAttr &assign);
+        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, StringAttr &condition);
+        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, ArrayAttr &assign, StringAttr &condition);
+    }];
 }
 
 #endif // SDIR_EdgeOp

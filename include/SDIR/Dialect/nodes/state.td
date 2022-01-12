@@ -28,6 +28,7 @@ def SDIR_StateNode : SDIR_Op<"state", [
 
     let extraClassDeclaration = [{
         static StateNode create(PatternRewriter &rewriter, Location location);
+        static StateNode create(PatternRewriter &rewriter, Location location, StringRef name);
         void setID(unsigned id);
     }];
 }

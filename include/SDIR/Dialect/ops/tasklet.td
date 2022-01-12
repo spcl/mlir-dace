@@ -60,6 +60,7 @@ def SDIR_CallOp : SDIR_Op<"call", [
 
     let extraClassDeclaration = [{
         static sdir::CallOp create(PatternRewriter &rewriter, Location loc, TaskletNode task, ValueRange operands);
+        static sdir::CallOp create(PatternRewriter &rewriter, Location loc, SDFGNode sdfg, ValueRange operands);
         StateNode getParentState();
         TaskletNode getTasklet();
         SDFGNode getSDFG();

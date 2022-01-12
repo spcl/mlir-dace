@@ -296,9 +296,14 @@ void SDFGNode::setID(unsigned id) {
 //===----------------------------------------------------------------------===//
 
 StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, "state");
+}
+
+StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
+                            StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, utils::generateID(), utils::generateName("state"));
+  build(builder, state, utils::generateID(), utils::generateName(name.str()));
   return cast<StateNode>(rewriter.createOperation(state));
 }
 
@@ -777,6 +782,33 @@ void ConsumeNode::setExitID(unsigned id) {
 //===----------------------------------------------------------------------===//
 // EdgeOp
 //===----------------------------------------------------------------------===//
+
+EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
+                      StateNode &to, ArrayAttr &assign, StringAttr &condition) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, from.sym_name(), to.sym_name(), assign, condition);
+  return cast<EdgeOp>(rewriter.createOperation(state));
+}
+
+EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
+                      StateNode &to, ArrayAttr &assign) {
+  StringAttr condition;
+  return create(rewriter, loc, from, to, assign, condition);
+}
+
+EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
+                      StateNode &to, StringAttr &condition) {
+  ArrayAttr assign;
+  return create(rewriter, loc, from, to, assign, condition);
+}
+
+EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
+                      StateNode &to) {
+  ArrayAttr assign;
+  StringAttr condition;
+  return create(rewriter, loc, from, to, assign, condition);
+}
 
 static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
   FlatSymbolRefAttr srcAttr;
@@ -1841,6 +1873,15 @@ sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
   return cast<sdir::CallOp>(rewriter.createOperation(state));
 }
 
+sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
+                                  SDFGNode sdfg, ValueRange operands) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  TypeRange tr = TypeRange(sdfg.getCallableResults());
+  build(builder, state, tr, sdfg.sym_name(), operands);
+  return cast<sdir::CallOp>(rewriter.createOperation(state));
+}
+
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1996,6 +2037,14 @@ LogicalResult verify(LibCallOp op) { return success(); }
 //===----------------------------------------------------------------------===//
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
+
+AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
+                                    StringRef sym) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, sym);
+  return cast<AllocSymbolOp>(rewriter.createOperation(state));
+}
 
 static ParseResult parseAllocSymbolOp(OpAsmParser &parser,
                                       OperationState &result) {
