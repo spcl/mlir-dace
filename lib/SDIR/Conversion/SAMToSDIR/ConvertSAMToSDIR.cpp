@@ -143,7 +143,12 @@ public:
       sdir::ReturnOp::create(rewriter, opClone->getLoc(),
                              opClone->getResults());
 
-      rewriter.eraseOp(op);
+      rewriter.setInsertionPointAfter(task);
+      sdir::CallOp call =
+          sdir::CallOp::create(rewriter, op->getLoc(), task, op->getOperands());
+
+      rewriter.replaceOp(op, call.getResults());
+
       return success();
     }
 
@@ -158,10 +163,11 @@ public:
   LogicalResult
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    LoadOp::create(rewriter, op.getLoc(),
-                   getTypeConverter()->convertType(op.getType()),
-                   adaptor.memref(), adaptor.indices());
-    rewriter.eraseOp(op);
+    LoadOp load = LoadOp::create(rewriter, op.getLoc(),
+                                 getTypeConverter()->convertType(op.getType()),
+                                 adaptor.memref(), adaptor.indices());
+
+    rewriter.replaceOp(op, load.getResult());
     return success();
   }
 };
