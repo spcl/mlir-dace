@@ -124,6 +124,10 @@ def SDIR_StoreOp : SDIR_Op<"store", [
         AnyType:$val, 
         SDIR_MemletType:$arr
     );
+
+    let extraClassDeclaration = [{
+        static StoreOp create(PatternRewriter &rewriter, Location loc, Value val, Value mem, ValueRange indices);
+    }];
 }
 
 //===----------------------------------------------------------------------===//
