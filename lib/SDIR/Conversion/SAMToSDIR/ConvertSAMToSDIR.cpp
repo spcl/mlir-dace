@@ -5,6 +5,7 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 
 using namespace mlir;
 using namespace sdir;
@@ -22,6 +23,7 @@ struct SDIRTarget : public ConversionTarget {
       //(op.getOps().empty() || !op.getOps<SDFGNode>().empty());
     });
     // All other operations are illegal
+    // NOTE: Disabled for debugging
     // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
@@ -34,27 +36,16 @@ public:
                                 PatternRewriter &rewriter) const override {
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), op.getType());
     StateNode state = StateNode::create(rewriter, op.getLoc());
-    sdfg.addEntryState(state);
-    // TODO: Use rewriter
-    state.body().takeBody(op.body());
+
+    rewriter.updateRootInPlace(sdfg, [&] {
+      sdfg.entryAttr(
+          SymbolRefAttr::get(op.getLoc().getContext(), state.sym_name()));
+    });
+
+    rewriter.updateRootInPlace(state,
+                               [&] { state.body().takeBody(op.body()); });
     rewriter.eraseOp(op);
     return success();
-  }
-};
-
-class TaskletTerminator : public OpRewritePattern<mlir::ReturnOp> {
-public:
-  using OpRewritePattern<mlir::ReturnOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mlir::ReturnOp op,
-                                PatternRewriter &rewriter) const override {
-    if (TaskletNode tn = dyn_cast<TaskletNode>(op->getParentOp())) {
-      sdir::ReturnOp::create(rewriter, op.getLoc(), op.getOperands());
-      rewriter.eraseOp(op);
-      return success();
-    }
-
-    return failure();
   }
 };
 
@@ -78,13 +69,23 @@ public:
         return failure();
       }
 
-      FunctionType ft = rewriter.getFunctionType(op->getOperandTypes(), {});
+      FunctionType ft =
+          rewriter.getFunctionType(op->getOperandTypes(), op->getResultTypes());
       TaskletNode task = TaskletNode::create(rewriter, op->getLoc(), ft);
-      // rewriter.clone(*op);
-      rewriter.eraseOp(op);
 
-      // sdir::ReturnOp::create(rewriter, op->getLoc(), op->getResults());
-      sdir::ReturnOp::create(rewriter, op->getLoc(), {});
+      BlockAndValueMapping mapping;
+      mapping.map(op->getOperands(), task.getArguments());
+
+      // NOTE: This feels hacky
+      // rewriter.clone(*op, mapping);
+      Operation *opClone = op->clone(mapping);
+      rewriter.updateRootInPlace(
+          task, [&] { task.body().getBlocks().front().push_front(opClone); });
+
+      sdir::ReturnOp::create(rewriter, opClone->getLoc(),
+                             opClone->getResults());
+
+      rewriter.eraseOp(op);
       return success();
     }
 
@@ -95,7 +96,6 @@ public:
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctxt = patterns.getContext();
   patterns.add<FuncToSDFG>(ctxt);
-  patterns.add<TaskletTerminator>(ctxt);
   patterns.add<OpToTasklet>(1, ctxt);
 }
 

@@ -120,39 +120,6 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
-  FunctionType ft = rewriter.getFunctionType({}, {});
-  return create(rewriter, loc, ft);
-}
-
-SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
-                          SmallVector<AllocOp> allocs) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-
-  SmallVector<Attribute> alloc_names;
-  for (AllocOp alloc : allocs) {
-    alloc_names.push_back(alloc.nameAttr());
-  }
-
-  ArrayAttr arg_names = rewriter.getArrayAttr(alloc_names);
-  state.addAttribute("arg_names", arg_names);
-
-  FunctionType ft = rewriter.getFunctionType({}, {});
-  build(builder, state, utils::generateID(), utils::generateName("sdfg"),
-        "state_0", ft);
-  SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&sdfg.getRegion());
-
-  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-  rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
-  for (AllocOp alloc : allocs) {
-    rewriter.insert(alloc);
-  }
-  rewriter.restoreInsertionPoint(ip);
-  return sdfg;
-}
-
 SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
                           FunctionType ft) {
   OpBuilder builder(loc->getContext());
@@ -275,10 +242,6 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-void SDFGNode::addEntryState(StateNode &node) {
-  entryAttr(SymbolRefAttr::get(getContext(), node.sym_name()));
-}
-
 unsigned SDFGNode::getIndexOfState(StateNode &node) {
   unsigned state_idx = 0;
 
@@ -336,7 +299,7 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName("state"));
   StateNode stateNode = cast<StateNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&stateNode.getRegion());
+  rewriter.createBlock(&stateNode.getRegion(), {});
   return stateNode;
 }
 
@@ -372,12 +335,11 @@ static void print(OpAsmPrinter &p, StateNode op) {
 LogicalResult verify(StateNode op) {
   // Verify that no other dialect is used in the body
   // Except func operations
-  // NOTE: Commented out for debugging only
-  /*
+  /* NOTE: Commented out for debugging
   for (Operation &oper : op.body().getOps())
     if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
       return op.emitOpError("does not support other dialects");
-*/
+  */
   return success();
 }
 
@@ -460,45 +422,6 @@ TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
         builder.getStringAttr("private"));
   TaskletNode task = cast<TaskletNode>(rewriter.createOperation(state));
   rewriter.createBlock(&task.getRegion(), {}, type.getInputs());
-  return task;
-}
-
-TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
-                                int64_t constant) {
-  OpBuilder builder(location->getContext());
-
-  FunctionType ft = rewriter.getFunctionType({}, {rewriter.getIndexType()});
-  TaskletNode task = create(rewriter, location, ft);
-
-  OperationState state2(location, arith::ConstantIndexOp::getOperationName());
-  arith::ConstantIndexOp::build(builder, state2, constant);
-  arith::ConstantIndexOp constOp =
-      cast<arith::ConstantIndexOp>(rewriter.createOperation(state2));
-
-  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-  rewriter.setInsertionPointToEnd(&task.body().getBlocks().front());
-  rewriter.insert(constOp);
-
-  sdir::ReturnOp ret = sdir::ReturnOp::create(rewriter, location, {constOp});
-  rewriter.insert(ret);
-  rewriter.restoreInsertionPoint(ip);
-  return task;
-}
-
-TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
-                                arith::ConstantOp constant) {
-  arith::ConstantOp constOp = constant.clone();
-  OpBuilder builder(location->getContext());
-
-  FunctionType ft = rewriter.getFunctionType({}, {constOp.getType()});
-  TaskletNode task = create(rewriter, location, ft);
-
-  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-  rewriter.setInsertionPointToEnd(&task.body().getBlocks().front());
-  rewriter.insert(constOp);
-  sdir::ReturnOp ret = sdir::ReturnOp::create(rewriter, location, {constOp});
-  rewriter.insert(ret);
-  rewriter.restoreInsertionPoint(ip);
   return task;
 }
 
