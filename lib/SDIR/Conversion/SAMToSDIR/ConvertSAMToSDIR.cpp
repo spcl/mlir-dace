@@ -41,7 +41,6 @@ public:
       sdfg.entryAttr(
           SymbolRefAttr::get(op.getLoc().getContext(), state.sym_name()));
     });
-
     rewriter.updateRootInPlace(state,
                                [&] { state.body().takeBody(op.body()); });
     rewriter.eraseOp(op);
@@ -76,8 +75,7 @@ public:
       BlockAndValueMapping mapping;
       mapping.map(op->getOperands(), task.getArguments());
 
-      // NOTE: This feels hacky
-      // rewriter.clone(*op, mapping);
+      // NOTE: Consider using move() or rewriter.clone()
       Operation *opClone = op->clone(mapping);
       rewriter.updateRootInPlace(
           task, [&] { task.body().getBlocks().front().push_front(opClone); });
