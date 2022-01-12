@@ -1261,6 +1261,26 @@ LogicalResult verify(LoadOp op) {
 // StoreOp
 //===----------------------------------------------------------------------===//
 
+StoreOp StoreOp::create(PatternRewriter &rewriter, Location loc, Value val,
+                        Value mem, ValueRange indices) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  SmallVector<Attribute> numList;
+  for (size_t i = 0; i < indices.size(); ++i) {
+    numList.push_back(builder.getUI32IntegerAttr(i));
+  }
+  ArrayAttr numArr = rewriter.getArrayAttr(numList);
+  state.addAttribute("indices_numList", numArr);
+
+  SmallVector<Attribute> attrList;
+  ArrayAttr attrArr = rewriter.getArrayAttr(attrList);
+  state.addAttribute("indices", attrArr);
+
+  build(builder, state, indices, val, mem);
+  return cast<StoreOp>(rewriter.createOperation(state));
+}
+
 static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();

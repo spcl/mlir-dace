@@ -166,12 +166,27 @@ public:
   }
 };
 
+class MemrefStoreToSDIR : public OpConversionPattern<memref::StoreOp> {
+public:
+  using OpConversionPattern<memref::StoreOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    StoreOp::create(rewriter, op.getLoc(), adaptor.value(), adaptor.memref(),
+                    adaptor.indices());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(1, ctxt);
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
+  patterns.add<MemrefStoreToSDIR>(converter, ctxt);
 }
 
 namespace {
