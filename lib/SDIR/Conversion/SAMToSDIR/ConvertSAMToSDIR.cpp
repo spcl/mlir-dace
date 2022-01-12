@@ -94,8 +94,12 @@ public:
     }
 
     // NOTE: Consider using rewriter
-    state.body().getBlocks().front().eraseArguments(
-        [](BlockArgument ba) { return true; });
+    /* BUG: Affects ops in tasklets
+    rewriter.updateRootInPlace(state, [&] {
+      state.body().getBlocks().front().eraseArguments(
+          [](BlockArgument ba) { return true; });
+    });
+    */
 
     rewriter.eraseOp(op);
     return success();
