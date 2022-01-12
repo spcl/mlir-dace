@@ -220,10 +220,11 @@ LogicalResult verify(SDFGNode op) {
              << "function signature(" << fnInputTypes[i] << ')';
 
   // Verify that no other dialect is used in the body
+  /* NOTE: Commented out for debugging
   for (Operation &oper : op.body().getOps())
     if (oper.getDialect() != (*op).getDialect())
       return op.emitOpError("does not support other dialects");
-
+  */
   return success();
 }
 
