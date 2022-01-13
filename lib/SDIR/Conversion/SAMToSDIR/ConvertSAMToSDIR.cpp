@@ -96,7 +96,6 @@ public:
           state.body().getBlocks().front().getArgument(i), sdfg.getArgument(i));
     }
 
-    // NOTE: Consider using rewriter
     /* BUG: Affects ops in tasklets
     rewriter.updateRootInPlace(state, [&] {
       state.body().getBlocks().front().eraseArguments(
@@ -119,16 +118,9 @@ public:
     // TODO: Check if there is a proper way of doing this
     if (op->getDialect()->getNamespace() == "arith" ||
         op->getDialect()->getNamespace() == "math") {
-      if (isa<TaskletNode>(op->getParentOp())) {
-        // Operation already in a tasklet
-        return failure();
-      }
 
-      // NOTE: For debugging only
-      //if (isa<scf::ForOp>(op->getParentOp())) {
-        // Wait for conversion to sdfg state machine
-      //  return failure();
-     // }
+      if (isa<TaskletNode>(op->getParentOp()))
+        return failure(); // Operation already in a tasklet
 
       FunctionType ft =
           rewriter.getFunctionType(op->getOperandTypes(), op->getResultTypes());
@@ -281,8 +273,7 @@ public:
     // TODO: remove block argument
     rewriter.updateRootInPlace(body, [&] {
       for (Value v : vals) {
-        v.replaceUsesWithIf(mapping.lookup(v),
-                            [&](OpOperand &oo) { return true; });
+        v.replaceAllUsesWith(mapping.lookup(v));
       }
     });
 
