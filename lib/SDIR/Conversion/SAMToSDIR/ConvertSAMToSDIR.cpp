@@ -115,26 +115,6 @@ public:
   }
 };
 
-class MemletToArray : public OpConversionPattern<SDFGNode> {
-public:
-  using OpConversionPattern<SDFGNode>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(SDFGNode op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    printf("starting\n");
-    for (Value v : adaptor.getOperands()) {
-      std::string val;
-      llvm::raw_string_ostream valStream(val);
-      v.print(valStream);
-      printf("val: %s\n", val);
-    }
-
-    // rewriter.eraseOp(op);
-    return failure();
-  }
-};
-
 class OpToTasklet : public ConversionPattern {
 public:
   OpToTasklet(TypeConverter &converter, MLIRContext *context)
@@ -287,14 +267,7 @@ public:
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
 
     for (unsigned i = 0; i < vals.size(); ++i) {
-      if (ArrayType art =
-              sdfg.getArgument(i + 3).getType().dyn_cast<ArrayType>()) {
-        GetAccessOp gao = GetAccessOp::create(rewriter, op.getLoc(), art,
-                                              sdfg.getArgument(i + 3));
-        vals[i].replaceAllUsesWith(gao);
-      } else {
-        vals[i].replaceAllUsesWith(sdfg.getArgument(i + 3));
-      }
+      vals[i].replaceAllUsesWith(sdfg.getArgument(i + 3));
     }
 
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
@@ -312,6 +285,11 @@ public:
 
     rewriter.replaceUsesOfBlockArgument(
         body.body().getBlocks().front().getArgument(0), symop);
+
+    // NOTE: Infinite loop
+    // rewriter.createBlock(&body.body());
+    // rewriter.mergeBlocks(&body.body().getBlocks().front(),
+    //                     &body.body().getBlocks().back(), {symop});
 
     rewriter.restoreInsertionPoint(ip);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
@@ -357,7 +335,6 @@ void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
   patterns.add<MemrefStoreToSDIR>(converter, ctxt);
   patterns.add<SCFForToSDIR>(converter, ctxt);
-  patterns.add<MemletToArray>(converter, ctxt);
 }
 
 namespace {
