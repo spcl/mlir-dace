@@ -60,23 +60,6 @@ public:
   }
 };
 
-class MemletToArrayConverter : public TypeConverter {
-public:
-  MemletToArrayConverter() {
-    addConversion([](Type type) { return type; });
-    addConversion(convertMemletTypes);
-  }
-
-  static Optional<Type> convertMemletTypes(Type type) {
-    if (MemletType mem = type.dyn_cast<MemletType>()) {
-      return ArrayType::get(mem.getContext(), mem.getElementType(),
-                            mem.getSymbols(), mem.getIntegers(),
-                            mem.getShape());
-    }
-    return llvm::None;
-  }
-};
-
 class FuncToSDFG : public OpConversionPattern<FuncOp> {
 public:
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -91,30 +74,19 @@ public:
             .failed())
       return failure();
 
-    MemletToArrayConverter converter;
-    SmallVector<Type> inputResultsArr;
-    if (converter.convertTypes(inputResults, inputResultsArr).failed())
-      return failure();
-
     SmallVector<Type> outputResults;
     if (getTypeConverter()
             ->convertTypes(op.getType().getResults(), outputResults)
             .failed())
       return failure();
 
-    FunctionType ft = rewriter.getFunctionType(inputResultsArr, outputResults);
+    FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft, op.sym_name());
     StateNode state = StateNode::create(rewriter, op.getLoc());
     rewriter.createBlock(&state.body());
 
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
-      if (ArrayType art = sdfg.getArgument(i).getType().dyn_cast<ArrayType>()) {
-        GetAccessOp gao = GetAccessOp::create(rewriter, op.getLoc(), art,
-                                              sdfg.getArgument(i));
-        op.getArgument(i).replaceAllUsesWith(gao);
-      } else {
-        op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
-      }
+      op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
     }
 
     rewriter.updateRootInPlace(sdfg, [&] {
@@ -293,11 +265,6 @@ public:
     if (getTypeConverter()->convertTypes(inputs, inputResults).failed())
       return failure();
 
-    MemletToArrayConverter converter;
-    SmallVector<Type> inputResultsArr;
-    if (converter.convertTypes(inputResults, inputResultsArr).failed())
-      return failure();
-
     FunctionType ft = rewriter.getFunctionType(inputResults, {});
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
     AllocSymbolOp::create(rewriter, op.getLoc(), "idx");
@@ -318,25 +285,21 @@ public:
 
     rewriter.restoreInsertionPoint(ip);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
-    // rewriter.createBlock(&body.body());
 
     for (unsigned i = 0; i < vals.size(); ++i) {
-      /*if (ArrayType art =
+      if (ArrayType art =
               sdfg.getArgument(i + 3).getType().dyn_cast<ArrayType>()) {
         GetAccessOp gao = GetAccessOp::create(rewriter, op.getLoc(), art,
                                               sdfg.getArgument(i + 3));
         vals[i].replaceAllUsesWith(gao);
-      } else {*/
-      vals[i].replaceAllUsesWith(sdfg.getArgument(i + 3));
-      //}
+      } else {
+        vals[i].replaceAllUsesWith(sdfg.getArgument(i + 3));
+      }
     }
 
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
     rewriter.eraseOp(op);
-
-    // rewriter.mergeBlocks(&body.body().getBlocks().front(),
-    //                      &body.body().getBlocks().back(), {symop});
 
     rewriter.setInsertionPointToStart(&body.body().getBlocks().front());
 
@@ -347,7 +310,8 @@ public:
             .getPointer() == nullptr)
       return failure();
 
-    rewriter.replaceUsesOfBlockArgument(body.body().getArgument(0), symop);
+    rewriter.replaceUsesOfBlockArgument(
+        body.body().getBlocks().front().getArgument(0), symop);
 
     rewriter.restoreInsertionPoint(ip);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
@@ -387,12 +351,12 @@ public:
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
-  patterns.add<FuncToSDFG>(converter, ctxt); // ERR
+  patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
   patterns.add<EraseTerminators>(1, ctxt);
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
   patterns.add<MemrefStoreToSDIR>(converter, ctxt);
-  patterns.add<SCFForToSDIR>(converter, ctxt); // ERR
+  patterns.add<SCFForToSDIR>(converter, ctxt);
   patterns.add<MemletToArray>(converter, ctxt);
 }
 
