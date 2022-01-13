@@ -20,16 +20,15 @@ def SDIR_EdgeOp : SDIR_Op<"edge", [
         ```
     }];
 
-    let arguments = (ins FlatSymbolRefAttr:$src, FlatSymbolRefAttr:$dest, 
-                        OptionalAttr<TypedArrayAttrBase<StrAttr, 
-                                    "assignment array">>:$assign, 
-                        OptionalAttr<StrAttr>:$condition);
+    let arguments = (ins 
+        FlatSymbolRefAttr:$src, FlatSymbolRefAttr:$dest, 
+        OptionalAttr<TypedArrayAttrBase<StrAttr, "assignment array">>:$assign, 
+        OptionalAttr<StrAttr>:$condition,
+        Optional<AnyType>:$ref
+    );
 
     let extraClassDeclaration = [{
-        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to);
-        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, ArrayAttr &assign);
-        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, StringAttr &condition);
-        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, ArrayAttr &assign, StringAttr &condition);
+        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, ArrayAttr &assign, StringAttr &condition, Value ref);
     }];
 }
 

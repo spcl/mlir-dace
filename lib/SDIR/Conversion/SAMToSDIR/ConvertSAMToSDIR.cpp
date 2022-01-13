@@ -274,25 +274,24 @@ public:
     // Edges
     rewriter.restoreInsertionPoint(ip);
 
-    // TODO: Fix arg naming
-    /*AsmState prState(sdfg);
-    std::string nameArg0;
-    llvm::raw_string_ostream nameArg0Stream(nameArg0);
-    sdfg.getArgument(0).printAsOperand(nameArg0Stream, prState);
-    nameArg0.erase(0, 1); // Remove %-sign
-    */
+    ArrayAttr emptyArr;
+    StringAttr emptyStr;
 
-    ArrayAttr initArr = rewriter.getStrArrayAttr({"idx: arg0"});
-    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr);
+    ArrayAttr initArr = rewriter.getStrArrayAttr({"idx: ref"});
+    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
+                   sdfg.getArgument(0));
 
-    StringAttr guardStr = rewriter.getStringAttr("idx < arg1");
-    EdgeOp::create(rewriter, op.getLoc(), guard, body, guardStr);
+    StringAttr guardStr = rewriter.getStringAttr("idx < ref");
+    EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
+                   sdfg.getArgument(1));
 
-    ArrayAttr bodyArr = rewriter.getStrArrayAttr({"idx: idx + arg2"});
-    EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr);
+    ArrayAttr bodyArr = rewriter.getStrArrayAttr({"idx: idx + ref"});
+    EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr, emptyStr,
+                   sdfg.getArgument(2));
 
-    StringAttr exitStr = rewriter.getStringAttr("not(idx < arg1)");
-    EdgeOp::create(rewriter, op.getLoc(), guard, exit, exitStr);
+    StringAttr exitStr = rewriter.getStringAttr("not(idx < ref)");
+    EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
+                   sdfg.getArgument(1));
 
     // TODO: add call
     rewriter.setInsertionPointAfter(sdfg);

@@ -784,30 +784,12 @@ void ConsumeNode::setExitID(unsigned id) {
 //===----------------------------------------------------------------------===//
 
 EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
-                      StateNode &to, ArrayAttr &assign, StringAttr &condition) {
+                      StateNode &to, ArrayAttr &assign, StringAttr &condition,
+                      Value ref) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, from.sym_name(), to.sym_name(), assign, condition);
+  build(builder, state, from.sym_name(), to.sym_name(), assign, condition, ref);
   return cast<EdgeOp>(rewriter.createOperation(state));
-}
-
-EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
-                      StateNode &to, ArrayAttr &assign) {
-  StringAttr condition;
-  return create(rewriter, loc, from, to, assign, condition);
-}
-
-EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
-                      StateNode &to, StringAttr &condition) {
-  ArrayAttr assign;
-  return create(rewriter, loc, from, to, assign, condition);
-}
-
-EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
-                      StateNode &to) {
-  ArrayAttr assign;
-  StringAttr condition;
-  return create(rewriter, loc, from, to, assign, condition);
 }
 
 static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
@@ -816,6 +798,19 @@ static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
 
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
+
+  if (parser.parseOptionalLParen().succeeded()) {
+    OpAsmParser::OperandType op;
+    SmallVector<Value> valList;
+    Type t;
+
+    if (parser.parseKeyword("ref") || parser.parseColon() ||
+        parser.parseOperand(op) || parser.parseColon() || parser.parseType(t) ||
+        parser.parseRParen() || parser.resolveOperands(op, t, valList))
+      return failure();
+
+    result.addOperands(valList);
+  }
 
   if (parser.parseAttribute(srcAttr, "src", result.attributes))
     return failure();
@@ -832,6 +827,8 @@ static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
 static void print(OpAsmPrinter &p, EdgeOp op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
   p << ' ';
+  if (!op.refMutable().empty())
+    p << "(ref: " << op.ref() << ": " << op.ref().getType() << ") ";
   p.printAttributeWithoutType(op.srcAttr());
   p << " -> ";
   p.printAttributeWithoutType(op.destAttr());
