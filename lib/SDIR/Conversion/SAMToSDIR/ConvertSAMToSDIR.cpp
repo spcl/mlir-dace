@@ -5,6 +5,7 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 
 using namespace mlir;
@@ -122,7 +123,7 @@ public:
 
       // NOTE: For debugging only
       if (isa<scf::ForOp>(op->getParentOp())) {
-        // Operation already in a tasklet
+        // Wait for conversion to sdfg state machine
         return failure();
       }
 
@@ -208,15 +209,34 @@ public:
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
 
-    FunctionType ft = rewriter.getFunctionType(
-        {
-            rewriter.getIndexType(), // lower bound
-            rewriter.getIndexType(), // upper bound
-            rewriter.getIndexType()  // step bound
-        },
-        {});
+    SmallVector<Value> vals;
+    SmallVector<Type> types;
+    SetVector<Value> valSet;
+    for (Operation &nested : (*op).getRegions().front().getOps()) {
+      for (Value v : nested.getOperands()) {
+        if (op.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
+          vals.push_back(v);
+          types.push_back(v.getType());
+          valSet.insert(v);
+        }
+      }
+    }
+
+    // SDFG
+    SmallVector<Type> inputs = {
+        rewriter.getIndexType(), // lower bound
+        rewriter.getIndexType(), // upper bound
+        rewriter.getIndexType()  // step bound
+    };
+    inputs.append(types);
+    FunctionType ft = rewriter.getFunctionType(inputs, {});
 
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
+    BlockAndValueMapping mapping;
+    for (size_t i = 0; i < vals.size(); ++i) {
+      mapping.map(vals[i], sdfg.getArgument(i + 3));
+    }
+
     AllocSymbolOp::create(rewriter, op.getLoc(), "idx");
 
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
@@ -229,21 +249,38 @@ public:
           SymbolRefAttr::get(op.getLoc().getContext(), init.sym_name()));
     });
 
+    // States
     rewriter.restoreInsertionPoint(ip);
     StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
     rewriter.createBlock(&guard.body());
 
+    // TODO: Add sym eval and replace loop value
     rewriter.restoreInsertionPoint(ip);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
 
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
+    rewriter.updateRootInPlace(body, [&] {
+      for (Value v : vals) {
+        v.replaceUsesWithIf(mapping.lookup(v),
+                            [&](OpOperand &oo) { return true; });
+      }
+    });
 
     rewriter.restoreInsertionPoint(ip);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
     rewriter.createBlock(&exit.body());
 
+    // Edges
     rewriter.restoreInsertionPoint(ip);
+
+    // TODO: Fix arg naming
+    /*AsmState prState(sdfg);
+    std::string nameArg0;
+    llvm::raw_string_ostream nameArg0Stream(nameArg0);
+    sdfg.getArgument(0).printAsOperand(nameArg0Stream, prState);
+    nameArg0.erase(0, 1); // Remove %-sign
+    */
 
     ArrayAttr initArr = rewriter.getStrArrayAttr({"idx: arg0"});
     EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr);
@@ -257,8 +294,11 @@ public:
     StringAttr exitStr = rewriter.getStringAttr("not(idx < arg1)");
     EdgeOp::create(rewriter, op.getLoc(), guard, exit, exitStr);
 
+    // TODO: add call
     rewriter.setInsertionPointAfter(sdfg);
-    sdir::CallOp::create(rewriter, op.getLoc(), sdfg, op.getOperands());
+    SmallVector<Value> callVals = op.getOperands();
+    // callVals.append(vals);
+    // sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callVals);
 
     rewriter.eraseOp(op);
     return success();
