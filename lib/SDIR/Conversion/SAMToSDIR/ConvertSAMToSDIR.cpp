@@ -74,6 +74,9 @@ public:
     FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
     StateNode state = StateNode::create(rewriter, op.getLoc());
+    for (unsigned i = 0; i < op.getNumArguments(); ++i) {
+      op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
+    }
 
     rewriter.updateRootInPlace(sdfg, [&] {
       sdfg.entryAttr(
@@ -122,10 +125,10 @@ public:
       }
 
       // NOTE: For debugging only
-      if (isa<scf::ForOp>(op->getParentOp())) {
+      //if (isa<scf::ForOp>(op->getParentOp())) {
         // Wait for conversion to sdfg state machine
-        return failure();
-      }
+      //  return failure();
+     // }
 
       FunctionType ft =
           rewriter.getFunctionType(op->getOperandTypes(), op->getResultTypes());
@@ -202,16 +205,17 @@ public:
   }
 };
 
-class SCFForToSDIR : public OpRewritePattern<scf::ForOp> {
+class SCFForToSDIR : public OpConversionPattern<scf::ForOp> {
 public:
-  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(scf::ForOp op,
-                                PatternRewriter &rewriter) const override {
-
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> vals;
     SmallVector<Type> types;
     SetVector<Value> valSet;
+
     for (Operation &nested : (*op).getRegions().front().getOps()) {
       for (Value v : nested.getOperands()) {
         if (op.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
@@ -229,16 +233,21 @@ public:
         rewriter.getIndexType()  // step bound
     };
     inputs.append(types);
-    FunctionType ft = rewriter.getFunctionType(inputs, {});
+
+    SmallVector<Type> inputResults;
+    if (getTypeConverter()->convertTypes(inputs, inputResults).failed())
+      return failure();
+
+    FunctionType ft = rewriter.getFunctionType(inputResults, {});
 
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
     BlockAndValueMapping mapping;
+
     for (size_t i = 0; i < vals.size(); ++i) {
       mapping.map(vals[i], sdfg.getArgument(i + 3));
     }
 
     AllocSymbolOp::create(rewriter, op.getLoc(), "idx");
-
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
 
     StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
@@ -254,12 +263,22 @@ public:
     StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
     rewriter.createBlock(&guard.body());
 
-    // TODO: Add sym eval and replace loop value
     rewriter.restoreInsertionPoint(ip);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
-
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
+    rewriter.setInsertionPointToStart(&body.body().getBlocks().front());
+
+    SymOp symop =
+        SymOp::create(rewriter, op.getLoc(), rewriter.getIndexType(), "idx");
+
+    if (rewriter.convertRegionTypes(&body.body(), *getTypeConverter())
+            .getPointer() == nullptr)
+      return failure();
+
+    rewriter.replaceUsesOfBlockArgument(body.body().getArgument(0), symop);
+
+    // TODO: remove block argument
     rewriter.updateRootInPlace(body, [&] {
       for (Value v : vals) {
         v.replaceUsesWithIf(mapping.lookup(v),
@@ -293,11 +312,10 @@ public:
     EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
                    sdfg.getArgument(1));
 
-    // TODO: add call
     rewriter.setInsertionPointAfter(sdfg);
-    SmallVector<Value> callVals = op.getOperands();
-    // callVals.append(vals);
-    // sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callVals);
+    SmallVector<Value> callVals = adaptor.getOperands();
+    callVals.append(vals);
+    sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callVals);
 
     rewriter.eraseOp(op);
     return success();
@@ -312,7 +330,7 @@ void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
   patterns.add<EraseTerminators>(1, ctxt);
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
   patterns.add<MemrefStoreToSDIR>(converter, ctxt);
-  patterns.add<SCFForToSDIR>(ctxt);
+  patterns.add<SCFForToSDIR>(converter, ctxt);
 }
 
 namespace {

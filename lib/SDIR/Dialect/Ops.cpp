@@ -220,11 +220,9 @@ LogicalResult verify(SDFGNode op) {
              << "function signature(" << fnInputTypes[i] << ')';
 
   // Verify that no other dialect is used in the body
-  /* NOTE: Commented out for debugging
   for (Operation &oper : op.body().getOps())
     if (oper.getDialect() != (*op).getDialect())
       return op.emitOpError("does not support other dialects");
-  */
   return success();
 }
 
@@ -339,11 +337,9 @@ static void print(OpAsmPrinter &p, StateNode op) {
 LogicalResult verify(StateNode op) {
   // Verify that no other dialect is used in the body
   // Except func operations
-  /* NOTE: Commented out for debugging
   for (Operation &oper : op.body().getOps())
     if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
       return op.emitOpError("does not support other dialects");
-  */
   return success();
 }
 
@@ -2086,6 +2082,14 @@ LogicalResult verify(AllocSymbolOp op) {
 //===----------------------------------------------------------------------===//
 // SymOp
 //===----------------------------------------------------------------------===//
+
+SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
+                    StringRef expr) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, type, expr);
+  return cast<SymOp>(rewriter.createOperation(state));
+}
 
 static ParseResult parseSymOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

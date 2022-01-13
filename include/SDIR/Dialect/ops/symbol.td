@@ -50,6 +50,9 @@ def SDIR_SymOp : SDIR_Op<"sym">{
 
     let arguments = (ins StrAttr:$expr);
     let results = (outs AnyTypeOf<[AnyInteger, Index]>:$res);
+    let extraClassDeclaration = [{
+        static SymOp create(PatternRewriter &rewriter, Location loc, Type t, StringRef expr);
+    }];
 }
 
 #endif // SDIR_SymbolOps
