@@ -30,9 +30,9 @@ struct SDIRTarget : public ConversionTarget {
   }
 };
 
-class MemrefTypeConverter : public TypeConverter {
+class MemrefToMemletConverter : public TypeConverter {
 public:
-  MemrefTypeConverter() {
+  MemrefToMemletConverter() {
     addConversion([](Type type) { return type; });
     addConversion(convertMemrefTypes);
   }
@@ -60,6 +60,23 @@ public:
   }
 };
 
+class MemletToArrayConverter : public TypeConverter {
+public:
+  MemletToArrayConverter() {
+    addConversion([](Type type) { return type; });
+    addConversion(convertMemletTypes);
+  }
+
+  static Optional<Type> convertMemletTypes(Type type) {
+    if (MemletType mem = type.dyn_cast<MemletType>()) {
+      return ArrayType::get(mem.getContext(), mem.getElementType(),
+                            mem.getSymbols(), mem.getIntegers(),
+                            mem.getShape());
+    }
+    return llvm::None;
+  }
+};
+
 class FuncToSDFG : public OpConversionPattern<FuncOp> {
 public:
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -74,17 +91,30 @@ public:
             .failed())
       return failure();
 
+    MemletToArrayConverter converter;
+    SmallVector<Type> inputResultsArr;
+    if (converter.convertTypes(inputResults, inputResultsArr).failed())
+      return failure();
+
     SmallVector<Type> outputResults;
     if (getTypeConverter()
             ->convertTypes(op.getType().getResults(), outputResults)
             .failed())
       return failure();
 
-    FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
+    FunctionType ft = rewriter.getFunctionType(inputResultsArr, outputResults);
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
     StateNode state = StateNode::create(rewriter, op.getLoc());
+    rewriter.createBlock(&state.body());
+
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
-      op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
+      if (ArrayType art = sdfg.getArgument(i).getType().dyn_cast<ArrayType>()) {
+        GetAccessOp gao = GetAccessOp::create(rewriter, op.getLoc(), art,
+                                              sdfg.getArgument(i));
+        op.getArgument(i).replaceAllUsesWith(gao);
+      } else {
+        op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
+      }
     }
 
     rewriter.updateRootInPlace(sdfg, [&] {
@@ -92,7 +122,11 @@ public:
           SymbolRefAttr::get(op.getLoc().getContext(), state.sym_name()));
     });
 
-    rewriter.inlineRegionBefore(op.body(), state.body(), state.body().begin());
+    rewriter.inlineRegionBefore(op.body(), state.body(), state.body().end());
+    rewriter.eraseOp(op);
+    rewriter.mergeBlocks(&state.body().getBlocks().back(),
+                         &state.body().getBlocks().front(),
+                         sdfg.getArguments());
 
     // hasValue() is inaccessable
     if (rewriter.convertRegionTypes(&state.body(), *getTypeConverter())
@@ -105,25 +139,38 @@ public:
           state.body().getBlocks().front().getArgument(i), sdfg.getArgument(i));
     }
 
-    /* BUG: Affects ops in tasklets
-    rewriter.updateRootInPlace(state, [&] {
-      state.body().getBlocks().front().eraseArguments(
-          [](BlockArgument ba) { return true; });
-    });
-    */
-
-    rewriter.eraseOp(op);
     return success();
   }
 };
 
-class OpToTasklet : public RewritePattern {
+class MemletToArray : public OpConversionPattern<SDFGNode> {
 public:
-  OpToTasklet(PatternBenefit benefit, MLIRContext *context)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
+  using OpConversionPattern<SDFGNode>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(SDFGNode op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    printf("starting\n");
+    for (Value v : adaptor.getOperands()) {
+      std::string val;
+      llvm::raw_string_ostream valStream(val);
+      v.print(valStream);
+      printf("val: %s\n", val);
+    }
+
+    // rewriter.eraseOp(op);
+    return failure();
+  }
+};
+
+class OpToTasklet : public ConversionPattern {
+public:
+  OpToTasklet(TypeConverter &converter, MLIRContext *context)
+      : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO: Check if there is a proper way of doing this
     if (op->getDialect()->getNamespace() == "arith" ||
         op->getDialect()->getNamespace() == "math") {
@@ -151,7 +198,6 @@ public:
           sdir::CallOp::create(rewriter, op->getLoc(), task, op->getOperands());
 
       rewriter.replaceOp(op, call.getResults());
-
       return success();
     }
 
@@ -188,7 +234,6 @@ public:
   LogicalResult
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Add parent check
     LoadOp load = LoadOp::create(rewriter, op.getLoc(),
                                  getTypeConverter()->convertType(op.getType()),
                                  adaptor.memref(), adaptor.indices());
@@ -205,7 +250,6 @@ public:
   LogicalResult
   matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Add parent check
     StoreOp::create(rewriter, op.getLoc(), adaptor.value(), adaptor.memref(),
                     adaptor.indices());
     rewriter.eraseOp(op);
@@ -220,8 +264,6 @@ public:
   LogicalResult
   matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Add parent check
-    // NOTE: Debugging
     if (!op.getLoopBody().getOps<scf::ForOp>().empty())
       return failure();
 
@@ -251,18 +293,17 @@ public:
     if (getTypeConverter()->convertTypes(inputs, inputResults).failed())
       return failure();
 
+    MemletToArrayConverter converter;
+    SmallVector<Type> inputResultsArr;
+    if (converter.convertTypes(inputResults, inputResultsArr).failed())
+      return failure();
+
     FunctionType ft = rewriter.getFunctionType(inputResults, {});
-
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
-    BlockAndValueMapping mapping;
-
-    for (size_t i = 0; i < vals.size(); ++i) {
-      mapping.map(vals[i], sdfg.getArgument(i + 3));
-    }
-
     AllocSymbolOp::create(rewriter, op.getLoc(), "idx");
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
 
+    // States
     StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
     rewriter.createBlock(&init.body());
 
@@ -271,15 +312,32 @@ public:
           SymbolRefAttr::get(op.getLoc().getContext(), init.sym_name()));
     });
 
-    // States
     rewriter.restoreInsertionPoint(ip);
     StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
     rewriter.createBlock(&guard.body());
 
     rewriter.restoreInsertionPoint(ip);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
+    // rewriter.createBlock(&body.body());
+
+    for (unsigned i = 0; i < vals.size(); ++i) {
+      /*if (ArrayType art =
+              sdfg.getArgument(i + 3).getType().dyn_cast<ArrayType>()) {
+        GetAccessOp gao = GetAccessOp::create(rewriter, op.getLoc(), art,
+                                              sdfg.getArgument(i + 3));
+        vals[i].replaceAllUsesWith(gao);
+      } else {*/
+      vals[i].replaceAllUsesWith(sdfg.getArgument(i + 3));
+      //}
+    }
+
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
+    rewriter.eraseOp(op);
+
+    // rewriter.mergeBlocks(&body.body().getBlocks().front(),
+    //                      &body.body().getBlocks().back(), {symop});
+
     rewriter.setInsertionPointToStart(&body.body().getBlocks().front());
 
     SymOp symop =
@@ -290,13 +348,6 @@ public:
       return failure();
 
     rewriter.replaceUsesOfBlockArgument(body.body().getArgument(0), symop);
-
-    // TODO: remove block argument
-    rewriter.updateRootInPlace(body, [&] {
-      for (Value v : vals) {
-        v.replaceAllUsesWith(mapping.lookup(v));
-      }
-    });
 
     rewriter.restoreInsertionPoint(ip);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
@@ -329,7 +380,6 @@ public:
     callVals.append(vals);
     sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callVals);
 
-    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -337,12 +387,13 @@ public:
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
-  patterns.add<FuncToSDFG>(converter, ctxt);
-  patterns.add<OpToTasklet>(1, ctxt);
+  patterns.add<FuncToSDFG>(converter, ctxt); // ERR
+  patterns.add<OpToTasklet>(converter, ctxt);
   patterns.add<EraseTerminators>(1, ctxt);
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
   patterns.add<MemrefStoreToSDIR>(converter, ctxt);
-  patterns.add<SCFForToSDIR>(converter, ctxt);
+  patterns.add<SCFForToSDIR>(converter, ctxt); // ERR
+  patterns.add<MemletToArray>(converter, ctxt);
 }
 
 namespace {
@@ -352,11 +403,10 @@ struct SAMToSDIRPass : public SAMToSDIRPassBase<SAMToSDIRPass> {
 } // namespace
 
 void SAMToSDIRPass::runOnOperation() {
-  // NOTE: Maybe change to a pass working on funcs?
   ModuleOp module = getOperation();
 
   RewritePatternSet patterns(&getContext());
-  MemrefTypeConverter converter;
+  MemrefToMemletConverter converter;
   populateSAMToSDIRConversionPatterns(patterns, converter);
 
   SDIRTarget target(getContext());

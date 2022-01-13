@@ -335,6 +335,8 @@ static void print(OpAsmPrinter &p, StateNode op) {
 }
 
 LogicalResult verify(StateNode op) {
+  // NOTE: Debugging
+  return success();
   // Verify that no other dialect is used in the body
   // Except func operations
   for (Operation &oper : op.body().getOps())
@@ -1013,17 +1015,17 @@ bool AllocTransientOp::isInState() {
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
-GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc,
-                                AllocOp arr) {
+GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc, Type t,
+                                Value arr) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
 
-  ArrayType art = arr.getType().cast<ArrayType>();
-  MemletType mem =
-      MemletType::get(loc->getContext(), art.getElementType(), art.getSymbols(),
-                      art.getIntegers(), art.getShape());
+  if (ArrayType art = t.dyn_cast<ArrayType>()) {
+    t = MemletType::get(loc->getContext(), art.getElementType(),
+                        art.getSymbols(), art.getIntegers(), art.getShape());
+  }
 
-  build(builder, state, mem, utils::generateID(), arr);
+  build(builder, state, t, utils::generateID(), arr);
   return cast<GetAccessOp>(rewriter.createOperation(state));
 }
 
@@ -1917,6 +1919,8 @@ LogicalResult verify(sdir::CallOp op) { return success(); }
 
 LogicalResult
 sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  // NOTE: Debugging
+  return success();
   // Check that the callee attribute was specified.
   FlatSymbolRefAttr fnAttr =
       (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
