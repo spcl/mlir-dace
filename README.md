@@ -1,6 +1,7 @@
 [![LIT Test](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml)
 [![Parse Test](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml)
 [![Translation Test](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml)
+[![Conversion Test](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml)
 
 # MLIR-DaCe
 Development repository for the Data-Centric MLIR dialect.
