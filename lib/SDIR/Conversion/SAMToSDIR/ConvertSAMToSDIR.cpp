@@ -1,6 +1,7 @@
 #include "SDIR/Conversion/SAMToSDIR/PassDetail.h"
 #include "SDIR/Conversion/SAMToSDIR/Passes.h"
 #include "SDIR/Dialect/Dialect.h"
+#include "SDIR/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -39,13 +40,21 @@ public:
   static Optional<Type> convertMemrefTypes(Type type) {
     if (MemRefType mem = type.dyn_cast<MemRefType>()) {
       SmallVector<int64_t> ints;
+      SmallVector<StringAttr> symbols;
       SmallVector<bool> shape;
       for (int64_t dim : mem.getShape()) {
-        ints.push_back(dim);
-        shape.push_back(true);
+        if (dim <= 0) {
+          StringAttr sym =
+              StringAttr::get(mem.getContext(), utils::generateName("s"));
+          symbols.push_back(sym);
+          shape.push_back(false);
+        } else {
+          ints.push_back(dim);
+          shape.push_back(true);
+        }
       }
-      return MemletType::get(mem.getContext(), mem.getElementType(), {}, ints,
-                             shape);
+      return MemletType::get(mem.getContext(), mem.getElementType(), symbols,
+                             ints, shape);
     }
     return llvm::None;
   }
@@ -158,7 +167,12 @@ public:
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
 
-    if (isa<mlir::ReturnOp>(op) || isa<scf::YieldOp>(op)) {
+    if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    if (isa<mlir::ReturnOp>(op) && !isa<FuncOp>(op->getParentOp())) {
       rewriter.eraseOp(op);
       return success();
     }
@@ -174,6 +188,7 @@ public:
   LogicalResult
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Add parent check
     LoadOp load = LoadOp::create(rewriter, op.getLoc(),
                                  getTypeConverter()->convertType(op.getType()),
                                  adaptor.memref(), adaptor.indices());
@@ -190,6 +205,7 @@ public:
   LogicalResult
   matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Add parent check
     StoreOp::create(rewriter, op.getLoc(), adaptor.value(), adaptor.memref(),
                     adaptor.indices());
     rewriter.eraseOp(op);
@@ -204,6 +220,11 @@ public:
   LogicalResult
   matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Add parent check
+    // NOTE: Debugging
+    if (!op.getLoopBody().getOps<scf::ForOp>().empty())
+      return failure();
+
     SmallVector<Value> vals;
     SmallVector<Type> types;
     SetVector<Value> valSet;
