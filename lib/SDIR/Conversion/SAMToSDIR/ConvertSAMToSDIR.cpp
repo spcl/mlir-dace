@@ -103,7 +103,7 @@ public:
       return failure();
 
     FunctionType ft = rewriter.getFunctionType(inputResultsArr, outputResults);
-    SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
+    SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft, op.sym_name());
     StateNode state = StateNode::create(rewriter, op.getLoc());
     rewriter.createBlock(&state.body());
 

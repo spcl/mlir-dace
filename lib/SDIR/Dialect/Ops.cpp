@@ -131,6 +131,16 @@ SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
   return sdfg;
 }
 
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
+                          FunctionType ft, StringRef name) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, utils::generateID(), name, "state_0", ft);
+  SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
+  rewriter.createBlock(&sdfg.getRegion(), {}, ft.getInputs());
+  return sdfg;
+}
+
 static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
