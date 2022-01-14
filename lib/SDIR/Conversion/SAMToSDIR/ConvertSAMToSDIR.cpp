@@ -18,15 +18,13 @@ struct SDIRTarget : public ConversionTarget {
     // Every Op in the SDIR Dialect is legal
     addLegalDialect<SDIRDialect>();
     // Implicit top level module operation is legal
-    // if it only contains a single SDFGNode or is empty
-    // TODO: Add checks
+    // if it is empty or only contains a single SDFGNode
     addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
-      return true;
-      //(op.getOps().empty() || !op.getOps<SDFGNode>().empty());
+      size_t numOps = op.body().getBlocks().front().getOperations().size();
+      return numOps == 0 || numOps == 1;
     });
     // All other operations are illegal
-    // NOTE: Disabled for debugging
-    // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
+    markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -379,7 +377,7 @@ void SAMToSDIRPass::runOnOperation() {
   populateSAMToSDIRConversionPatterns(patterns, converter);
 
   SDIRTarget target(getContext());
-  if (failed(applyPartialConversion(module, target, std::move(patterns))))
+  if (failed(applyFullConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }
 
