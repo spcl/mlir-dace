@@ -2085,6 +2085,13 @@ AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
   return cast<AllocSymbolOp>(rewriter.createOperation(state));
 }
 
+AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, sym);
+  return cast<AllocSymbolOp>(Operation::create(state));
+}
+
 static ParseResult parseAllocSymbolOp(OpAsmParser &parser,
                                       OperationState &result) {
   StringAttr symAttr;

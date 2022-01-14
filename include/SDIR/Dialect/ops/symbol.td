@@ -26,6 +26,7 @@ def SDIR_AllocSymbolOp : SDIR_Op<"alloc_symbol", [
 
     let extraClassDeclaration = [{
         static AllocSymbolOp create(PatternRewriter &rewriter, Location loc, StringRef sym);
+        static AllocSymbolOp create(Location loc, StringRef sym);
     }];
 }
 

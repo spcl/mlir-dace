@@ -213,7 +213,7 @@ public:
 
   void getExternalValues(scf::ForOp &root, scf::ForOp &curr,
                          SmallVector<Value> &vals,
-                         SetVector<Value> &valSet) const {
+                         DenseSet<Value> &valSet) const {
     for (Operation &nested : curr.getRegion().getOps()) {
       for (Value v : nested.getOperands()) {
         if (root.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
@@ -244,7 +244,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> valsBounds = {
         adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep()};
-    SetVector<Value> valSet;
+    DenseSet<Value> valSet;
     for (Value v : valsBounds)
       valSet.insert(v);
     SmallVector<Value> vals;

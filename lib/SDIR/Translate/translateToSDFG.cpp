@@ -10,7 +10,13 @@ using namespace sdir;
 using namespace emitter;
 using namespace translation;
 
+//===----------------------------------------------------------------------===//
+// Maps for inserting access nodes & creating symbols
+//===----------------------------------------------------------------------===//
+
 llvm::DenseMap<Operation *, BlockAndValueMapping> allocMaps;
+llvm::DenseMap<Operation *, SmallVector<std::string>> symMaps;
+
 //===----------------------------------------------------------------------===//
 // ModuleOp
 //===----------------------------------------------------------------------===//
@@ -117,6 +123,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   } else {
     jemit.startNamedList("arg_names");
     BlockAndValueMapping argToAlloc;
+    SmallVector<std::string> typeSymbols;
 
     for (BlockArgument bArg : op.getArguments()) {
       AsmState state(op);
@@ -126,13 +133,19 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
       name.erase(0, 1); // Remove %-sign
       jemit.startEntry();
       jemit.printString(name);
+
       AllocOp aop = AllocOp::create(op.getLoc(), bArg.getType(), name);
       bArg.replaceAllUsesExcept(aop, aop);
       op.body().getBlocks().front().push_front(aop);
       argToAlloc.map(bArg, aop);
+
+      if (MemletType mem = bArg.getType().dyn_cast<MemletType>())
+        for (StringAttr sa : mem.getSymbols())
+          typeSymbols.push_back(sa.str());
     }
 
     allocMaps.insert({op.getOperation(), argToAlloc});
+    symMaps.insert({op.getOperation(), typeSymbols});
     jemit.endList(); // arg_names
   }
 
@@ -177,6 +190,12 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.endObject(); // _arrays
 
   jemit.startNamedObject("symbols");
+  for (std::string s : symMaps.lookup(op)) {
+    AllocSymbolOp aso = AllocSymbolOp::create(op.getLoc(), s);
+    if (translateToSDFG(aso, jemit).failed())
+      return failure();
+  }
+
   for (Operation &oper : op.body().getOps()) {
     if (AllocSymbolOp alloc = dyn_cast<AllocSymbolOp>(oper))
       if (translateToSDFG(alloc, jemit).failed())
@@ -287,29 +306,27 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
   // Insert access nodes
   SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
   BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
+
   for (BlockArgument bArg : sdfg.getArguments()) {
     Value alloc = argToAlloc.lookup<Value>(bArg);
+    DenseSet<Operation *> users;
 
-    bool isUsed = false;
     for (Operation *nop : alloc.getUsers()) {
       if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
-        if (state == op) {
-          isUsed = true;
-          break;
-        }
-      } else {
-        mlir::emitError(
-            nop->getLoc(),
-            "Users of SDFG arguments must be direct children of States");
-        return failure();
+        if (state == op)
+          users.insert(nop);
       }
     }
 
-    if (!isUsed)
-      continue;
-    GetAccessOp gao = GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
-    alloc.replaceAllUsesExcept(gao, gao);
-    op.body().getBlocks().front().push_front(gao);
+    if (!users.empty()) {
+      GetAccessOp gao =
+          GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
+      op.body().getBlocks().front().push_front(gao);
+
+      alloc.replaceUsesWithIf(gao, [&](OpOperand &opop) {
+        return users.contains(opop.getOwner());
+      });
+    }
   }
 
   unsigned nodeID = 0;
@@ -718,11 +735,25 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.startNamedList("strides");
-  ArrayRef<int64_t> shape = op.getType().getIntegers();
 
-  for (int i = shape.size() - 1; i > 0; --i) {
+  ArrayRef<bool> shape = op.getType().getShape();
+  ArrayRef<int64_t> integers = op.getType().getIntegers();
+  ArrayRef<StringAttr> symbols = op.getType().getSymbols();
+
+  SmallVector<std::string> strideList;
+  unsigned intIdx = 0;
+  unsigned symIdx = 0;
+
+  for (unsigned i = 0; i < shape.size(); ++i) {
+    if (shape[i])
+      strideList.push_back(std::to_string(integers[intIdx++]));
+    else
+      strideList.push_back(symbols[symIdx++].str());
+  }
+
+  for (int i = strideList.size() - 1; i > 0; --i) {
     jemit.startEntry();
-    jemit.printInt(shape[i]);
+    jemit.printString(strideList[i]);
   }
 
   jemit.startEntry();
@@ -739,9 +770,9 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
     return failure();
 
   jemit.startNamedList("shape");
-  for (int64_t s : shape) {
+  for (std::string s : strideList) {
     jemit.startEntry();
-    jemit.printInt(s);
+    jemit.printString(s);
   }
   jemit.endList(); // shape
 
@@ -835,10 +866,26 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   jemit.startNamedList("strides");
-  ArrayRef<int64_t> shape = op.arr().getType().cast<MemletType>().getIntegers();
-  for (int i = shape.size() - 1; i > 0; --i) {
+
+  GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
+  ArrayRef<bool> shape = gao.getShape();
+  ArrayRef<int64_t> integers = gao.getIntegers();
+  ArrayRef<StringAttr> symbols = gao.getSymbols();
+
+  SmallVector<std::string> strideList;
+  unsigned intIdx = 0;
+  unsigned symIdx = 0;
+
+  for (unsigned i = 0; i < shape.size(); ++i) {
+    if (shape[i])
+      strideList.push_back(std::to_string(integers[intIdx++]));
+    else
+      strideList.push_back(symbols[symIdx++].str());
+  }
+
+  for (int i = strideList.size() - 1; i > 0; --i) {
     jemit.startEntry();
-    jemit.printInt(shape[i]);
+    jemit.printString(strideList[i]);
   }
 
   jemit.startEntry();
