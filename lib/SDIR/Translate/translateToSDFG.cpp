@@ -101,6 +101,22 @@ void printStrides(SmallVector<std::string> strides, JsonEmitter &jemit) {
   jemit.printInt(1);
 }
 
+std::string getValueName(Value v, Operation &stateOp) {
+  std::string name;
+  AsmState state(&stateOp);
+  llvm::raw_string_ostream nameStream(name);
+  v.printAsOperand(nameStream, state);
+  utils::sanitizeName(name);
+  return name;
+}
+
+std::string getTypeName(Type t) {
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  t.print(nameStream);
+  return name;
+}
+
 //===----------------------------------------------------------------------===//
 // ModuleOp
 //===----------------------------------------------------------------------===//
@@ -127,10 +143,7 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
   op.getValue().print(valStream);
   val.erase(val.find(' '));
 
-  AsmState state(op);
-  std::string res;
-  llvm::raw_string_ostream resStream(res);
-  op.getResult().printAsOperand(resStream, state);
+  std::string res = getValueName(op.getResult(), *op);
 
   jemit.startNamedList(res);
 
@@ -210,11 +223,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
     SmallVector<std::string> typeSymbols;
 
     for (BlockArgument bArg : op.getArguments()) {
-      AsmState state(op);
-      std::string name;
-      llvm::raw_string_ostream nameStream(name);
-      bArg.printAsOperand(nameStream, state);
-      name.erase(0, 1); // Remove %-sign
+      std::string name = getValueName(bArg, *op);
       jemit.startEntry();
       jemit.printString(name);
 
@@ -338,11 +347,7 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("in_connectors");
   for (BlockArgument bArg : op.getArguments()) {
-    AsmState state(op);
-    std::string name;
-    llvm::raw_string_ostream nameStream(name);
-    bArg.printAsOperand(nameStream, state);
-    name.erase(0, 1); // Remove %-sign
+    std::string name = getValueName(bArg, *op);
     jemit.printKVPair(name, "null", /*stringify=*/false);
   }
   jemit.endObject(); // in_connectors
@@ -491,8 +496,6 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     ++numOps;
   }
 
-  AsmState state(op);
-
   if (dyn_cast<arith::AddFOp>(firstOp) || dyn_cast<arith::AddIOp>(firstOp)) {
     std::string nameArg0 = op.getInputName(0);
     std::string nameArg1 = op.getInputName(1);
@@ -552,8 +555,6 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
 
   jemit.startNamedObject("code");
 
-  AsmState state(op);
-
   // Try to lift the body of the tasklet
   // If lifting fails (body is complex) then emit MLIR code directly
   // liftToPython() emits automatically emits the generated python code
@@ -564,14 +565,8 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
     // Prints all arguments with types
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
       BlockArgument bArg = op.getArgument(i);
-
-      std::string name;
-      llvm::raw_string_ostream nameStream(name);
-      bArg.printAsOperand(nameStream, state);
-
-      std::string type;
-      llvm::raw_string_ostream typeStream(type);
-      bArg.getType().print(typeStream);
+      std::string name = getValueName(bArg, *op);
+      std::string type = getTypeName(bArg.getType());
 
       if (i > 0)
         code.append(", ");
@@ -582,11 +577,8 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
 
     code.append(") -> ");
 
-    std::string retType;
-    llvm::raw_string_ostream retTypeStream(retType);
     for (Type res : op.getCallableResults())
-      res.print(retTypeStream);
-    code.append(retType);
+      code.append(getTypeName(res));
 
     code.append(" {\\n");
 
@@ -651,12 +643,9 @@ LogicalResult translation::translateToSDFG(MapNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   jemit.startNamedList("params");
-  AsmState state(op);
   for (BlockArgument arg : op.getBody()->getArguments()) {
     jemit.startEntry();
-    std::string name;
-    llvm::raw_string_ostream nameStream(name);
-    arg.printAsOperand(nameStream, state);
+    std::string name = getValueName(arg, *op);
     jemit.printString(name);
   }
   jemit.endList(); // params
@@ -853,11 +842,7 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
 LogicalResult translation::translateToSDFG(AllocTransientOp &op,
                                            JsonEmitter &jemit) {
-  AsmState state(op.getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  op->getResult(0).printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
+  std::string name = getValueName(op.getResult(), *op.getParentSDFG());
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Array");
@@ -1077,11 +1062,7 @@ LogicalResult translation::translateToSDFG(SubviewOp &op, JsonEmitter &jemit) {
 
 LogicalResult translation::translateToSDFG(AllocStreamOp &op,
                                            JsonEmitter &jemit) {
-  AsmState state(op.getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  op->getResult(0).printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
+  std::string name = getValueName(op.getResult(), *op.getParentSDFG());
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
@@ -1111,11 +1092,7 @@ LogicalResult translation::translateToSDFG(AllocStreamOp &op,
 
 LogicalResult translation::translateToSDFG(AllocTransientStreamOp &op,
                                            JsonEmitter &jemit) {
-  AsmState state(op.getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  op->getResult(0).printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
+  std::string name = getValueName(op.getResult(), *op.getParentSDFG());
 
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Stream");
@@ -1245,14 +1222,7 @@ LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
   jemit.printKVPair("src", access.ID());
   jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   jemit.printKVPair("dst", sdfg.ID());
-
-  std::string argname;
-  AsmState state(sdfg);
-  BlockArgument bArg = sdfg.getArgument(argIdx);
-  llvm::raw_string_ostream argnameStream(argname);
-  bArg.printAsOperand(argnameStream, state);
-
-  argname.erase(0, 1); // remove %-sign
+  std::string argname = getValueName(sdfg.getArgument(argIdx), *sdfg);
   jemit.printKVPair("dst_connector", argname);
 
   jemit.endObject();
@@ -1398,9 +1368,7 @@ StringRef translation::translateTypeToSDFG(Type &t, Location &loc,
   if (t.isIndex())
     return "int64";
 
-  std::string type;
-  llvm::raw_string_ostream typeStream(type);
-  t.print(typeStream);
+  std::string type = getTypeName(t);
   mlir::emitError(loc, "Unsupported type: " + type);
 
   return "";
