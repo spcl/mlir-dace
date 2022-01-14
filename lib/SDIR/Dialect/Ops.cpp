@@ -345,8 +345,6 @@ static void print(OpAsmPrinter &p, StateNode op) {
 }
 
 LogicalResult verify(StateNode op) {
-  // NOTE: Debugging
-  return success();
   // Verify that no other dialect is used in the body
   // Except func operations
   for (Operation &oper : op.body().getOps())
@@ -1929,8 +1927,6 @@ LogicalResult verify(sdir::CallOp op) { return success(); }
 
 LogicalResult
 sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-  // NOTE: Debugging
-  return success();
   // Check that the callee attribute was specified.
   FlatSymbolRefAttr fnAttr =
       (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");

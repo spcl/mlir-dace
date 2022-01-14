@@ -137,7 +137,6 @@ public:
       BlockAndValueMapping mapping;
       mapping.map(op->getOperands(), task.getArguments());
 
-      // NOTE: Consider using move() or rewriter.clone()
       Operation *opClone = op->clone(mapping);
       rewriter.updateRootInPlace(
           task, [&] { task.body().getBlocks().front().push_front(opClone); });
@@ -213,23 +212,44 @@ class SCFForToSDIR : public OpConversionPattern<scf::ForOp> {
 public:
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (!op.getLoopBody().getOps<scf::ForOp>().empty())
-      return failure();
-
-    SmallVector<Value> vals;
-    SetVector<Value> valSet;
-
-    for (Operation &nested : op.getRegion().getOps()) {
+  void getExternalValues(scf::ForOp &root, scf::ForOp &curr,
+                         SmallVector<Value> &vals,
+                         SetVector<Value> &valSet) const {
+    for (Operation &nested : curr.getRegion().getOps()) {
       for (Value v : nested.getOperands()) {
-        if (op.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
+        if (root.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
           vals.push_back(v);
           valSet.insert(v);
         }
       }
+      if (scf::ForOp fop = dyn_cast<scf::ForOp>(nested)) {
+        getExternalValues(root, fop, vals, valSet);
+      }
     }
+  }
+
+  bool isNested(scf::ForOp &root, Operation &op) const {
+    for (Operation &nested : root.getRegion().getOps()) {
+      if (&nested == &op)
+        return true;
+
+      if (scf::ForOp fop = dyn_cast<scf::ForOp>(nested)) {
+        return isNested(fop, op);
+      }
+    }
+    return false;
+  }
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // if (!op.getLoopBody().getOps<scf::ForOp>().empty())
+    //   return failure();
+
+    SmallVector<Value> vals;
+    SetVector<Value> valSet;
+
+    getExternalValues(op, op, vals, valSet);
 
     // SDFG
     SmallVector<Type> inputs = {
@@ -265,23 +285,15 @@ public:
     rewriter.restoreInsertionPoint(ip);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
 
+    for (unsigned i = 0; i < vals.size(); ++i) {
+      vals[i].replaceUsesWithIf(sdfg.getArgument(i + 3), [&](OpOperand &opop) {
+        return isNested(op, *opop.getOwner());
+      });
+    }
+
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
     rewriter.eraseOp(op);
-
-    for (unsigned i = 0; i < vals.size(); ++i) {
-      vals[i].replaceUsesWithIf(sdfg.getArgument(i + 3), [&](OpOperand &opop) {
-        if (opop.getOwner()->getParentOp() == body) {
-          return true;
-        }
-
-        if (opop.getOwner()->getParentOp()->getParentOp() == body) {
-          return true;
-        }
-
-        return false;
-      });
-    }
 
     rewriter.setInsertionPointToStart(&body.body().getBlocks().front());
 
@@ -295,10 +307,11 @@ public:
     rewriter.replaceUsesOfBlockArgument(
         body.body().getBlocks().front().getArgument(0), symop);
 
-    // NOTE: Infinite loop
-    // rewriter.createBlock(&body.body());
-    // rewriter.mergeBlocks(&body.body().getBlocks().front(),
-    //                     &body.body().getBlocks().back(), {symop});
+    // body.body().getBlocks().front().eraseArgument(0);
+    //  NOTE: Infinite loop
+    //  rewriter.createBlock(&body.body());
+    //  rewriter.mergeBlocks(&body.body().getBlocks().front(),
+    //                      &body.body().getBlocks().back(), {symop});
 
     rewriter.restoreInsertionPoint(ip);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
