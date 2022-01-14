@@ -26,6 +26,7 @@ def SDIR_GetAccessOp : SDIR_Op<"get_access", [
 
     let extraClassDeclaration = [{
         static GetAccessOp create(PatternRewriter &rewriter, Location loc, Type t, Value arr);
+        static GetAccessOp create(Location loc, Type t, Value arr);
         Type getAllocType();
         ArrayRef<StringAttr> getSymbols();
         ArrayRef<int64_t> getIntegers();

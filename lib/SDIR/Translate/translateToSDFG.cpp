@@ -27,6 +27,7 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
+// TODO: Remove. ConstantOps in SDFGs are obsolete
 LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
   std::string val;
   llvm::raw_string_ostream valStream(val);
@@ -272,6 +273,30 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
   jemit.endObject(); // attributes
 
   jemit.startNamedList("nodes");
+
+  // Insert access nodes
+  for (BlockArgument bArg : cast<SDFGNode>(op->getParentOp()).getArguments()) {
+    bool isUsed = false;
+    for (Operation *nop : bArg.getUsers()) {
+      if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
+        if (state == op) {
+          isUsed = true;
+          break;
+        }
+      } else {
+        mlir::emitError(
+            nop->getLoc(),
+            "Users of SDFG arguments must be direct children of States");
+        return failure();
+      }
+    }
+
+    if (!isUsed)
+      continue;
+    GetAccessOp gao = GetAccessOp::create(op.getLoc(), bArg.getType(), bArg);
+    bArg.replaceAllUsesWith(gao);
+    op.body().getBlocks().front().push_front(gao);
+  }
 
   unsigned nodeID = 0;
   for (Operation &oper : op.body().getOps()) {

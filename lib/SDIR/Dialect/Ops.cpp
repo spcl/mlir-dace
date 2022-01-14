@@ -1037,6 +1037,19 @@ GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc, Type t,
   return cast<GetAccessOp>(rewriter.createOperation(state));
 }
 
+GetAccessOp GetAccessOp::create(Location loc, Type t, Value arr) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  if (ArrayType art = t.dyn_cast<ArrayType>()) {
+    t = MemletType::get(loc->getContext(), art.getElementType(),
+                        art.getSymbols(), art.getIntegers(), art.getShape());
+  }
+
+  build(builder, state, t, utils::generateID(), arr);
+  return cast<GetAccessOp>(Operation::create(state));
+}
+
 static ParseResult parseGetAccessOp(OpAsmParser &parser,
                                     OperationState &result) {
   IntegerAttr intAttr =
