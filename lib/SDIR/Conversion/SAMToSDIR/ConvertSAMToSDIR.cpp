@@ -1,3 +1,4 @@
+// BUG: Remapping of values faulty
 #include "SDIR/Conversion/SAMToSDIR/PassDetail.h"
 #include "SDIR/Conversion/SAMToSDIR/Passes.h"
 #include "SDIR/Dialect/Dialect.h"
