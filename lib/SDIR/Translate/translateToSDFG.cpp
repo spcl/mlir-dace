@@ -420,6 +420,19 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
     }
   }
 
+  // get operations requiring indirects
+  SmallVector<Operation *> indirects;
+  SmallVector<Operation *> directs;
+  for (Operation &oper : op.body().getOps()) {
+    if (StoreOp edge = dyn_cast<StoreOp>(oper)) {
+      if (edge.indicesMutable().empty()) {
+        directs.push_back(&oper);
+      } else {
+        indirects.push_back(&oper);
+      }
+    }
+  }
+
   unsigned nodeID = 0;
   for (Operation &oper : op.body().getOps()) {
     if (TaskletNode tasklet = dyn_cast<TaskletNode>(oper)) {
@@ -459,12 +472,13 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedList("edges");
 
-  for (Operation &oper : op.body().getOps()) {
-    if (CopyOp edge = dyn_cast<CopyOp>(oper))
+  for (Operation *oper : directs)
+    if (StoreOp edge = dyn_cast<StoreOp>(oper))
       if (translateToSDFG(edge, jemit).failed())
         return failure();
 
-    if (StoreOp edge = dyn_cast<StoreOp>(oper))
+  for (Operation &oper : op.body().getOps()) {
+    if (CopyOp edge = dyn_cast<CopyOp>(oper))
       if (translateToSDFG(edge, jemit).failed())
         return failure();
 
@@ -1189,14 +1203,16 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   jemit.startNamedObject("subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-  printIndices(load.getLoc(), load->getAttr("indices"), jemit);
+  if (printIndices(load.getLoc(), load->getAttr("indices"), jemit).failed())
+    return failure();
   jemit.endList();   // ranges
   jemit.endObject(); // subset
 
   jemit.startNamedObject("src_subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-  printIndices(load.getLoc(), load->getAttr("indices"), jemit);
+  if (printIndices(load.getLoc(), load->getAttr("indices"), jemit).failed())
+    return failure();
   jemit.endList();   // ranges
   jemit.endObject(); // src_subset
 
