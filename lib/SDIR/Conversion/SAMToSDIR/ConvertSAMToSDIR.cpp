@@ -220,14 +220,12 @@ public:
       return failure();
 
     SmallVector<Value> vals;
-    SmallVector<Type> types;
     SetVector<Value> valSet;
 
-    for (Operation &nested : (*op).getRegions().front().getOps()) {
+    for (Operation &nested : op.getRegion().getOps()) {
       for (Value v : nested.getOperands()) {
         if (op.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
           vals.push_back(v);
-          types.push_back(v.getType());
           valSet.insert(v);
         }
       }
@@ -239,7 +237,8 @@ public:
         rewriter.getIndexType(), // upper bound
         rewriter.getIndexType()  // step bound
     };
-    inputs.append(types);
+    for (Value v : vals)
+      inputs.push_back(v.getType());
 
     SmallVector<Type> inputResults;
     if (getTypeConverter()->convertTypes(inputs, inputResults).failed())
@@ -266,13 +265,23 @@ public:
     rewriter.restoreInsertionPoint(ip);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
 
-    for (unsigned i = 0; i < vals.size(); ++i) {
-      vals[i].replaceAllUsesWith(sdfg.getArgument(i + 3));
-    }
-
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
     rewriter.eraseOp(op);
+
+    for (unsigned i = 0; i < vals.size(); ++i) {
+      vals[i].replaceUsesWithIf(sdfg.getArgument(i + 3), [&](OpOperand &opop) {
+        if (opop.getOwner()->getParentOp() == body) {
+          return true;
+        }
+
+        if (opop.getOwner()->getParentOp()->getParentOp() == body) {
+          return true;
+        }
+
+        return false;
+      });
+    }
 
     rewriter.setInsertionPointToStart(&body.body().getBlocks().front());
 
