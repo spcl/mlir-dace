@@ -922,6 +922,17 @@ AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res) {
   return cast<AllocOp>(rewriter.createOperation(state));
 }
 
+AllocOp AllocOp::create(Location loc, Type res, StringRef name) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StringAttr nameAttr = builder.getStringAttr(name);
+  if (MemletType mem = res.dyn_cast<MemletType>()) {
+    res = mem.toArray();
+  }
+  build(builder, state, res, {}, nameAttr);
+  return cast<AllocOp>(Operation::create(state));
+}
+
 SDFGNode AllocOp::getParentSDFG() {
   Operation *sdfgOrState = (*this)->getParentOp();
 
@@ -1029,8 +1040,7 @@ GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc, Type t,
   OperationState state(loc, getOperationName());
 
   if (ArrayType art = t.dyn_cast<ArrayType>()) {
-    t = MemletType::get(loc->getContext(), art.getElementType(),
-                        art.getSymbols(), art.getIntegers(), art.getShape());
+    t = art.toMemlet();
   }
 
   build(builder, state, t, utils::generateID(), arr);
@@ -1042,8 +1052,7 @@ GetAccessOp GetAccessOp::create(Location loc, Type t, Value arr) {
   OperationState state(loc, getOperationName());
 
   if (ArrayType art = t.dyn_cast<ArrayType>()) {
-    t = MemletType::get(loc->getContext(), art.getElementType(),
-                        art.getSymbols(), art.getIntegers(), art.getShape());
+    t = art.toMemlet();
   }
 
   build(builder, state, t, utils::generateID(), arr);

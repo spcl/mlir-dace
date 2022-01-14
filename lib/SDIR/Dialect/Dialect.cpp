@@ -126,3 +126,21 @@ void SDIRDialect::printType(Type type, DialectAsmPrinter &os) const {
   if (logRes.failed())
     emitError(nullptr, "Failed to print dialect type");
 }
+
+//===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+MemletType ArrayType::toMemlet() {
+  return MemletType::get(getContext(), getElementType(), getSymbols(),
+                         getIntegers(), getShape());
+}
+
+//===----------------------------------------------------------------------===//
+// MemletType
+//===----------------------------------------------------------------------===//
+
+ArrayType MemletType::toArray() {
+  return ArrayType::get(getContext(), getElementType(), getSymbols(),
+                        getIntegers(), getShape());
+}

@@ -2,12 +2,15 @@
 #include "SDIR/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace mlir;
 using namespace sdir;
 using namespace emitter;
 using namespace translation;
 
+llvm::DenseMap<Operation *, BlockAndValueMapping> allocMaps;
 //===----------------------------------------------------------------------===//
 // ModuleOp
 //===----------------------------------------------------------------------===//
@@ -82,6 +85,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("name", op.sym_name());
 
   jemit.startNamedObject("constants_prop");
+  // TODO: Remove. Obsolete
   for (StateNode state : op.body().getOps<StateNode>())
     for (arith::ConstantOp constOp : state.body().getOps<arith::ConstantOp>())
       if (printConstant(constOp, jemit).failed())
@@ -112,6 +116,7 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
     }
   } else {
     jemit.startNamedList("arg_names");
+    BlockAndValueMapping argToAlloc;
 
     for (BlockArgument bArg : op.getArguments()) {
       AsmState state(op);
@@ -121,8 +126,13 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
       name.erase(0, 1); // Remove %-sign
       jemit.startEntry();
       jemit.printString(name);
+      AllocOp aop = AllocOp::create(op.getLoc(), bArg.getType(), name);
+      bArg.replaceAllUsesExcept(aop, aop);
+      op.body().getBlocks().front().push_front(aop);
+      argToAlloc.map(bArg, aop);
     }
 
+    allocMaps.insert({op.getOperation(), argToAlloc});
     jemit.endList(); // arg_names
   }
 
@@ -275,9 +285,13 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
   jemit.startNamedList("nodes");
 
   // Insert access nodes
-  for (BlockArgument bArg : cast<SDFGNode>(op->getParentOp()).getArguments()) {
+  SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
+  BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
+  for (BlockArgument bArg : sdfg.getArguments()) {
+    Value alloc = argToAlloc.lookup<Value>(bArg);
+
     bool isUsed = false;
-    for (Operation *nop : bArg.getUsers()) {
+    for (Operation *nop : alloc.getUsers()) {
       if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
         if (state == op) {
           isUsed = true;
@@ -293,8 +307,8 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
     if (!isUsed)
       continue;
-    GetAccessOp gao = GetAccessOp::create(op.getLoc(), bArg.getType(), bArg);
-    bArg.replaceAllUsesWith(gao);
+    GetAccessOp gao = GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
+    alloc.replaceAllUsesExcept(gao, gao);
     op.body().getBlocks().front().push_front(gao);
   }
 
@@ -704,7 +718,7 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
   jemit.endList(); // shape
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  printDebuginfo(*op, jemit);
+  translation::printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
 

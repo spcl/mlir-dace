@@ -59,6 +59,8 @@ def SDIR_ArrayType : SDIR_Type<"Array">{
     }];
 
     let extraClassDeclaration = [{
+        MemletType toMemlet();
+
         size_t getUndefRank(){ 
             size_t undefSize = 0;
             for(int64_t dim : getIntegers()) if(dim == -1) undefSize++;
@@ -107,6 +109,7 @@ def SDIR_MemletType : SDIR_Type<"Memlet">{
     }];
 
     let extraClassDeclaration = [{
+        ArrayType toArray();
         size_t getRank(){ return getShape().size(); }
     }];
 }

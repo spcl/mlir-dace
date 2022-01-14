@@ -26,6 +26,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 
     let extraClassDeclaration = [{
         static AllocOp create(PatternRewriter &rewriter, Location loc, Type res);
+        static AllocOp create(Location loc, Type res, StringRef name);
         SDFGNode getParentSDFG();
         bool isInState();
         std::string getName();
