@@ -243,20 +243,19 @@ public:
   LogicalResult
   matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // if (!op.getLoopBody().getOps<scf::ForOp>().empty())
-    //   return failure();
-
-    SmallVector<Value> vals;
+    SmallVector<Value> valsBounds = {
+        adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep()};
     SetVector<Value> valSet;
-
+    for (Value v : valsBounds)
+      valSet.insert(v);
+    SmallVector<Value> vals;
     getExternalValues(op, op, vals, valSet);
 
     // SDFG
-    SmallVector<Type> inputs = {
-        rewriter.getIndexType(), // lower bound
-        rewriter.getIndexType(), // upper bound
-        rewriter.getIndexType()  // step bound
-    };
+    SmallVector<Type> inputs;
+    for (Value v : valsBounds)
+      inputs.push_back(v.getType());
+
     for (Value v : vals)
       inputs.push_back(v.getType());
 
@@ -291,6 +290,12 @@ public:
       });
     }
 
+    for (unsigned i = 0; i < valsBounds.size(); ++i) {
+      valsBounds[i].replaceUsesWithIf(
+          sdfg.getArgument(i),
+          [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
+    }
+
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
     rewriter.eraseOp(op);
@@ -308,10 +313,10 @@ public:
         body.body().getBlocks().front().getArgument(0), symop);
 
     // body.body().getBlocks().front().eraseArgument(0);
-    //  NOTE: Infinite loop
-    //  rewriter.createBlock(&body.body());
-    //  rewriter.mergeBlocks(&body.body().getBlocks().front(),
-    //                      &body.body().getBlocks().back(), {symop});
+    //   NOTE: Infinite loop
+    //   rewriter.createBlock(&body.body());
+    //   rewriter.mergeBlocks(&body.body().getBlocks().front(),
+    //                       &body.body().getBlocks().back(), {symop});
 
     rewriter.restoreInsertionPoint(ip);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
