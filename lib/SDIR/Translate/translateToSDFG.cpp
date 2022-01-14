@@ -18,6 +18,90 @@ llvm::DenseMap<Operation *, BlockAndValueMapping> allocMaps;
 llvm::DenseMap<Operation *, SmallVector<std::string>> symMaps;
 
 //===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+LogicalResult printRange(Location loc, Attribute &attr, JsonEmitter &jemit) {
+  if (StringAttr sym_str = attr.dyn_cast<StringAttr>()) {
+    jemit.startObject();
+    jemit.printKVPair("start", sym_str.getValue());
+    jemit.printKVPair("end", sym_str.getValue());
+    jemit.printKVPair("step", 1);
+    jemit.printKVPair("tile", 1);
+    jemit.endObject();
+  } else if (IntegerAttr sym_int = attr.dyn_cast<IntegerAttr>()) {
+    jemit.startObject();
+    jemit.printKVPair("start", sym_int);
+    jemit.printKVPair("end", sym_int);
+    jemit.printKVPair("step", 1);
+    jemit.printKVPair("tile", 1);
+    jemit.endObject();
+  } else {
+    mlir::emitError(loc, "'indices' must consist of StringAttr or IntegerAttr");
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult printIndices(Location loc, Attribute attr, JsonEmitter &jemit) {
+  if (ArrayAttr syms = attr.dyn_cast<ArrayAttr>()) {
+    if (syms.getValue().size() == 0) {
+      jemit.startObject();
+      jemit.printKVPair("start", 0);
+      jemit.printKVPair("end", 0);
+      jemit.printKVPair("step", 1);
+      jemit.printKVPair("tile", 1);
+      jemit.endObject();
+    }
+
+    for (Attribute sym : syms.getValue()) {
+      if (printRange(loc, sym, jemit).failed())
+        return failure();
+    }
+  } else {
+    mlir::emitError(loc, "'indices' must be an ArrayAttr");
+    return failure();
+  }
+  return success();
+}
+
+SmallVector<std::string> buildStrideList(MemletType mem) {
+  ArrayRef<bool> shape = mem.getShape();
+  ArrayRef<int64_t> integers = mem.getIntegers();
+  ArrayRef<StringAttr> symbols = mem.getSymbols();
+
+  SmallVector<std::string> strideList;
+  unsigned intIdx = 0;
+  unsigned symIdx = 0;
+
+  for (unsigned i = 0; i < shape.size(); ++i) {
+    if (shape[i])
+      strideList.push_back(std::to_string(integers[intIdx++]));
+    else
+      strideList.push_back(symbols[symIdx++].str());
+  }
+  return strideList;
+}
+
+SmallVector<std::string> buildStrideList(GetAccessOp &op) {
+  return buildStrideList(op.getType().cast<MemletType>());
+}
+
+SmallVector<std::string> buildStrideList(AllocOp &op) {
+  return buildStrideList(op.getType().toMemlet());
+}
+
+void printStrides(SmallVector<std::string> strides, JsonEmitter &jemit) {
+  for (int i = strides.size() - 1; i > 0; --i) {
+    jemit.startEntry();
+    jemit.printString(strides[i]);
+  }
+
+  jemit.startEntry();
+  jemit.printInt(1);
+}
+
+//===----------------------------------------------------------------------===//
 // ModuleOp
 //===----------------------------------------------------------------------===//
 
@@ -101,11 +185,11 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 
   if ((*op).hasAttr("arg_names")) {
     Attribute arg_names = op->getAttr("arg_names");
-    if (ArrayAttr arg_names_arr = arg_names.cast<ArrayAttr>()) {
+    if (ArrayAttr arg_names_arr = arg_names.dyn_cast<ArrayAttr>()) {
       jemit.startNamedList("arg_names");
 
       for (Attribute arg_name : arg_names_arr.getValue()) {
-        if (StringAttr arg_name_str = arg_name.cast<StringAttr>()) {
+        if (StringAttr arg_name_str = arg_name.dyn_cast<StringAttr>()) {
           jemit.startEntry();
           jemit.printString(arg_name_str.getValue());
         } else {
@@ -735,29 +819,8 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.startNamedList("strides");
-
-  ArrayRef<bool> shape = op.getType().getShape();
-  ArrayRef<int64_t> integers = op.getType().getIntegers();
-  ArrayRef<StringAttr> symbols = op.getType().getSymbols();
-
-  SmallVector<std::string> strideList;
-  unsigned intIdx = 0;
-  unsigned symIdx = 0;
-
-  for (unsigned i = 0; i < shape.size(); ++i) {
-    if (shape[i])
-      strideList.push_back(std::to_string(integers[intIdx++]));
-    else
-      strideList.push_back(symbols[symIdx++].str());
-  }
-
-  for (int i = strideList.size() - 1; i > 0; --i) {
-    jemit.startEntry();
-    jemit.printString(strideList[i]);
-  }
-
-  jemit.startEntry();
-  jemit.printInt(1);
+  SmallVector<std::string> strideList = buildStrideList(op);
+  printStrides(strideList, jemit);
   jemit.endList(); // strides
 
   Type element = op.getType().getElementType();
@@ -866,30 +929,9 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   jemit.startNamedList("strides");
-
   GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
-  ArrayRef<bool> shape = gao.getShape();
-  ArrayRef<int64_t> integers = gao.getIntegers();
-  ArrayRef<StringAttr> symbols = gao.getSymbols();
-
-  SmallVector<std::string> strideList;
-  unsigned intIdx = 0;
-  unsigned symIdx = 0;
-
-  for (unsigned i = 0; i < shape.size(); ++i) {
-    if (shape[i])
-      strideList.push_back(std::to_string(integers[intIdx++]));
-    else
-      strideList.push_back(symbols[symIdx++].str());
-  }
-
-  for (int i = strideList.size() - 1; i > 0; --i) {
-    jemit.startEntry();
-    jemit.printString(strideList[i]);
-  }
-
-  jemit.startEntry();
-  jemit.printInt(1);
+  SmallVector<std::string> strideList = buildStrideList(gao);
+  printStrides(strideList, jemit);
   jemit.endList(); // strides
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
@@ -902,35 +944,8 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-
-  if (ArrayAttr syms = op->getAttr("indices").cast<ArrayAttr>()) {
-    if (syms.getValue().size() == 0) {
-      jemit.startObject();
-      jemit.printKVPair("start", 0);
-      jemit.printKVPair("end", 0);
-      jemit.printKVPair("step", 1);
-      jemit.printKVPair("tile", 1);
-      jemit.endObject();
-    }
-
-    for (Attribute sym : syms.getValue()) {
-      if (StringAttr sym_str = sym.cast<StringAttr>()) {
-        jemit.startObject();
-        jemit.printKVPair("start", sym_str.getValue());
-        jemit.printKVPair("end", sym_str.getValue());
-        jemit.printKVPair("step", 1);
-        jemit.printKVPair("tile", 1);
-        jemit.endObject();
-      } else {
-        mlir::emitError(op.getLoc(), "'indices' must consist of StringAttr");
-        return failure();
-      }
-    }
-  } else {
-    mlir::emitError(op.getLoc(), "'indices' must be an ArrayAttr");
+  if (printIndices(op.getLoc(), op->getAttr("indices"), jemit).failed())
     return failure();
-  }
-
   jemit.endList();   // ranges
   jemit.endObject(); // subset
 
@@ -938,24 +953,8 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
 
-  if (ArrayAttr syms = op->getAttr("indices").cast<ArrayAttr>()) {
-    for (Attribute sym : syms.getValue()) {
-      if (StringAttr sym_str = sym.cast<StringAttr>()) {
-        jemit.startObject();
-        jemit.printKVPair("start", sym_str.getValue());
-        jemit.printKVPair("end", sym_str.getValue());
-        jemit.printKVPair("step", 1);
-        jemit.printKVPair("tile", 1);
-        jemit.endObject();
-      } else {
-        mlir::emitError(op.getLoc(), "'indices' must consist of StringAttr");
-        return failure();
-      }
-    }
-  } else {
-    mlir::emitError(op.getLoc(), "'indices' must be an ArrayAttr");
+  if (printIndices(op.getLoc(), op->getAttr("indices"), jemit).failed())
     return failure();
-  }
 
   jemit.endList();   // ranges
   jemit.endObject(); // dst_subset
@@ -1185,15 +1184,9 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   jemit.startNamedObject("attributes");
 
   jemit.startNamedList("strides");
-  ArrayRef<int64_t> shape =
-      load.arr().getType().cast<MemletType>().getIntegers();
-  for (int i = shape.size() - 1; i > 0; --i) {
-    jemit.startEntry();
-    jemit.printInt(shape[i]);
-  }
-
-  jemit.startEntry();
-  jemit.printInt(1);
+  GetAccessOp aop = cast<GetAccessOp>(load.arr().getDefiningOp());
+  SmallVector<std::string> strideList = buildStrideList(aop);
+  printStrides(strideList, jemit);
   jemit.endList(); // strides
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
@@ -1206,70 +1199,14 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   jemit.startNamedObject("subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-
-  if (ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()) {
-    if (syms.getValue().size() == 0) {
-      jemit.startObject();
-      jemit.printKVPair("start", 0);
-      jemit.printKVPair("end", 0);
-      jemit.printKVPair("step", 1);
-      jemit.printKVPair("tile", 1);
-      jemit.endObject();
-    }
-
-    for (Attribute sym : syms.getValue()) {
-      if (StringAttr sym_str = sym.cast<StringAttr>()) {
-        jemit.startObject();
-        jemit.printKVPair("start", sym_str.getValue());
-        jemit.printKVPair("end", sym_str.getValue());
-        jemit.printKVPair("step", 1);
-        jemit.printKVPair("tile", 1);
-        jemit.endObject();
-      } else {
-        mlir::emitError(load.getLoc(), "'indices' must consist of StringAttr");
-        return failure();
-      }
-    }
-  } else {
-    mlir::emitError(load.getLoc(), "'indices' must be an ArrayAttr");
-    return failure();
-  }
-
+  printIndices(load.getLoc(), load->getAttr("indices"), jemit);
   jemit.endList();   // ranges
   jemit.endObject(); // subset
 
   jemit.startNamedObject("src_subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-
-  if (ArrayAttr syms = load->getAttr("indices").cast<ArrayAttr>()) {
-    if (syms.getValue().size() == 0) {
-      jemit.startObject();
-      jemit.printKVPair("start", 0);
-      jemit.printKVPair("end", 0);
-      jemit.printKVPair("step", 1);
-      jemit.printKVPair("tile", 1);
-      jemit.endObject();
-    }
-
-    for (Attribute sym : syms.getValue()) {
-      if (StringAttr sym_str = sym.cast<StringAttr>()) {
-        jemit.startObject();
-        jemit.printKVPair("start", sym_str.getValue());
-        jemit.printKVPair("end", sym_str.getValue());
-        jemit.printKVPair("step", 1);
-        jemit.printKVPair("tile", 1);
-        jemit.endObject();
-      } else {
-        mlir::emitError(load.getLoc(), "'indices' must consist of StringAttr");
-        return failure();
-      }
-    }
-  } else {
-    mlir::emitError(load.getLoc(), "'indices' must be an ArrayAttr");
-    return failure();
-  }
-
+  printIndices(load.getLoc(), load->getAttr("indices"), jemit);
   jemit.endList();   // ranges
   jemit.endObject(); // src_subset
 
