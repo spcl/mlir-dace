@@ -4,6 +4,8 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/DenseMap.h"
+#include <regex>
+#include <string>
 
 using namespace mlir;
 using namespace sdir;
@@ -718,6 +720,12 @@ LogicalResult translation::translateToSDFG(EdgeOp &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.startNamedObject("assignments");
 
+  std::string refname = "";
+  if (!op.refMutable().empty()) {
+    AllocOp aop = cast<AllocOp>(op.ref().getDefiningOp());
+    refname = aop.getName();
+  }
+
   if (op.assign().hasValue()) {
     ArrayAttr assignments = op.assign().getValue();
 
@@ -725,7 +733,9 @@ LogicalResult translation::translateToSDFG(EdgeOp &op, JsonEmitter &jemit) {
       if (StringAttr strAttr = assignment.dyn_cast<StringAttr>()) {
         StringRef content = strAttr.getValue();
         std::pair<StringRef, StringRef> kv = content.split(':');
-        jemit.printKVPair(kv.first.trim(), kv.second.trim());
+        std::string replaced = std::regex_replace(kv.second.trim().str(),
+                                                  std::regex("ref"), refname);
+        jemit.printKVPair(kv.first.trim(), replaced);
       } else {
         mlir::emitError(
             op.getLoc(),
@@ -742,7 +752,10 @@ LogicalResult translation::translateToSDFG(EdgeOp &op, JsonEmitter &jemit) {
     if (op.condition().getValue().empty()) {
       jemit.printKVPair("string_data", "1");
     } else {
-      jemit.printKVPair("string_data", op.condition().getValue());
+      std::string cond = op.condition().getValue().trim().str();
+      std::string replaced =
+          std::regex_replace(cond, std::regex("ref"), refname);
+      jemit.printKVPair("string_data", replaced);
     }
   } else {
     jemit.printKVPair("string_data", "1");
