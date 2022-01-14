@@ -312,6 +312,7 @@ public:
     rewriter.replaceUsesOfBlockArgument(
         body.body().getBlocks().front().getArgument(0), symop);
 
+    // TODO: Get rid of block arguments
     // body.body().getBlocks().front().eraseArgument(0);
     //   NOTE: Infinite loop
     //   rewriter.createBlock(&body.body());
