@@ -31,8 +31,8 @@ LogicalResult printRange(Location loc, Attribute &attr, JsonEmitter &jemit) {
     jemit.endObject();
   } else if (IntegerAttr sym_int = attr.dyn_cast<IntegerAttr>()) {
     jemit.startObject();
-    jemit.printKVPair("start", sym_int);
-    jemit.printKVPair("end", sym_int);
+    jemit.printKVPair("start", sym_int.getInt());
+    jemit.printKVPair("end", sym_int.getInt());
     jemit.printKVPair("step", 1);
     jemit.printKVPair("tile", 1);
     jemit.endObject();
