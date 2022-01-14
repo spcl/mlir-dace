@@ -15,13 +15,13 @@ void mlir::sdir::translation::registerToSDFGTranslation() {
         mlir::LogicalResult res =
             mlir::sdir::translation::translateToSDFG(module, jemit);
         mlir::LogicalResult jRes = jemit.finish();
-        if (jRes.failed()) {
+
+        if (res.failed()) {
+          return mlir::failure();
+        } else if (jRes.failed()) {
           emitError(module.getLoc(), "Invalid JSON generated");
           return mlir::failure();
         }
-
-        if (res.failed())
-          return mlir::failure();
 
         return mlir::success();
       },

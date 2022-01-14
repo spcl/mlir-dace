@@ -393,15 +393,8 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   AsmState state(op);
 
   if (dyn_cast<arith::AddFOp>(firstOp) || dyn_cast<arith::AddIOp>(firstOp)) {
-    std::string nameArg0;
-    llvm::raw_string_ostream nameArg0Stream(nameArg0);
-    op.getArgument(0).printAsOperand(nameArg0Stream, state);
-    nameArg0.erase(0, 1); // Remove %-sign
-
-    std::string nameArg1;
-    llvm::raw_string_ostream nameArg1Stream(nameArg1);
-    op.getArgument(1).printAsOperand(nameArg1Stream, state);
-    nameArg1.erase(0, 1); // Remove %-sign
+    std::string nameArg0 = op.getInputName(0);
+    std::string nameArg1 = op.getInputName(1);
 
     jemit.printKVPair("string_data", "__out = " + nameArg0 + " + " + nameArg1);
     jemit.printKVPair("language", "Python");
@@ -409,15 +402,8 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   }
 
   if (dyn_cast<arith::MulFOp>(firstOp) || dyn_cast<arith::MulIOp>(firstOp)) {
-    std::string nameArg0;
-    llvm::raw_string_ostream nameArg0Stream(nameArg0);
-    op.getArgument(0).printAsOperand(nameArg0Stream, state);
-    nameArg0.erase(0, 1); // Remove %-sign
-
-    std::string nameArg1;
-    llvm::raw_string_ostream nameArg1Stream(nameArg1);
-    op.getArgument(1).printAsOperand(nameArg1Stream, state);
-    nameArg1.erase(0, 1); // Remove %-sign
+    std::string nameArg0 = op.getInputName(0);
+    std::string nameArg1 = op.getInputName(1);
 
     jemit.printKVPair("string_data", "__out = " + nameArg0 + " * " + nameArg1);
     jemit.printKVPair("language", "Python");
@@ -527,12 +513,9 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
 
   jemit.startNamedObject("in_connectors");
 
-  for (BlockArgument bArg : op.getArguments()) {
-    std::string name;
-    llvm::raw_string_ostream nameStream(name);
-    bArg.printAsOperand(nameStream, state);
-    name.erase(0, 1); // Remove %-sign
-    jemit.printKVPair(name, "null", /*stringify=*/false);
+  for (unsigned i = 0; i < op.getNumArguments(); ++i) {
+    jemit.printKVPair(op.getInputName(i), "null",
+                      /*stringify=*/false);
   }
 
   jemit.endObject(); // in_connectors
@@ -1256,15 +1239,7 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
   }
 
   jemit.printKVPair("dst", task.ID());
-
-  std::string argname;
-  AsmState state(task);
-  BlockArgument bArg = task.getArgument(argIdx);
-  llvm::raw_string_ostream argnameStream(argname);
-  bArg.printAsOperand(argnameStream, state);
-
-  argname.erase(0, 1); // remove %-sign
-  jemit.printKVPair("dst_connector", argname);
+  jemit.printKVPair("dst_connector", task.getInputName(argIdx));
 
   jemit.endObject();
   return success();
@@ -1321,15 +1296,29 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   jemit.printKVPair("src_connector", "__out");
 
   jemit.printKVPair("dst", taskDest.ID());
+  jemit.printKVPair("dst_connector", taskDest.getInputName(argIdx));
 
-  std::string argname;
-  AsmState state(taskDest);
-  BlockArgument bArg = taskDest.getArgument(argIdx);
-  llvm::raw_string_ostream argnameStream(argname);
-  bArg.printAsOperand(argnameStream, state);
+  jemit.endObject();
+  return success();
+}
 
-  argname.erase(0, 1); // remove %-sign
-  jemit.printKVPair("dst_connector", argname);
+LogicalResult printAccessTaskletEdge(GetAccessOp &access, TaskletNode &task,
+                                     int argIdx, JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("data", access.getName());
+  jemit.endObject(); // attributes
+  jemit.endObject(); // data
+  jemit.endObject(); // attributes
+  jemit.printKVPair("src", access.ID());
+  jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  jemit.printKVPair("dst", task.ID());
+  jemit.printKVPair("dst_connector", task.getInputName(argIdx));
 
   jemit.endObject();
   return success();
@@ -1348,6 +1337,9 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
                      dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
+          return failure();
+      } else if (GetAccessOp acc = dyn_cast<GetAccessOp>(val.getDefiningOp())) {
+        if (printAccessTaskletEdge(acc, task, i, jemit).failed())
           return failure();
       } else {
         mlir::emitError(op.getLoc(), "Operands must be results of GetAccessOp, "

@@ -539,6 +539,16 @@ void TaskletNode::setID(unsigned id) {
   IDAttr(intAttr);
 }
 
+std::string TaskletNode::getInputName(unsigned idx) {
+  BlockArgument bArg = getArgument(idx);
+  AsmState state(*this);
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  bArg.printAsOperand(nameStream, state);
+  name.erase(0, 1); // Remove %-sign
+  return getName().str() + "_" + name;
+}
+
 //===----------------------------------------------------------------------===//
 // MapNode
 //===----------------------------------------------------------------------===//
@@ -926,9 +936,13 @@ AllocOp AllocOp::create(Location loc, Type res, StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = builder.getStringAttr(name);
+
   if (MemletType mem = res.dyn_cast<MemletType>()) {
     res = mem.toArray();
+  } else if (!res.isa<ArrayType>()) {
+    res = ArrayType::get(res.getContext(), res, {}, {}, {});
   }
+
   build(builder, state, res, {}, nameAttr);
   return cast<AllocOp>(Operation::create(state));
 }
