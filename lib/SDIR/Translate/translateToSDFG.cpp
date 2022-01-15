@@ -586,6 +586,41 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
+  if (isa<StoreOp>(firstOp)) {
+    std::string indices;
+
+    for (unsigned i = 0; i < op.getNumArguments() - 2; ++i) {
+      if (i > 0)
+        indices.append(", ");
+      indices.append(op.getInputName(i));
+    }
+
+    std::string valName = op.getInputName(op.getNumArguments() - 2);
+    std::string arrName = op.getInputName(op.getNumArguments() - 1);
+
+    jemit.printKVPair("string_data",
+                      arrName + "[" + indices + "]" + " = " + valName);
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
+  if (isa<LoadOp>(firstOp)) {
+    std::string indices;
+
+    for (unsigned i = 0; i < op.getNumArguments() - 1; ++i) {
+      if (i > 0)
+        indices.append(", ");
+      indices.append(op.getInputName(i));
+    }
+
+    std::string arrName = op.getInputName(op.getNumArguments() - 1);
+
+    jemit.printKVPair("string_data",
+                      "__out = " + arrName + "[" + indices + "]");
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
   emitRemark(op.getLoc(), "No lifting to python possible");
   return failure();
 }
