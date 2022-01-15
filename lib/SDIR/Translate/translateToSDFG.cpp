@@ -475,25 +475,32 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
       if (sym.use_empty())
         continue;
 
-      FunctionType ft =
-          FunctionType::get(op.getContext(), {}, sym->getResultTypes());
+      // BUG: Doesn't properly replace everything
+      for (OpOperand &use : sym.res().getUses()) {
+        FunctionType ft =
+            FunctionType::get(op.getContext(), {}, sym->getResultTypes());
 
-      TaskletNode task =
-          TaskletNode::create(op.getLoc(), utils::generateName("sym_task"), ft);
+        TaskletNode task = TaskletNode::create(
+            op.getLoc(), utils::generateName("sym_task"), ft);
 
-      Operation *copy = sym->clone();
-      task.body().getBlocks().front().push_back(copy);
+        Operation *copy = sym->clone();
+        task.body().getBlocks().front().push_back(copy);
 
-      ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
-      task.body().getBlocks().front().push_back(ret);
-      op.body().getBlocks().front().push_front(task);
+        ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
+        task.body().getBlocks().front().push_back(ret);
+        op.body().getBlocks().front().push_front(task);
 
-      CallOp call = CallOp::create(op.getLoc(), task, {});
-      OpBuilder builder(op.getLoc().getContext());
-      builder.setInsertionPointAfter(sym);
-      builder.insert(call);
+        CallOp call = CallOp::create(op.getLoc(), task, {});
+        OpBuilder builder(op.getLoc().getContext());
+        builder.setInsertionPointAfter(sym);
+        builder.insert(call);
 
-      sym->replaceAllUsesWith(call);
+        sym.res().replaceUsesWithIf(call.getResult(0), [&](OpOperand &opop) {
+          return true; // opop.getOwner() == use.getOwner();
+        });
+      }
+
+      // sym.erase();
     }
   }
 
