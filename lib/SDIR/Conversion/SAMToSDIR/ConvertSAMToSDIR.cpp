@@ -244,16 +244,37 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> valsBounds = {
         adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep()};
+
     DenseSet<Value> valSet;
     for (Value v : valsBounds)
       valSet.insert(v);
+
     SmallVector<Value> vals;
     getExternalValues(op, op, vals, valSet);
 
+    unsigned lowerBoundIdx = 0;
+    unsigned upperBoundIdx = 1;
+    unsigned stepIdx = 2;
+    unsigned boundsLen = 3;
+
     // SDFG
-    SmallVector<Type> inputs;
-    for (Value v : valsBounds)
-      inputs.push_back(v.getType());
+    SmallVector<Type> inputs = {valsBounds[0].getType()};
+    if (valsBounds[1].getDefiningOp() == valsBounds[0].getDefiningOp()) {
+      upperBoundIdx = lowerBoundIdx;
+      boundsLen--;
+    } else {
+      inputs.push_back(valsBounds[1].getType());
+    }
+
+    if (valsBounds[2].getDefiningOp() == valsBounds[1].getDefiningOp()) {
+      stepIdx = upperBoundIdx;
+      boundsLen--;
+    } else if (valsBounds[2].getDefiningOp() == valsBounds[0].getDefiningOp()) {
+      stepIdx = lowerBoundIdx;
+      boundsLen--;
+    } else {
+      inputs.push_back(valsBounds[2].getType());
+    }
 
     for (Value v : vals)
       inputs.push_back(v.getType());
@@ -284,16 +305,22 @@ public:
     StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
 
     for (unsigned i = 0; i < vals.size(); ++i) {
-      vals[i].replaceUsesWithIf(sdfg.getArgument(i + 3), [&](OpOperand &opop) {
-        return isNested(op, *opop.getOwner());
-      });
-    }
-
-    for (unsigned i = 0; i < valsBounds.size(); ++i) {
-      valsBounds[i].replaceUsesWithIf(
-          sdfg.getArgument(i),
+      vals[i].replaceUsesWithIf(
+          sdfg.getArgument(i + boundsLen),
           [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
     }
+
+    valsBounds[0].replaceUsesWithIf(
+        sdfg.getArgument(lowerBoundIdx),
+        [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
+
+    valsBounds[1].replaceUsesWithIf(
+        sdfg.getArgument(upperBoundIdx),
+        [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
+
+    valsBounds[2].replaceUsesWithIf(
+        sdfg.getArgument(stepIdx),
+        [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
 
     rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
                                 body.body().begin());
@@ -330,24 +357,31 @@ public:
 
     ArrayAttr initArr = rewriter.getStrArrayAttr({"idx: ref"});
     EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
-                   sdfg.getArgument(0));
+                   sdfg.getArgument(lowerBoundIdx));
 
     StringAttr guardStr = rewriter.getStringAttr("idx < ref");
     EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
-                   sdfg.getArgument(1));
+                   sdfg.getArgument(upperBoundIdx));
 
     ArrayAttr bodyArr = rewriter.getStrArrayAttr({"idx: idx + ref"});
     EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr, emptyStr,
-                   sdfg.getArgument(2));
+                   sdfg.getArgument(stepIdx));
 
     StringAttr exitStr = rewriter.getStringAttr("not(idx < ref)");
     EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
-                   sdfg.getArgument(1));
+                   sdfg.getArgument(upperBoundIdx));
 
     rewriter.setInsertionPointAfter(sdfg);
     SmallVector<Value> callVals = adaptor.getOperands();
-    callVals.append(vals);
-    sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callVals);
+    SmallVector<Value> callValsReduced = {callVals[lowerBoundIdx]};
+    if (upperBoundIdx != lowerBoundIdx)
+      callValsReduced.push_back(callVals[upperBoundIdx]);
+
+    if (stepIdx != upperBoundIdx && stepIdx != lowerBoundIdx)
+      callValsReduced.push_back(callVals[stepIdx]);
+
+    callValsReduced.append(vals);
+    sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callValsReduced);
 
     return success();
   }
