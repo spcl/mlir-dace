@@ -347,6 +347,15 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.printKVPair("label", op.sym_name());
 
+  jemit.startNamedObject("symbol_mapping");
+
+  for (BlockArgument bArg : op.getArguments())
+    if (MemletType mem = bArg.getType().dyn_cast<MemletType>())
+      for (StringAttr sa : mem.getSymbols())
+        jemit.printKVPair(sa.str(), sa.str());
+
+  jemit.endObject(); // symbol_mapping
+
   jemit.startNamedObject("in_connectors");
   for (BlockArgument bArg : op.getArguments()) {
     std::string name = getValueName(bArg, *op);
@@ -1315,6 +1324,7 @@ LogicalResult printLoadEdgeAttr(LoadOp &load, JsonEmitter &jemit) {
     return failure();
   jemit.endList();   // ranges
   jemit.endObject(); // src_subset
+  return success();
 }
 
 void printMultiConnectorStart(JsonEmitter &jemit) {
