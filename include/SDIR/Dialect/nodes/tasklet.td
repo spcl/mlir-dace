@@ -38,9 +38,10 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
 
     let extraClassDeclaration = [{
         static TaskletNode create(PatternRewriter &rewriter, Location location,  FunctionType type);
+        static TaskletNode create(Location location,  StringRef name, FunctionType type);
         static TaskletNode create(Location location, StringRef name,
                                   FunctionType type, 
-                                  ArrayRef<NamedAttribute> attrs = {});
+                                  ArrayRef<NamedAttribute> attrs);
         static TaskletNode create(Location location, StringRef name, 
                                   FunctionType type, 
                                   Operation::dialect_attr_range attrs);

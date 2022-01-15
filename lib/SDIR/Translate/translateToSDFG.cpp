@@ -392,8 +392,6 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
   jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
   jemit.endObject(); // attributes
 
-  jemit.startNamedList("nodes");
-
   // Insert access nodes
   SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
   BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
@@ -420,18 +418,49 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
     }
   }
 
-  // get operations requiring indirects
+  // separate operations requiring indirects
   SmallVector<Operation *> indirects;
   SmallVector<Operation *> directs;
   for (Operation &oper : op.body().getOps()) {
     if (StoreOp edge = dyn_cast<StoreOp>(oper)) {
-      if (edge.indicesMutable().empty()) {
-        directs.push_back(&oper);
-      } else {
+      if (edge.isIndirect())
         indirects.push_back(&oper);
-      }
+      else
+        directs.push_back(&oper);
     }
+
+    if (LoadOp edge = dyn_cast<LoadOp>(oper))
+      if (edge.isIndirect())
+        indirects.push_back(&oper);
   }
+
+  // Rewrite indirect operations
+  for (Operation *oper : indirects) {
+    FunctionType ft = FunctionType::get(
+        op.getContext(), oper->getOperandTypes(), oper->getResultTypes());
+
+    TaskletNode task = TaskletNode::create(
+        op.getLoc(), utils::generateName("indirect_task"), ft);
+
+    BlockAndValueMapping valMapping;
+    valMapping.map(oper->getOperands(), task.getArguments());
+
+    Operation *copy = oper->clone(valMapping);
+    task.body().getBlocks().front().push_back(copy);
+
+    ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
+    task.body().getBlocks().front().push_back(ret);
+    op.body().getBlocks().front().push_front(task);
+
+    CallOp call = CallOp::create(op.getLoc(), task, oper->getOperands());
+    OpBuilder builder(op.getLoc().getContext());
+    builder.setInsertionPointAfter(oper);
+    builder.insert(call);
+
+    oper->replaceAllUsesWith(call);
+  }
+
+  jemit.startNamedList("nodes");
 
   unsigned nodeID = 0;
   for (Operation &oper : op.body().getOps()) {
@@ -503,27 +532,28 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   Operation *firstOp = nullptr;
 
   for (Operation &oper : op.body().getOps()) {
-    if (numOps >= 2) {
-      emitRemark(op.getLoc(), "No lifting to python possible");
-      return failure();
-    }
     if (numOps == 0)
       firstOp = &oper;
     ++numOps;
   }
 
-  if (dyn_cast<arith::AddFOp>(firstOp) || dyn_cast<arith::AddIOp>(firstOp)) {
+  if (numOps != 2) {
+    emitRemark(op.getLoc(), "No lifting to python possible");
+    return failure();
+  }
+
+  if (isa<arith::AddFOp>(firstOp) || isa<arith::AddIOp>(firstOp)) {
     std::string nameArg0 = op.getInputName(0);
-    std::string nameArg1 = op.getInputName(1);
+    std::string nameArg1 = op.getInputName(op.getNumArguments() - 1);
 
     jemit.printKVPair("string_data", "__out = " + nameArg0 + " + " + nameArg1);
     jemit.printKVPair("language", "Python");
     return success();
   }
 
-  if (dyn_cast<arith::MulFOp>(firstOp) || dyn_cast<arith::MulIOp>(firstOp)) {
+  if (isa<arith::MulFOp>(firstOp) || isa<arith::MulIOp>(firstOp)) {
     std::string nameArg0 = op.getInputName(0);
-    std::string nameArg1 = op.getInputName(1);
+    std::string nameArg1 = op.getInputName(op.getNumArguments() - 1);
 
     jemit.printKVPair("string_data", "__out = " + nameArg0 + " * " + nameArg1);
     jemit.printKVPair("language", "Python");
@@ -575,7 +605,8 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
   // If lifting fails (body is complex) then emit MLIR code directly
   // liftToPython() emits automatically emits the generated python code
   if (liftToPython(op, jemit).failed()) {
-    // Convention: MLIR tasklets use the mlir_entry function as the entry point
+    // Convention: MLIR tasklets use the mlir_entry function as the entry
+    // point
     std::string code = "module {\\n func @mlir_entry(";
 
     // Prints all arguments with types
@@ -614,7 +645,16 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
     }
 
     code.append("}\\n}");
-    jemit.printKVPair("string_data", code);
+
+    std::size_t n = code.length();
+    std::string escapedCode;
+
+    for (std::size_t i = 0; i < n; ++i) {
+      if (code[i] == '\\' || code[i] == '\"')
+        escapedCode += '\\';
+      escapedCode += code[i];
+    }
+    jemit.printKVPair("string_data", escapedCode);
     jemit.printKVPair("language", "MLIR");
   }
 

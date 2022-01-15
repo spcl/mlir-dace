@@ -436,6 +436,17 @@ TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
 }
 
 TaskletNode TaskletNode::create(Location location, StringRef name,
+                                FunctionType type) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  build(builder, state, utils::generateID(), utils::generateName(name.str()),
+        type, builder.getStringAttr("private"));
+  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+  builder.createBlock(&task.body(), {}, type.getInputs());
+  return task;
+}
+
+TaskletNode TaskletNode::create(Location location, StringRef name,
                                 FunctionType type,
                                 ArrayRef<NamedAttribute> attrs) {
   OpBuilder builder(location->getContext());
@@ -1326,6 +1337,14 @@ LogicalResult verify(LoadOp op) {
   return success();
 }
 
+bool LoadOp::isIndirect() {
+  for (Value v : indices())
+    if (!isa<sdir::CallOp>(v.getDefiningOp()))
+      return true;
+
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // StoreOp
 //===----------------------------------------------------------------------===//
@@ -1410,6 +1429,14 @@ LogicalResult verify(StoreOp op) {
     return op.emitOpError("incorrect number of indices for store");
 
   return success();
+}
+
+bool StoreOp::isIndirect() {
+  for (Value v : indices())
+    if (!isa<sdir::CallOp>(v.getDefiningOp()))
+      return true;
+
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1899,26 +1926,56 @@ sdir::ReturnOp sdir::ReturnOp::create(PatternRewriter &rewriter, Location loc,
   return cast<sdir::ReturnOp>(rewriter.createOperation(state));
 }
 
+sdir::ReturnOp sdir::ReturnOp::create(Location loc, mlir::ValueRange input) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, input);
+  return cast<sdir::ReturnOp>(Operation::create(state));
+}
+
 //===----------------------------------------------------------------------===//
 // CallOp
 //===----------------------------------------------------------------------===//
 
 sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
-                                  TaskletNode task, ValueRange operands) {
+                                  TypeRange types, ValueRange operands,
+                                  StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  TypeRange tr = TypeRange(task.getCallableResults());
-  build(builder, state, tr, task.sym_name(), operands);
+  build(builder, state, types, name, operands);
   return cast<sdir::CallOp>(rewriter.createOperation(state));
 }
 
 sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
+                                  TaskletNode task, ValueRange operands) {
+  return create(rewriter, loc, TypeRange(task.getCallableResults()), operands,
+                task.sym_name());
+}
+
+sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
                                   SDFGNode sdfg, ValueRange operands) {
+  return create(rewriter, loc, TypeRange(sdfg.getCallableResults()), operands,
+                sdfg.sym_name());
+}
+
+sdir::CallOp sdir::CallOp::create(Location loc, TypeRange types,
+                                  ValueRange operands, StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  TypeRange tr = TypeRange(sdfg.getCallableResults());
-  build(builder, state, tr, sdfg.sym_name(), operands);
-  return cast<sdir::CallOp>(rewriter.createOperation(state));
+  build(builder, state, types, name, operands);
+  return cast<sdir::CallOp>(Operation::create(state));
+}
+
+sdir::CallOp sdir::CallOp::create(Location loc, TaskletNode task,
+                                  ValueRange operands) {
+  return create(loc, TypeRange(task.getCallableResults()), operands,
+                task.sym_name());
+}
+
+sdir::CallOp sdir::CallOp::create(Location loc, SDFGNode sdfg,
+                                  ValueRange operands) {
+  return create(loc, TypeRange(sdfg.getCallableResults()), operands,
+                sdfg.sym_name());
 }
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
