@@ -460,6 +460,34 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
     oper->replaceAllUsesWith(call);
   }
 
+  // Wrap symbolic evaluations
+  for (Operation &oper : op.body().getOps()) {
+    if (SymOp sym = dyn_cast<SymOp>(oper)) {
+      if (sym.use_empty())
+        continue;
+
+      FunctionType ft =
+          FunctionType::get(op.getContext(), {}, sym->getResultTypes());
+
+      TaskletNode task =
+          TaskletNode::create(op.getLoc(), utils::generateName("sym_task"), ft);
+
+      Operation *copy = sym->clone();
+      task.body().getBlocks().front().push_back(copy);
+
+      ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
+      task.body().getBlocks().front().push_back(ret);
+      op.body().getBlocks().front().push_front(task);
+
+      CallOp call = CallOp::create(op.getLoc(), task, {});
+      OpBuilder builder(op.getLoc().getContext());
+      builder.setInsertionPointAfter(sym);
+      builder.insert(call);
+
+      sym->replaceAllUsesWith(call);
+    }
+  }
+
   jemit.startNamedList("nodes");
 
   unsigned nodeID = 0;
@@ -617,6 +645,12 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
 
     jemit.printKVPair("string_data",
                       "__out = " + arrName + "[" + indices + "]");
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
+  if (SymOp sym = dyn_cast<SymOp>(firstOp)) {
+    jemit.printKVPair("string_data", "__out = " + sym.expr().str());
     jemit.printKVPair("language", "Python");
     return success();
   }
@@ -1252,16 +1286,7 @@ LogicalResult translation::translateToSDFG(StreamLengthOp &op,
 // CallOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
-                                   JsonEmitter &jemit) {
-  jemit.startObject();
-  jemit.printKVPair("type", "MultiConnectorEdge");
-
-  jemit.startNamedObject("attributes");
-  jemit.startNamedObject("data");
-  jemit.printKVPair("type", "Memlet");
-  jemit.startNamedObject("attributes");
-
+LogicalResult printLoadEdgeAttr(LoadOp &load, JsonEmitter &jemit) {
   jemit.startNamedList("strides");
   GetAccessOp aop = cast<GetAccessOp>(load.arr().getDefiningOp());
   SmallVector<std::string> strideList = buildStrideList(aop);
@@ -1290,10 +1315,31 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
     return failure();
   jemit.endList();   // ranges
   jemit.endObject(); // src_subset
+}
 
+void printMultiConnectorStart(JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+}
+
+void printMultiConnectorAttrEnd(JsonEmitter &jemit) {
   jemit.endObject(); // attributes
   jemit.endObject(); // data
   jemit.endObject(); // attributes
+}
+
+void printMultiConnectorEnd(JsonEmitter &jemit) { jemit.endObject(); }
+
+LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
+                                   JsonEmitter &jemit) {
+  printMultiConnectorStart(jemit);
+  if (printLoadEdgeAttr(load, jemit).failed())
+    return failure();
+  printMultiConnectorAttrEnd(jemit);
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("src", aNode.ID());
@@ -1305,48 +1351,15 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
 
   jemit.printKVPair("dst", task.ID());
   jemit.printKVPair("dst_connector", task.getInputName(argIdx));
-
-  jemit.endObject();
-  return success();
-}
-
-LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
-                                  int argIdx, JsonEmitter &jemit) {
-  jemit.startObject();
-  jemit.printKVPair("type", "MultiConnectorEdge");
-
-  jemit.startNamedObject("attributes");
-  jemit.startNamedObject("data");
-  jemit.printKVPair("type", "Memlet");
-  jemit.startNamedObject("attributes");
-  jemit.printKVPair("data", access.getName());
-  jemit.endObject(); // attributes
-  jemit.endObject(); // data
-  jemit.endObject(); // attributes
-  jemit.printKVPair("src", access.ID());
-  jemit.printKVPair("src_connector", "null", /*stringify=*/false);
-  jemit.printKVPair("dst", sdfg.ID());
-  std::string argname = getValueName(sdfg.getArgument(argIdx), *sdfg);
-  jemit.printKVPair("dst_connector", argname);
-
-  jemit.endObject();
+  printMultiConnectorEnd(jemit);
   return success();
 }
 
 LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
                                       TaskletNode &taskDest, int argIdx,
                                       JsonEmitter &jemit) {
-  jemit.startObject();
-  jemit.printKVPair("type", "MultiConnectorEdge");
-
-  jemit.startNamedObject("attributes");
-  jemit.startNamedObject("data");
-  jemit.printKVPair("type", "Memlet");
-  jemit.startNamedObject("attributes");
-
-  jemit.endObject(); // attributes
-  jemit.endObject(); // data
-  jemit.endObject(); // attributes
+  printMultiConnectorStart(jemit);
+  printMultiConnectorAttrEnd(jemit);
 
   jemit.printKVPair("src", taskSrc.ID());
   // TODO: Implement multiple return values
@@ -1356,34 +1369,60 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   jemit.printKVPair("dst", taskDest.ID());
   jemit.printKVPair("dst_connector", taskDest.getInputName(argIdx));
 
-  jemit.endObject();
+  printMultiConnectorEnd(jemit);
   return success();
 }
 
 LogicalResult printAccessTaskletEdge(GetAccessOp &access, TaskletNode &task,
                                      int argIdx, JsonEmitter &jemit) {
-  jemit.startObject();
-  jemit.printKVPair("type", "MultiConnectorEdge");
-
-  jemit.startNamedObject("attributes");
-  jemit.startNamedObject("data");
-  jemit.printKVPair("type", "Memlet");
-  jemit.startNamedObject("attributes");
+  printMultiConnectorStart(jemit);
   jemit.printKVPair("data", access.getName());
-  jemit.endObject(); // attributes
-  jemit.endObject(); // data
-  jemit.endObject(); // attributes
+  printMultiConnectorAttrEnd(jemit);
+
   jemit.printKVPair("src", access.ID());
   jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   jemit.printKVPair("dst", task.ID());
   jemit.printKVPair("dst_connector", task.getInputName(argIdx));
+  printMultiConnectorEnd(jemit);
+  return success();
+}
 
-  jemit.endObject();
+LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
+                                  int argIdx, JsonEmitter &jemit) {
+  printMultiConnectorStart(jemit);
+  jemit.printKVPair("data", access.getName());
+  printMultiConnectorAttrEnd(jemit);
+
+  jemit.printKVPair("src", access.ID());
+  jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  jemit.printKVPair("dst", sdfg.ID());
+  jemit.printKVPair("dst_connector",
+                    getValueName(sdfg.getArgument(argIdx), *sdfg));
+
+  printMultiConnectorEnd(jemit);
+  return success();
+}
+
+LogicalResult printTaskletSDFGEdge(TaskletNode &task, SDFGNode &sdfg,
+                                   int argIdx, JsonEmitter &jemit) {
+  printMultiConnectorStart(jemit);
+  printMultiConnectorAttrEnd(jemit);
+
+  jemit.printKVPair("src", task.ID());
+  // TODO: Implement multiple return values
+  // Takes the form __out_%d
+  jemit.printKVPair("src_connector", "__out");
+  jemit.printKVPair("dst", sdfg.ID());
+  jemit.printKVPair("dst_connector",
+                    getValueName(sdfg.getArgument(argIdx), *sdfg));
+
+  printMultiConnectorEnd(jemit);
   return success();
 }
 
 LogicalResult translation::translateToSDFG(sdir::CallOp &op,
                                            JsonEmitter &jemit) {
+  // TODO: This can be refactored to avoid code duplication
   if (op.callsTasklet()) {
     TaskletNode task = op.getTasklet();
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -1391,6 +1430,7 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
       if (LoadOp load = dyn_cast<LoadOp>(val.getDefiningOp())) {
         if (printLoadTaskletEdge(load, task, i, jemit).failed())
           return failure();
+
       } else if (sdir::CallOp call =
                      dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
         TaskletNode taskSrc = call.getTasklet();
@@ -1413,8 +1453,15 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
       if (GetAccessOp acc = dyn_cast<GetAccessOp>(val.getDefiningOp())) {
         if (printAccessSDFGEdge(acc, sdfg, i, jemit).failed())
           return failure();
+      } else if (sdir::CallOp call =
+                     dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
+        TaskletNode taskSrc = call.getTasklet();
+        if (printTaskletSDFGEdge(taskSrc, sdfg, i, jemit).failed())
+          return failure();
       } else {
-        mlir::emitError(op.getLoc(), "Operands must be results of GetAccessOp");
+        mlir::emitError(
+            op.getLoc(),
+            "Operands must be results of GetAccessOp or TaskletNode");
         return failure();
       }
     }
