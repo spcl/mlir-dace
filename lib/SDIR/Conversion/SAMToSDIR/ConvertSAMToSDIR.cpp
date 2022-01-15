@@ -68,16 +68,20 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
 
     SmallVector<Type> inputResults;
-    if (getTypeConverter()
-            ->convertTypes(op.getType().getInputs(), inputResults)
-            .failed())
-      return failure();
+    for (unsigned i = 0; i < op.getNumArguments(); i++) {
+      // NOTE: Hotfix, check if a better solution exists
+      MemrefToMemletConverter memo;
+      Type nt = memo.convertType(op.getType().getInput(i));
+      inputResults.push_back(nt);
+    }
 
     SmallVector<Type> outputResults;
-    if (getTypeConverter()
-            ->convertTypes(op.getType().getResults(), outputResults)
-            .failed())
-      return failure();
+    for (unsigned i = 0; i < op.getNumResults(); i++) {
+      // NOTE: Hotfix, check if a better solution exists
+      MemrefToMemletConverter memo;
+      Type nt = memo.convertType(op.getType().getResult(i));
+      outputResults.push_back(nt);
+    }
 
     FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft, op.sym_name());
@@ -280,8 +284,12 @@ public:
       inputs.push_back(v.getType());
 
     SmallVector<Type> inputResults;
-    if (getTypeConverter()->convertTypes(inputs, inputResults).failed())
-      return failure();
+    for (unsigned i = 0; i < inputs.size(); i++) {
+      // NOTE: Hotfix, check if a better solution exists
+      MemrefToMemletConverter memo;
+      Type nt = memo.convertType(inputs[i]);
+      inputResults.push_back(nt);
+    }
 
     FunctionType ft = rewriter.getFunctionType(inputResults, {});
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
