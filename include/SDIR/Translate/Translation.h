@@ -42,7 +42,7 @@ LogicalResult translateToSDFG(LibCallOp &op, JsonEmitter &jemit);
 LogicalResult translateToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
 LogicalResult translateToSDFG(SymOp &op, JsonEmitter &jemit);
 
-StringRef translateTypeToSDFG(Type &t, Location &loc, JsonEmitter &jemit);
+StringRef translateTypeToSDFG(Type &t, Location &loc);
 inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
 
 } // namespace mlir::sdir::translation

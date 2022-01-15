@@ -156,7 +156,7 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
 
   Type type = op.getType();
   Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(type, loc, jemit);
+  StringRef dtype = translateTypeToSDFG(type, loc);
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -600,7 +600,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   if (arith::ConstantOp oper = dyn_cast<arith::ConstantOp>(firstOp)) {
     Type t = oper.getType();
     Location loc = oper.getLoc();
-    StringRef type = translateTypeToSDFG(t, loc, jemit);
+    StringRef type = translateTypeToSDFG(t, loc);
     std::string val;
 
     if (arith::ConstantFloatOp flop =
@@ -923,7 +923,7 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
 
   Type element = op.getType().getElementType();
   Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+  StringRef dtype = translateTypeToSDFG(element, loc);
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -959,7 +959,7 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
 
   Type element = op.getType().getElementType();
   Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+  StringRef dtype = translateTypeToSDFG(element, loc);
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -996,7 +996,7 @@ LogicalResult translation::translateToSDFG(AllocTransientOp &op,
 
   Type element = op.getType().getElementType();
   Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(element, loc, jemit);
+  StringRef dtype = translateTypeToSDFG(element, loc);
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -1216,7 +1216,7 @@ LogicalResult translation::translateToSDFG(AllocStreamOp &op,
 
   Type type = op.getType().getElementType();
   Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(type, loc, jemit);
+  StringRef dtype = translateTypeToSDFG(type, loc);
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -1246,7 +1246,7 @@ LogicalResult translation::translateToSDFG(AllocTransientStreamOp &op,
 
   Type type = op.getType().getElementType();
   Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(type, loc, jemit);
+  StringRef dtype = translateTypeToSDFG(type, loc);
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -1512,8 +1512,7 @@ LogicalResult translation::translateToSDFG(SymOp &op, JsonEmitter &jemit) {
 // Translate type
 //===----------------------------------------------------------------------===//
 
-StringRef translation::translateTypeToSDFG(Type &t, Location &loc,
-                                           JsonEmitter &jemit) {
+StringRef translation::translateTypeToSDFG(Type &t, Location &loc) {
   if (t.isF64())
     return "float64";
 
