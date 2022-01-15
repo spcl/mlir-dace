@@ -623,6 +623,17 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
+  if (arith::IndexCastOp ico = dyn_cast<arith::IndexCastOp>(firstOp)) {
+    std::string nameArg0 = op.getInputName(0);
+    Type t = ico.getType();
+    Location loc = op.getLoc();
+    StringRef resT = translateTypeToSDFG(t, loc);
+    std::string entry = "__out = dace." + resT.str() + "(" + nameArg0 + ")";
+    jemit.printKVPair("string_data", entry);
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
   if (isa<StoreOp>(firstOp)) {
     std::string indices;
 
