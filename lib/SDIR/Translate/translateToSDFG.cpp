@@ -626,6 +626,8 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
+  // TODO: Add arith ops
+
   if (arith::ConstantOp oper = dyn_cast<arith::ConstantOp>(firstOp)) {
     Type t = oper.getType();
     Location loc = oper.getLoc();
@@ -1497,7 +1499,7 @@ void translation::prepForTranslation(sdir::CallOp &op) {
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Value val = op.getOperand(i);
-    if (!op.callsTasklet() && val.hasOneUse())
+    if (val.hasOneUse())
       continue;
 
     if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
