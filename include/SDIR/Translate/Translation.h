@@ -45,6 +45,9 @@ LogicalResult translateToSDFG(SymOp &op, JsonEmitter &jemit);
 StringRef translateTypeToSDFG(Type &t, Location &loc);
 inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
 
+void prepForTranslation(StateNode &op);
+void prepForTranslation(sdir::CallOp &op);
+
 } // namespace mlir::sdir::translation
 
 #endif // SDIR_Translation_H

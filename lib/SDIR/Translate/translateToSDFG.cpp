@@ -244,6 +244,10 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
     jemit.endList(); // arg_names
   }
 
+  for (Operation &oper : op.body().getOps())
+    if (StateNode state = dyn_cast<StateNode>(oper))
+      prepForTranslation(state);
+
   jemit.startNamedObject("_arrays");
 
   for (AllocOp alloc : op.body().getOps<AllocOp>())
@@ -391,52 +395,13 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 // StateNode
 //===----------------------------------------------------------------------===//
 
-LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
-  jemit.startObject();
-  jemit.printKVPair("type", "SDFGState");
-  jemit.printKVPair("label", op.sym_name());
-  jemit.printKVPair("id", op.ID(), /*stringify=*/false);
-
-  jemit.startNamedObject("attributes");
-  jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
-  jemit.endObject(); // attributes
-
-  // Insert access nodes
-  SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
-  BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
-
-  for (BlockArgument bArg : sdfg.getArguments()) {
-    Value alloc = argToAlloc.lookup<Value>(bArg);
-    DenseSet<Operation *> users;
-
-    for (Operation *nop : alloc.getUsers()) {
-      if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
-        if (state == op)
-          users.insert(nop);
-      }
-    }
-
-    if (!users.empty()) {
-      GetAccessOp gao =
-          GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
-      op.body().getBlocks().front().push_front(gao);
-
-      alloc.replaceUsesWithIf(gao, [&](OpOperand &opop) {
-        return users.contains(opop.getOwner());
-      });
-    }
-  }
-
+void translation::prepForTranslation(StateNode &op) {
   // separate operations requiring indirects
   SmallVector<Operation *> indirects;
-  SmallVector<Operation *> directs;
   for (Operation &oper : op.body().getOps()) {
-    if (StoreOp edge = dyn_cast<StoreOp>(oper)) {
+    if (StoreOp edge = dyn_cast<StoreOp>(oper))
       if (edge.isIndirect())
         indirects.push_back(&oper);
-      else
-        directs.push_back(&oper);
-    }
 
     if (LoadOp edge = dyn_cast<LoadOp>(oper))
       if (edge.isIndirect())
@@ -467,6 +432,7 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
     builder.insert(call);
 
     oper->replaceAllUsesWith(call);
+    oper->erase();
   }
 
   // Wrap symbolic evaluations
@@ -501,6 +467,47 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
       }
 
       // sym.erase();
+    }
+  }
+
+  for (Operation &oper : op.body().getOps())
+    if (CallOp call = dyn_cast<CallOp>(oper))
+      prepForTranslation(call);
+}
+
+LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "SDFGState");
+  jemit.printKVPair("label", op.sym_name());
+  jemit.printKVPair("id", op.ID(), /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
+  jemit.endObject(); // attributes
+
+  // Insert access nodes
+  SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
+  BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
+
+  for (BlockArgument bArg : sdfg.getArguments()) {
+    Value alloc = argToAlloc.lookup<Value>(bArg);
+    DenseSet<Operation *> users;
+
+    for (Operation *nop : alloc.getUsers()) {
+      if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
+        if (state == op)
+          users.insert(nop);
+      }
+    }
+
+    if (!users.empty()) {
+      GetAccessOp gao =
+          GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
+      op.body().getBlocks().front().push_front(gao);
+
+      alloc.replaceUsesWithIf(gao, [&](OpOperand &opop) {
+        return users.contains(opop.getOwner());
+      });
     }
   }
 
@@ -545,12 +552,11 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedList("edges");
 
-  for (Operation *oper : directs)
+  for (Operation &oper : op.body().getOps()) {
     if (StoreOp edge = dyn_cast<StoreOp>(oper))
       if (translateToSDFG(edge, jemit).failed())
         return failure();
 
-  for (Operation &oper : op.body().getOps()) {
     if (CopyOp edge = dyn_cast<CopyOp>(oper))
       if (translateToSDFG(edge, jemit).failed())
         return failure();
@@ -1082,13 +1088,7 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   printStrides(strideList, jemit);
   jemit.endList(); // strides
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
-    jemit.printKVPair("data", aNode.getName());
-  } else {
-    mlir::emitError(op.getLoc(), "Array must be defined by a GetAccessOp");
-    return failure();
-  }
-
+  jemit.printKVPair("data", gao.getName());
   jemit.startNamedObject("subset");
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
@@ -1127,8 +1127,13 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
       // Takes the form __return_%d
       jemit.printKVPair("src_connector", "__return");
     }
+  } else if (LoadOp load = dyn_cast<LoadOp>(op.val().getDefiningOp())) {
+    GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
+    jemit.printKVPair("src", gao.ID());
+    jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
-    mlir::emitError(op.getLoc(), "Value must be result of TaskletNode");
+    mlir::emitError(op.getLoc(),
+                    "Value must be result of TaskletNode or LoadOp");
     return failure();
   }
 
@@ -1446,6 +1451,45 @@ LogicalResult printTaskletSDFGEdge(TaskletNode &task, SDFGNode &sdfg,
 
   printMultiConnectorEnd(jemit);
   return success();
+}
+
+void translation::prepForTranslation(sdir::CallOp &op) {
+  if (!op.callsTasklet())
+    return;
+
+  StateNode state = op.getParentState();
+  TaskletNode task = op.getTasklet();
+
+  for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+    Value val = op.getOperand(i);
+    if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
+      TaskletNode taskSrc = call.getTasklet();
+
+      // TODO: Only one output supported
+      Type t = taskSrc.getType().getResult(0);
+      if (!t.isa<MemletType>()) {
+        t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+      }
+
+      AllocOp alloc =
+          AllocOp::create(op.getLoc(), t, utils::generateName("ttt"));
+
+      GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, alloc);
+
+      state.body().getBlocks().front().push_front(alloc);
+      state.body().getBlocks().front().push_front(gao);
+
+      StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});
+      LoadOp load = LoadOp::create(op.getLoc(), gao, {});
+
+      OpBuilder builder(op.getLoc().getContext());
+      builder.setInsertionPoint(op);
+      builder.insert(store);
+      builder.insert(load);
+
+      op.setOperand(i, load);
+    }
+  }
 }
 
 LogicalResult translation::translateToSDFG(sdir::CallOp &op,

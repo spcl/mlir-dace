@@ -90,7 +90,9 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 
     let extraClassDeclaration = [{
         static LoadOp create(PatternRewriter &rewriter, Location loc, GetAccessOp acc, ValueRange indices);
+        static LoadOp create(Location loc, GetAccessOp acc, ValueRange indices);
         static LoadOp create(PatternRewriter &rewriter, Location loc, Type t, Value mem, ValueRange indices);
+        static LoadOp create(Location loc, Type t, Value mem, ValueRange indices);
         bool isIndirect();
     }];
 }
@@ -129,6 +131,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
 
     let extraClassDeclaration = [{
         static StoreOp create(PatternRewriter &rewriter, Location loc, Value val, Value mem, ValueRange indices);
+        static StoreOp create(Location loc, Value val, Value mem, ValueRange indices);
         bool isIndirect();
     }];
 }

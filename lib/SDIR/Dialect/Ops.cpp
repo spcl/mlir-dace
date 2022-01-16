@@ -1283,6 +1283,35 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
   return cast<LoadOp>(rewriter.createOperation(state));
 }
 
+LoadOp LoadOp::create(Location loc, GetAccessOp acc, ValueRange indices) {
+  return create(loc, acc.getAllocType(), acc, indices);
+}
+
+LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  if (ArrayType arr = t.dyn_cast<ArrayType>())
+    t = arr.getElementType();
+
+  else if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+    t = arr.getElementType();
+
+  SmallVector<Attribute> numList;
+  for (size_t i = 0; i < indices.size(); ++i) {
+    numList.push_back(builder.getUI32IntegerAttr(i));
+  }
+  ArrayAttr numArr = builder.getArrayAttr(numList);
+  state.addAttribute("indices_numList", numArr);
+
+  SmallVector<Attribute> attrList;
+  ArrayAttr attrArr = builder.getArrayAttr(attrList);
+  state.addAttribute("indices", attrArr);
+
+  build(builder, state, t, indices, mem);
+  return cast<LoadOp>(Operation::create(state));
+}
+
 static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1367,6 +1396,26 @@ StoreOp StoreOp::create(PatternRewriter &rewriter, Location loc, Value val,
 
   build(builder, state, indices, val, mem);
   return cast<StoreOp>(rewriter.createOperation(state));
+}
+
+StoreOp StoreOp::create(Location loc, Value val, Value mem,
+                        ValueRange indices) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  SmallVector<Attribute> numList;
+  for (size_t i = 0; i < indices.size(); ++i) {
+    numList.push_back(builder.getUI32IntegerAttr(i));
+  }
+  ArrayAttr numArr = builder.getArrayAttr(numList);
+  state.addAttribute("indices_numList", numArr);
+
+  SmallVector<Attribute> attrList;
+  ArrayAttr attrArr = builder.getArrayAttr(attrList);
+  state.addAttribute("indices", attrArr);
+
+  build(builder, state, indices, val, mem);
+  return cast<StoreOp>(Operation::create(state));
 }
 
 static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
