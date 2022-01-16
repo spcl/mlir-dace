@@ -1038,6 +1038,22 @@ LogicalResult verify(AllocTransientOp op) {
   return success();
 }
 
+AllocTransientOp AllocTransientOp::create(Location loc, Type res,
+                                          StringRef name) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StringAttr nameAttr = builder.getStringAttr(name);
+
+  if (MemletType mem = res.dyn_cast<MemletType>()) {
+    res = mem.toArray();
+  } else if (!res.isa<ArrayType>()) {
+    res = ArrayType::get(res.getContext(), res, {}, {}, {});
+  }
+
+  build(builder, state, res, {}, nameAttr);
+  return cast<AllocTransientOp>(Operation::create(state));
+}
+
 SDFGNode AllocTransientOp::getParentSDFG() {
   Operation *sdfgOrState = (*this)->getParentOp();
 
@@ -1053,6 +1069,22 @@ bool AllocTransientOp::isInState() {
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
     return true;
   return false;
+}
+
+std::string AllocTransientOp::getName() {
+  if ((*this)->hasAttr("name")) {
+    Attribute nameAttr = (*this)->getAttr("name");
+    if (StringAttr name = nameAttr.cast<StringAttr>())
+      return name.getValue().str();
+  }
+
+  AsmState state(getParentSDFG());
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  (*this)->getResult(0).printAsOperand(nameStream, state);
+  utils::sanitizeName(name);
+
+  return name;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1231,6 +1263,9 @@ std::string GetAccessOp::getName() {
   Operation *alloc = arr().getDefiningOp();
 
   if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
+    return allocArr.getName();
+
+  if (AllocTransientOp allocArr = dyn_cast<AllocTransientOp>(alloc))
     return allocArr.getName();
 
   AsmState state(getParentSDFG());

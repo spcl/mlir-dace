@@ -93,6 +93,10 @@ SmallVector<std::string> buildStrideList(AllocOp &op) {
   return buildStrideList(op.getType().toMemlet());
 }
 
+SmallVector<std::string> buildStrideList(AllocTransientOp &op) {
+  return buildStrideList(op.getType().toMemlet());
+}
+
 void printStrides(SmallVector<std::string> strides, JsonEmitter &jemit) {
   for (int i = strides.size() - 1; i > 0; --i) {
     jemit.startEntry();
@@ -438,8 +442,10 @@ void translation::prepForTranslation(StateNode &op) {
   // Wrap symbolic evaluations
   for (Operation &oper : op.body().getOps()) {
     if (SymOp sym = dyn_cast<SymOp>(oper)) {
-      if (sym.use_empty())
+      if (sym.use_empty()) {
+        sym.erase();
         continue;
+      }
 
       FunctionType ft = FunctionType::get(op.getContext(), {}, sym.getType());
 
@@ -458,19 +464,19 @@ void translation::prepForTranslation(StateNode &op) {
       OpBuilder builder(op.getLoc().getContext());
       builder.setInsertionPointAfter(sym);
 
-      if (sym.res().hasOneUse()) {
+      /*if (sym.res().hasOneUse()) {
         builder.insert(call);
         sym.replaceAllUsesWith(call.getResult(0));
         sym.erase();
         continue;
-      }
+      }*/
 
       Type t = sym.getType();
       if (!t.isa<MemletType>())
         t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
 
-      AllocOp aop =
-          AllocOp::create(op.getLoc(), t, utils::generateName("sym_wrap"));
+      AllocTransientOp aop = AllocTransientOp::create(
+          op.getLoc(), t, utils::generateName("sym_wrap"));
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, aop);
 
       StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});
@@ -896,8 +902,12 @@ LogicalResult translation::translateToSDFG(EdgeOp &op, JsonEmitter &jemit) {
 
   std::string refname = "";
   if (!op.refMutable().empty()) {
-    AllocOp aop = cast<AllocOp>(op.ref().getDefiningOp());
-    refname = aop.getName();
+    if (AllocOp aop = dyn_cast<AllocOp>(op.ref().getDefiningOp())) {
+      refname = aop.getName();
+    } else {
+      AllocTransientOp atop = cast<AllocTransientOp>(op.ref().getDefiningOp());
+      refname = atop.getName();
+    }
   }
 
   if (op.assign().hasValue()) {
@@ -1027,12 +1037,9 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
 // AllocTransientOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translation::translateToSDFG(AllocTransientOp &op,
-                                           JsonEmitter &jemit) {
-  std::string name = getValueName(op.getResult(), *op.getParentSDFG());
-
-  jemit.startNamedObject(name);
-  jemit.printKVPair("type", "Array");
+LogicalResult printScalar(AllocTransientOp &op, JsonEmitter &jemit) {
+  jemit.startNamedObject(op.getName());
+  jemit.printKVPair("type", "Scalar");
 
   jemit.startNamedObject("attributes");
 
@@ -1044,6 +1051,50 @@ LogicalResult translation::translateToSDFG(AllocTransientOp &op,
     jemit.printKVPair("dtype", dtype);
   else
     return failure();
+
+  jemit.startNamedList("shape");
+  jemit.startEntry();
+  jemit.printInt(1);
+  jemit.endList(); // shape
+
+  jemit.printKVPair("transient", "true", /*stringify=*/false);
+  translation::printDebuginfo(*op, jemit);
+
+  jemit.endObject(); // attributes
+
+  jemit.endObject();
+  return success();
+}
+
+LogicalResult translation::translateToSDFG(AllocTransientOp &op,
+                                           JsonEmitter &jemit) {
+  if (op.getType().getShape().size() == 0)
+    return printScalar(op, jemit);
+
+  jemit.startNamedObject(op.getName());
+  jemit.printKVPair("type", "Array");
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedList("strides");
+  SmallVector<std::string> strideList = buildStrideList(op);
+  printStrides(strideList, jemit);
+  jemit.endList(); // strides
+
+  Type element = op.getType().getElementType();
+  Location loc = op.getLoc();
+  StringRef dtype = translateTypeToSDFG(element, loc);
+
+  if (dtype != "")
+    jemit.printKVPair("dtype", dtype);
+  else
+    return failure();
+
+  jemit.startNamedList("shape");
+  for (std::string s : strideList) {
+    jemit.startEntry();
+    jemit.printString(s);
+  }
+  jemit.endList(); // shape
 
   jemit.printKVPair("transient", "true", /*stringify=*/false);
   printDebuginfo(*op, jemit);
@@ -1495,12 +1546,8 @@ LogicalResult printLoadSDFGEdge(LoadOp &load, SDFGNode &sdfg, int argIdx,
 }
 
 void translation::prepForTranslation(sdir::CallOp &op) {
-  StateNode state = op.getParentState();
-
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Value val = op.getOperand(i);
-    if (val.hasOneUse())
-      continue;
 
     if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
       OpBuilder builder(op.getLoc().getContext());
@@ -1513,8 +1560,8 @@ void translation::prepForTranslation(sdir::CallOp &op) {
         t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
       }
 
-      AllocOp alloc =
-          AllocOp::create(op.getLoc(), t, utils::generateName("ttt"));
+      AllocTransientOp alloc =
+          AllocTransientOp::create(op.getLoc(), t, utils::generateName("ttt"));
 
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, alloc);
       StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});

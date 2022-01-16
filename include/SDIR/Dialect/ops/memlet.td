@@ -52,12 +52,17 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
         ```
     }];
 
-    let arguments = (ins Variadic<Index>:$params);
+    let arguments = (ins 
+        Variadic<Index>:$params,
+        OptionalAttr<StrAttr>:$name
+    );
     let results = (outs SDIR_ArrayType:$res);
 
     let extraClassDeclaration = [{
+        static AllocTransientOp create(Location loc, Type res, StringRef name);
         SDFGNode getParentSDFG();
         bool isInState();
+        std::string getName();
     }];
 }
 
