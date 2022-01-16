@@ -131,6 +131,8 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
       if (translateToSDFG(sdfg, jemit).failed())
         return failure();
 
+  op.dump();
+
   return success();
 }
 
@@ -441,32 +443,48 @@ void translation::prepForTranslation(StateNode &op) {
       if (sym.use_empty())
         continue;
 
-      // BUG: Doesn't properly replace everything
-      for (OpOperand &use : sym.res().getUses()) {
-        FunctionType ft =
-            FunctionType::get(op.getContext(), {}, sym->getResultTypes());
+      FunctionType ft = FunctionType::get(op.getContext(), {}, sym.getType());
 
-        TaskletNode task = TaskletNode::create(
-            op.getLoc(), utils::generateName("sym_task"), ft);
+      TaskletNode task =
+          TaskletNode::create(op.getLoc(), utils::generateName("sym_task"), ft);
 
-        Operation *copy = sym->clone();
-        task.body().getBlocks().front().push_back(copy);
+      Operation *copy = sym->clone();
+      task.body().getBlocks().front().push_back(copy);
 
-        ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
-        task.body().getBlocks().front().push_back(ret);
-        op.body().getBlocks().front().push_front(task);
+      ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
+      task.body().getBlocks().front().push_back(ret);
+      op.body().getBlocks().front().push_front(task);
 
-        CallOp call = CallOp::create(op.getLoc(), task, {});
-        OpBuilder builder(op.getLoc().getContext());
-        builder.setInsertionPointAfter(sym);
+      CallOp call = CallOp::create(op.getLoc(), task, {});
+
+      OpBuilder builder(op.getLoc().getContext());
+      builder.setInsertionPointAfter(sym);
+
+      if (sym.res().hasOneUse()) {
         builder.insert(call);
-
-        sym.res().replaceUsesWithIf(call.getResult(0), [&](OpOperand &opop) {
-          return true; // opop.getOwner() == use.getOwner();
-        });
+        sym.replaceAllUsesWith(call.getResult(0));
+        sym.erase();
+        continue;
       }
 
-      // sym.erase();
+      Type t = sym.getType();
+      if (!t.isa<MemletType>())
+        t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+
+      AllocOp aop =
+          AllocOp::create(op.getLoc(), t, utils::generateName("sym_wrap"));
+      GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, aop);
+
+      StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});
+      LoadOp load = LoadOp::create(op.getLoc(), gao, {});
+
+      builder.insert(aop);
+      builder.insert(gao);
+      builder.insert(call);
+      builder.insert(store);
+      builder.insert(load);
+      sym.replaceAllUsesWith(load.res());
+      sym.erase();
     }
   }
 
@@ -1128,7 +1146,7 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
       jemit.printKVPair("src_connector", "__return");
     }
   } else if (LoadOp load = dyn_cast<LoadOp>(op.val().getDefiningOp())) {
-    GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
+    GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
     jemit.printKVPair("src", gao.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
@@ -1453,6 +1471,29 @@ LogicalResult printTaskletSDFGEdge(TaskletNode &task, SDFGNode &sdfg,
   return success();
 }
 
+LogicalResult printLoadSDFGEdge(LoadOp &load, SDFGNode &sdfg, int argIdx,
+                                JsonEmitter &jemit) {
+  printMultiConnectorStart(jemit);
+  if (printLoadEdgeAttr(load, jemit).failed())
+    return failure();
+  printMultiConnectorAttrEnd(jemit);
+
+  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
+    jemit.printKVPair("src", aNode.ID());
+    jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  } else {
+    mlir::emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
+    return failure();
+  }
+
+  jemit.printKVPair("dst", sdfg.ID());
+  jemit.printKVPair("dst_connector",
+                    getValueName(sdfg.getArgument(argIdx), *sdfg));
+
+  printMultiConnectorEnd(jemit);
+  return success();
+}
+
 void translation::prepForTranslation(sdir::CallOp &op) {
   if (!op.callsTasklet())
     return;
@@ -1530,10 +1571,14 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletSDFGEdge(taskSrc, sdfg, i, jemit).failed())
           return failure();
+      } else if (LoadOp load = dyn_cast<LoadOp>(val.getDefiningOp())) {
+        if (printLoadSDFGEdge(load, sdfg, i, jemit).failed())
+          return failure();
+
       } else {
         mlir::emitError(
             op.getLoc(),
-            "Operands must be results of GetAccessOp or TaskletNode");
+            "Operands must be results of GetAccessOp, LoadOp or TaskletNode");
         return failure();
       }
     }
