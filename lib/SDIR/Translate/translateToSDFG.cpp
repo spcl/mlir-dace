@@ -131,8 +131,6 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
       if (translateToSDFG(sdfg, jemit).failed())
         return failure();
 
-  op.dump();
-
   return success();
 }
 
