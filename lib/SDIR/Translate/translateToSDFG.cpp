@@ -135,7 +135,7 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
       if (translateToSDFG(sdfg, jemit).failed())
         return failure();
 
-  return op.verify();
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -182,6 +182,33 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
   return success();
 }
 
+void translation::prepForTranslation(SDFGNode &op) {
+  if (!(*op).hasAttr("arg_names")) {
+    BlockAndValueMapping argToAlloc;
+    SmallVector<std::string> typeSymbols;
+
+    for (BlockArgument bArg : op.getArguments()) {
+      std::string name = getValueName(bArg, *op);
+
+      AllocOp aop = AllocOp::create(op.getLoc(), bArg.getType(), name);
+      bArg.replaceAllUsesExcept(aop, aop);
+      op.body().getBlocks().front().push_front(aop);
+      argToAlloc.map(bArg, aop);
+
+      if (MemletType mem = bArg.getType().dyn_cast<MemletType>())
+        for (StringAttr sa : mem.getSymbols())
+          typeSymbols.push_back(sa.str());
+    }
+
+    allocMaps.insert({op.getOperation(), argToAlloc});
+    symMaps.insert({op.getOperation(), typeSymbols});
+  }
+
+  for (Operation &oper : op.body().getOps())
+    if (StateNode state = dyn_cast<StateNode>(oper))
+      prepForTranslation(state);
+}
+
 LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "SDFG");
   jemit.printKVPair("sdfg_list_id", utils::generateID(),
@@ -225,32 +252,13 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
     }
   } else {
     jemit.startNamedList("arg_names");
-    BlockAndValueMapping argToAlloc;
-    SmallVector<std::string> typeSymbols;
-
     for (BlockArgument bArg : op.getArguments()) {
       std::string name = getValueName(bArg, *op);
       jemit.startEntry();
       jemit.printString(name);
-
-      AllocOp aop = AllocOp::create(op.getLoc(), bArg.getType(), name);
-      bArg.replaceAllUsesExcept(aop, aop);
-      op.body().getBlocks().front().push_front(aop);
-      argToAlloc.map(bArg, aop);
-
-      if (MemletType mem = bArg.getType().dyn_cast<MemletType>())
-        for (StringAttr sa : mem.getSymbols())
-          typeSymbols.push_back(sa.str());
     }
-
-    allocMaps.insert({op.getOperation(), argToAlloc});
-    symMaps.insert({op.getOperation(), typeSymbols});
     jemit.endList(); // arg_names
   }
-
-  for (Operation &oper : op.body().getOps())
-    if (StateNode state = dyn_cast<StateNode>(oper))
-      prepForTranslation(state);
 
   jemit.startNamedObject("_arrays");
 
@@ -304,11 +312,6 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
       if (translateToSDFG(alloc, jemit).failed())
         return failure();
 
-  for (StateNode state : op.body().getOps<StateNode>())
-    for (AllocSymbolOp alloc : state.body().getOps<AllocSymbolOp>())
-      if (translateToSDFG(alloc, jemit).failed())
-        return failure();
-
   jemit.endObject(); // symbols
   jemit.endObject(); // attributes
 
@@ -342,6 +345,8 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
 }
 
 LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
+  prepForTranslation(op);
+
   if (!op.isNested()) {
     jemit.startObject();
 
@@ -361,10 +366,8 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("symbol_mapping");
 
-  for (BlockArgument bArg : op.getArguments())
-    if (MemletType mem = bArg.getType().dyn_cast<MemletType>())
-      for (StringAttr sa : mem.getSymbols())
-        jemit.printKVPair(sa.str(), sa.str());
+  for (std::string mappedSy : symMaps.lookup(op))
+    jemit.printKVPair(mappedSy, mappedSy);
 
   jemit.endObject(); // symbol_mapping
 
@@ -474,44 +477,35 @@ void translation::prepForTranslation(StateNode &op) {
     OpBuilder builder(op.getLoc().getContext());
     builder.setInsertionPoint(store);
 
-    GetAccessOp acc = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
-    store.setOperand(store.getNumOperands() - 1, acc);
-    builder.insert(acc);
+    Type t = store.arr().getType();
+    if (!t.isa<MemletType>())
+      t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
 
-    SmallVector<StringRef> symNames;
-    for (unsigned i = 0; i < store.getNumOperands() - 2; ++i) {
-      std::string name = utils::generateName("store_idx");
-      symNames.push_back(name);
-      AllocSymbolOp allocSym = AllocSymbolOp::create(op.getLoc(), name);
-      builder.insert(allocSym);
+    FunctionType ft =
+        FunctionType::get(op.getContext(), store.getOperandTypes(), t);
 
-      Type t = store.getOperand(i).getType();
-      if (!t.isa<MemletType>())
-        t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+    TaskletNode task = TaskletNode::create(
+        op.getLoc(), utils::generateName("indirect_store"), ft);
 
-      // NOTE: Maybe change to i1?
-      Type outT = MemletType::get(op.getLoc().getContext(),
-                                  builder.getI64Type(), {}, {}, {});
+    BlockAndValueMapping valMapping;
+    valMapping.map(store.getOperands(), task.getArguments());
 
-      FunctionType ft = FunctionType::get(op.getContext(), t, {});
-      TaskletNode task = TaskletNode::create(
-          op.getLoc(), utils::generateName("indirect_store_idx"), ft);
+    Operation *copy = store.getOperation()->clone(valMapping);
+    task.body().getBlocks().front().push_back(copy);
 
-      SymWriteOp swo =
-          SymWriteOp::create(op.getLoc(), task.getArgument(0), name);
-      task.body().getBlocks().front().push_back(swo);
+    ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
+    task.body().getBlocks().front().push_back(ret);
+    builder.insert(task);
 
-      ReturnOp ret = ReturnOp::create(op.getLoc(), {});
-      task.body().getBlocks().front().push_back(ret);
-      builder.insert(task);
+    CallOp call = CallOp::create(op.getLoc(), task, store.getOperands());
+    builder.insert(call);
 
-      CallOp call = CallOp::create(op.getLoc(), task, store.getOperand(i));
-      builder.insert(call);
-    }
+    GetAccessOp gao = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
+    builder.insert(gao);
 
-    StoreOp newStore =
-        StoreOp::create(op.getLoc(), store.val(), store.arr(), symNames);
+    StoreOp newStore = StoreOp::create(op.getLoc(), call.getResult(0), gao);
     builder.insert(newStore);
+
     store.erase();
   }
 
@@ -540,13 +534,6 @@ void translation::prepForTranslation(StateNode &op) {
       OpBuilder builder(op.getLoc().getContext());
       builder.setInsertionPointAfter(sym);
 
-      /*if (sym.res().hasOneUse()) {
-        builder.insert(call);
-        sym.replaceAllUsesWith(call.getResult(0));
-        sym.erase();
-        continue;
-      }*/
-
       Type t = sym.getType();
       if (!t.isa<MemletType>())
         t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
@@ -569,9 +556,13 @@ void translation::prepForTranslation(StateNode &op) {
     }
   }
 
-  for (Operation &oper : op.body().getOps())
+  for (Operation &oper : op.body().getOps()) {
+    // if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper))
+    //   prepForTranslation(sdfg);
+
     if (CallOp call = dyn_cast<CallOp>(oper))
       prepForTranslation(call);
+  }
 }
 
 LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
@@ -660,7 +651,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     ++numOps;
   }
 
-  if (numOps != 2) {
+  if (numOps > 2) {
     emitRemark(op.getLoc(), "No lifting to python possible");
     return failure();
   }
@@ -763,9 +754,9 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
-  if (SymWriteOp sym = dyn_cast<SymWriteOp>(firstOp)) {
+  if (isa<sdir::ReturnOp>(firstOp)) {
     std::string nameArg0 = op.getInputName(0);
-    jemit.printKVPair("string_data", sym.sym().str() + " = " + nameArg0);
+    jemit.printKVPair("string_data", "__out = " + nameArg0);
     jemit.printKVPair("language", "Python");
     return success();
   }
@@ -1201,6 +1192,11 @@ LogicalResult translation::translateToSDFG(LoadOp &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
+  bool fullRange = op->getAttr("isFullRange") != nullptr &&
+                   op->getAttr("isFullRange").cast<BoolAttr>().getValue();
+
+  GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
+
   jemit.startObject();
   jemit.printKVPair("type", "MultiConnectorEdge");
 
@@ -1209,30 +1205,33 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  jemit.startNamedList("strides");
-  GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
-  SmallVector<std::string> strideList = buildStrideList(gao);
-  printStrides(strideList, jemit);
-  jemit.endList(); // strides
-
   jemit.printKVPair("data", gao.getName());
-  jemit.startNamedObject("subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-  if (printIndices(op.getLoc(), op->getAttr("indices"), jemit).failed())
-    return failure();
-  jemit.endList();   // ranges
-  jemit.endObject(); // subset
+  jemit.printKVPair("volume", 1);
 
-  jemit.startNamedObject("dst_subset");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
+  if (!fullRange) {
+    jemit.startNamedList("strides");
+    SmallVector<std::string> strideList = buildStrideList(gao);
+    printStrides(strideList, jemit);
+    jemit.endList(); // strides
 
-  if (printIndices(op.getLoc(), op->getAttr("indices"), jemit).failed())
-    return failure();
+    jemit.startNamedObject("subset");
+    jemit.printKVPair("type", "Range");
+    jemit.startNamedList("ranges");
+    if (printIndices(op.getLoc(), op->getAttr("indices"), jemit).failed())
+      return failure();
+    jemit.endList();   // ranges
+    jemit.endObject(); // subset
 
-  jemit.endList();   // ranges
-  jemit.endObject(); // dst_subset
+    jemit.startNamedObject("dst_subset");
+    jemit.printKVPair("type", "Range");
+    jemit.startNamedList("ranges");
+
+    if (printIndices(op.getLoc(), op->getAttr("indices"), jemit).failed())
+      return failure();
+
+    jemit.endList();   // ranges
+    jemit.endObject(); // dst_subset
+  }
 
   jemit.endObject(); // attributes
   jemit.endObject(); // data
@@ -1291,6 +1290,7 @@ LogicalResult translation::translateToSDFG(CopyOp &op, JsonEmitter &jemit) {
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
+    jemit.printKVPair("volume", 1);
   } else {
     mlir::emitError(op.getLoc(),
                     "Source array must be defined by a GetAccessOp");
@@ -1454,6 +1454,7 @@ LogicalResult printLoadEdgeAttr(LoadOp &load, JsonEmitter &jemit) {
 
   if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
+    jemit.printKVPair("volume", 1);
   } else {
     mlir::emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
     return failure();
@@ -1537,6 +1538,7 @@ LogicalResult printAccessTaskletEdge(GetAccessOp &access, TaskletNode &task,
                                      int argIdx, JsonEmitter &jemit) {
   printMultiConnectorStart(jemit);
   jemit.printKVPair("data", access.getName());
+  jemit.printKVPair("volume", 1);
   printMultiConnectorAttrEnd(jemit);
 
   jemit.printKVPair("src", access.ID());
@@ -1551,6 +1553,7 @@ LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
                                   int argIdx, JsonEmitter &jemit) {
   printMultiConnectorStart(jemit);
   jemit.printKVPair("data", access.getName());
+  jemit.printKVPair("volume", 1);
   printMultiConnectorAttrEnd(jemit);
 
   jemit.printKVPair("src", access.ID());

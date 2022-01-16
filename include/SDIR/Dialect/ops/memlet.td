@@ -138,6 +138,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
         static StoreOp create(PatternRewriter &rewriter, Location loc, Value val, Value mem, ValueRange indices);
         static StoreOp create(Location loc, Value val, Value mem, ValueRange indices);
         static StoreOp create(Location loc, Value val, Value mem, ArrayRef<StringRef> indices);
+        static StoreOp create(Location loc, Value val, Value mem);
         bool isIndirect();
     }];
 }

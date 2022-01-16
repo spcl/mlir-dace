@@ -57,33 +57,4 @@ def SDIR_SymOp : SDIR_Op<"sym">{
     }];
 }
 
-//===----------------------------------------------------------------------===//
-// SymWriteOp
-//===----------------------------------------------------------------------===//
-
-def SDIR_SymWriteOp : SDIR_Op<"sym_write">{
-    let summary = "symbolic write operation";
-    let description = [{
-        Write a value to a symbol.
-        For example:
-
-        ```mlir
-        sdir.state @state_0 {
-            ...
-            sdir.sym %1, "N" : i32
-            ...
-        }
-        ```
-    }];
-
-    let arguments = (ins 
-        AnyType:$val,
-        StrAttr:$sym
-    );
-    let extraClassDeclaration = [{
-        static SymWriteOp create(Location loc, Value val, StringRef sym);
-    }];
-}
-
-
 #endif // SDIR_SymbolOps

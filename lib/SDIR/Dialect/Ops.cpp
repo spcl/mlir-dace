@@ -315,6 +315,13 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
   return cast<StateNode>(rewriter.createOperation(state));
 }
 
+StateNode StateNode::create(Location loc, StringRef name) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, utils::generateID(), utils::generateName(name.str()));
+  return cast<StateNode>(Operation::create(state));
+}
+
 static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -817,6 +824,14 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   OperationState state(loc, getOperationName());
   build(builder, state, from.sym_name(), to.sym_name(), assign, condition, ref);
   return cast<EdgeOp>(rewriter.createOperation(state));
+}
+
+EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
+                      ArrayAttr &assign, StringAttr &condition, Value ref) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, from.sym_name(), to.sym_name(), assign, condition, ref);
+  return cast<EdgeOp>(Operation::create(state));
 }
 
 static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
@@ -1471,6 +1486,25 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem,
 
   ArrayAttr attrArr = builder.getArrayAttr(attrList);
   state.addAttribute("indices", attrArr);
+
+  build(builder, state, {}, val, mem);
+  return cast<StoreOp>(Operation::create(state));
+}
+
+StoreOp StoreOp::create(Location loc, Value val, Value mem) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  SmallVector<Attribute> numList;
+  ArrayAttr numArr = builder.getArrayAttr(numList);
+  state.addAttribute("indices_numList", numArr);
+
+  SmallVector<Attribute> attrList;
+  ArrayAttr attrArr = builder.getArrayAttr(attrList);
+  state.addAttribute("indices", attrArr);
+
+  BoolAttr fullRange = builder.getBoolAttr(true);
+  state.addAttribute("isFullRange", fullRange);
 
   build(builder, state, {}, val, mem);
   return cast<StoreOp>(Operation::create(state));
@@ -2342,51 +2376,6 @@ static void print(OpAsmPrinter &p, SymOp op) {
 
 LogicalResult verify(SymOp op) { return success(); }
 
-//===----------------------------------------------------------------------===//
-// SymWriteOp
-//===----------------------------------------------------------------------===//
-
-SymWriteOp SymWriteOp::create(Location loc, Value val, StringRef sym) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  build(builder, state, val, sym);
-  return cast<SymWriteOp>(Operation::create(state));
-}
-
-static ParseResult parseSymWriteOp(OpAsmParser &parser,
-                                   OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  OpAsmParser::OperandType valOperand;
-  if (parser.parseOperand(valOperand))
-    return failure();
-
-  if (parser.parseComma())
-    return failure();
-
-  std::string symName;
-  if (parser.parseString(&symName))
-    return failure();
-
-  result.addAttribute("sym", parser.getBuilder().getStringAttr(symName));
-
-  Type valType;
-  if (parser.parseColonType(valType))
-    return failure();
-
-  if (parser.resolveOperand(valOperand, valType, result.operands))
-    return failure();
-
-  return success();
-}
-
-static void print(OpAsmPrinter &p, SymWriteOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym"});
-  p << ' ' << op.val() << ", \"" << op.sym() << "\" : " << op.val().getType();
-}
-
-LogicalResult verify(SymWriteOp op) { return success(); }
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
