@@ -131,7 +131,7 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
       if (translateToSDFG(sdfg, jemit).failed())
         return failure();
 
-  return success();
+  return op.verify();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1493,19 +1493,20 @@ LogicalResult printLoadSDFGEdge(LoadOp &load, SDFGNode &sdfg, int argIdx,
 }
 
 void translation::prepForTranslation(sdir::CallOp &op) {
-  if (!op.callsTasklet())
-    return;
-
   StateNode state = op.getParentState();
-  TaskletNode task = op.getTasklet();
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Value val = op.getOperand(i);
+    if (!op.callsTasklet() && val.hasOneUse())
+      continue;
+
     if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
-      TaskletNode taskSrc = call.getTasklet();
+      OpBuilder builder(op.getLoc().getContext());
+      FunctionType ft = builder.getFunctionType(call.getOperandTypes(),
+                                                call.getResultTypes());
 
       // TODO: Only one output supported
-      Type t = taskSrc.getType().getResult(0);
+      Type t = ft.getResult(0);
       if (!t.isa<MemletType>()) {
         t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
       }
@@ -1514,19 +1515,16 @@ void translation::prepForTranslation(sdir::CallOp &op) {
           AllocOp::create(op.getLoc(), t, utils::generateName("ttt"));
 
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, alloc);
-
-      state.body().getBlocks().front().push_front(alloc);
-      state.body().getBlocks().front().push_front(gao);
-
       StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});
       LoadOp load = LoadOp::create(op.getLoc(), gao, {});
 
-      OpBuilder builder(op.getLoc().getContext());
-      builder.setInsertionPoint(op);
+      builder.setInsertionPointAfter(call);
+      builder.insert(alloc);
+      builder.insert(gao);
       builder.insert(store);
       builder.insert(load);
 
-      op.setOperand(i, load);
+      val.replaceAllUsesExcept(load, store);
     }
   }
 }
