@@ -433,6 +433,20 @@ void translation::prepForTranslation(StateNode &op) {
     }
   }
 
+  // Add access nodes for stores
+  for (StoreOp store : op.body().getOps<StoreOp>()) {
+    if (store.arr().hasOneUse() || store.isIndirect())
+      continue;
+
+    OpBuilder builder(op.getLoc().getContext());
+    builder.setInsertionPoint(store);
+
+    GetAccessOp gao = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
+    builder.insert(gao);
+
+    store.setOperand(store.getNumOperands() - 1, gao);
+  }
+
   // separate operations requiring indirects
   SmallVector<LoadOp> indirectsLoads;
   SmallVector<StoreOp> indirectsStores;
