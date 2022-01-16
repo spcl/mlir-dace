@@ -137,6 +137,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
     let extraClassDeclaration = [{
         static StoreOp create(PatternRewriter &rewriter, Location loc, Value val, Value mem, ValueRange indices);
         static StoreOp create(Location loc, Value val, Value mem, ValueRange indices);
+        static StoreOp create(Location loc, Value val, Value mem, ArrayRef<StringRef> indices);
         bool isIndirect();
     }];
 }

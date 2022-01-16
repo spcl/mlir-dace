@@ -299,11 +299,15 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
       return failure();
   }
 
-  for (Operation &oper : op.body().getOps()) {
+  for (Operation &oper : op.body().getOps())
     if (AllocSymbolOp alloc = dyn_cast<AllocSymbolOp>(oper))
       if (translateToSDFG(alloc, jemit).failed())
         return failure();
-  }
+
+  for (StateNode state : op.body().getOps<StateNode>())
+    for (AllocSymbolOp alloc : state.body().getOps<AllocSymbolOp>())
+      if (translateToSDFG(alloc, jemit).failed())
+        return failure();
 
   jemit.endObject(); // symbols
   jemit.endObject(); // attributes
@@ -400,43 +404,115 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void translation::prepForTranslation(StateNode &op) {
+  // Insert access nodes
+  SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
+  BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
+
+  for (BlockArgument bArg : sdfg.getArguments()) {
+    Value alloc = argToAlloc.lookup<Value>(bArg);
+    DenseSet<Operation *> users;
+
+    for (Operation *nop : alloc.getUsers()) {
+      if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
+        if (state == op)
+          users.insert(nop);
+      }
+    }
+
+    if (!users.empty()) {
+      GetAccessOp gao =
+          GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
+      op.body().getBlocks().front().push_front(gao);
+
+      alloc.replaceUsesWithIf(gao, [&](OpOperand &opop) {
+        return users.contains(opop.getOwner());
+      });
+    }
+  }
+
   // separate operations requiring indirects
-  SmallVector<Operation *> indirects;
+  SmallVector<LoadOp> indirectsLoads;
+  SmallVector<StoreOp> indirectsStores;
   for (Operation &oper : op.body().getOps()) {
     if (StoreOp edge = dyn_cast<StoreOp>(oper))
       if (edge.isIndirect())
-        indirects.push_back(&oper);
+        indirectsStores.push_back(edge);
 
     if (LoadOp edge = dyn_cast<LoadOp>(oper))
       if (edge.isIndirect())
-        indirects.push_back(&oper);
+        indirectsLoads.push_back(edge);
   }
 
   // Rewrite indirect operations
-  for (Operation *oper : indirects) {
-    FunctionType ft = FunctionType::get(
-        op.getContext(), oper->getOperandTypes(), oper->getResultTypes());
+  for (LoadOp load : indirectsLoads) {
+    FunctionType ft = FunctionType::get(op.getContext(), load.getOperandTypes(),
+                                        load.getType());
 
     TaskletNode task = TaskletNode::create(
-        op.getLoc(), utils::generateName("indirect_task"), ft);
+        op.getLoc(), utils::generateName("indirect_load"), ft);
 
     BlockAndValueMapping valMapping;
-    valMapping.map(oper->getOperands(), task.getArguments());
+    valMapping.map(load.getOperands(), task.getArguments());
 
-    Operation *copy = oper->clone(valMapping);
+    Operation *copy = load.getOperation()->clone(valMapping);
     task.body().getBlocks().front().push_back(copy);
 
     ReturnOp ret = ReturnOp::create(op.getLoc(), copy->getResults());
     task.body().getBlocks().front().push_back(ret);
     op.body().getBlocks().front().push_front(task);
 
-    CallOp call = CallOp::create(op.getLoc(), task, oper->getOperands());
+    CallOp call = CallOp::create(op.getLoc(), task, load.getOperands());
     OpBuilder builder(op.getLoc().getContext());
-    builder.setInsertionPointAfter(oper);
+    builder.setInsertionPointAfter(load);
     builder.insert(call);
 
-    oper->replaceAllUsesWith(call);
-    oper->erase();
+    load.replaceAllUsesWith(call);
+    load.erase();
+  }
+
+  for (StoreOp store : indirectsStores) {
+    OpBuilder builder(op.getLoc().getContext());
+    builder.setInsertionPoint(store);
+
+    GetAccessOp acc = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
+    store.setOperand(store.getNumOperands() - 1, acc);
+    builder.insert(acc);
+
+    SmallVector<StringRef> symNames;
+    for (unsigned i = 0; i < store.getNumOperands() - 2; ++i) {
+      std::string name = utils::generateName("store_idx");
+      symNames.push_back(name);
+      AllocSymbolOp allocSym = AllocSymbolOp::create(op.getLoc(), name);
+      builder.insert(allocSym);
+
+      Type t = store.getOperand(i).getType();
+      if (!t.isa<MemletType>())
+        t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+
+      // NOTE: Maybe change to i1?
+      Type outT = MemletType::get(op.getLoc().getContext(),
+                                  builder.getI64Type(), {}, {}, {});
+
+      FunctionType ft = FunctionType::get(op.getContext(), t, {});
+      TaskletNode task = TaskletNode::create(
+          op.getLoc(), utils::generateName("indirect_store_idx"), ft);
+
+      SymWriteOp swo =
+          SymWriteOp::create(op.getLoc(), task.getArgument(0), name);
+      task.body().getBlocks().front().push_back(swo);
+
+      ReturnOp ret = ReturnOp::create(op.getLoc(), {});
+      task.body().getBlocks().front().push_back(ret);
+      builder.insert(task);
+
+      CallOp call = CallOp::create(op.getLoc(), task, store.getOperand(i));
+      builder.insert(call);
+    }
+
+    StoreOp newStore =
+        StoreOp::create(op.getLoc(), store.val(), store.arr(), symNames);
+    builder.insert(newStore);
+    store.erase();
   }
 
   // Wrap symbolic evaluations
@@ -479,7 +555,8 @@ void translation::prepForTranslation(StateNode &op) {
           op.getLoc(), t, utils::generateName("sym_wrap"));
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, aop);
 
-      StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});
+      StoreOp store =
+          StoreOp::create(op.getLoc(), call.getResult(0), gao, ValueRange());
       LoadOp load = LoadOp::create(op.getLoc(), gao, {});
 
       builder.insert(aop);
@@ -506,32 +583,6 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.printAttributes(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
   jemit.endObject(); // attributes
-
-  // Insert access nodes
-  SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
-  BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
-
-  for (BlockArgument bArg : sdfg.getArguments()) {
-    Value alloc = argToAlloc.lookup<Value>(bArg);
-    DenseSet<Operation *> users;
-
-    for (Operation *nop : alloc.getUsers()) {
-      if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
-        if (state == op)
-          users.insert(nop);
-      }
-    }
-
-    if (!users.empty()) {
-      GetAccessOp gao =
-          GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
-      op.body().getBlocks().front().push_front(gao);
-
-      alloc.replaceUsesWithIf(gao, [&](OpOperand &opop) {
-        return users.contains(opop.getOwner());
-      });
-    }
-  }
 
   jemit.startNamedList("nodes");
 
@@ -708,6 +759,13 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
 
   if (SymOp sym = dyn_cast<SymOp>(firstOp)) {
     jemit.printKVPair("string_data", "__out = " + sym.expr().str());
+    jemit.printKVPair("language", "Python");
+    return success();
+  }
+
+  if (SymWriteOp sym = dyn_cast<SymWriteOp>(firstOp)) {
+    std::string nameArg0 = op.getInputName(0);
+    jemit.printKVPair("string_data", sym.sym().str() + " = " + nameArg0);
     jemit.printKVPair("language", "Python");
     return success();
   }
@@ -1564,7 +1622,8 @@ void translation::prepForTranslation(sdir::CallOp &op) {
           AllocTransientOp::create(op.getLoc(), t, utils::generateName("ttt"));
 
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, alloc);
-      StoreOp store = StoreOp::create(op.getLoc(), call.getResult(0), gao, {});
+      StoreOp store =
+          StoreOp::create(op.getLoc(), call.getResult(0), gao, ValueRange());
       LoadOp load = LoadOp::create(op.getLoc(), gao, {});
 
       builder.setInsertionPointAfter(call);

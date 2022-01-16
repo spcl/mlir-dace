@@ -1453,6 +1453,29 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem,
   return cast<StoreOp>(Operation::create(state));
 }
 
+StoreOp StoreOp::create(Location loc, Value val, Value mem,
+                        ArrayRef<StringRef> indices) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  SmallVector<Attribute> numList;
+  for (size_t i = 0; i < indices.size(); ++i) {
+    numList.push_back(builder.getUI32IntegerAttr(-1));
+  }
+  ArrayAttr numArr = builder.getArrayAttr(numList);
+  state.addAttribute("indices_numList", numArr);
+
+  SmallVector<Attribute> attrList;
+  for (StringRef str : indices)
+    attrList.push_back(builder.getStringAttr(str));
+
+  ArrayAttr attrArr = builder.getArrayAttr(attrList);
+  state.addAttribute("indices", attrArr);
+
+  build(builder, state, {}, val, mem);
+  return cast<StoreOp>(Operation::create(state));
+}
+
 static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -2285,6 +2308,13 @@ SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
   return cast<SymOp>(rewriter.createOperation(state));
 }
 
+SymOp SymOp::create(Location loc, Type type, StringRef expr) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, type, expr);
+  return cast<SymOp>(Operation::create(state));
+}
+
 static ParseResult parseSymOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -2312,6 +2342,51 @@ static void print(OpAsmPrinter &p, SymOp op) {
 
 LogicalResult verify(SymOp op) { return success(); }
 
+//===----------------------------------------------------------------------===//
+// SymWriteOp
+//===----------------------------------------------------------------------===//
+
+SymWriteOp SymWriteOp::create(Location loc, Value val, StringRef sym) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, val, sym);
+  return cast<SymWriteOp>(Operation::create(state));
+}
+
+static ParseResult parseSymWriteOp(OpAsmParser &parser,
+                                   OperationState &result) {
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  OpAsmParser::OperandType valOperand;
+  if (parser.parseOperand(valOperand))
+    return failure();
+
+  if (parser.parseComma())
+    return failure();
+
+  std::string symName;
+  if (parser.parseString(&symName))
+    return failure();
+
+  result.addAttribute("sym", parser.getBuilder().getStringAttr(symName));
+
+  Type valType;
+  if (parser.parseColonType(valType))
+    return failure();
+
+  if (parser.resolveOperand(valOperand, valType, result.operands))
+    return failure();
+
+  return success();
+}
+
+static void print(OpAsmPrinter &p, SymWriteOp op) {
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym"});
+  p << ' ' << op.val() << ", \"" << op.sym() << "\" : " << op.val().getType();
+}
+
+LogicalResult verify(SymWriteOp op) { return success(); }
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
