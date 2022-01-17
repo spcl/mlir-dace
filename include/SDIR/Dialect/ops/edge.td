@@ -29,6 +29,7 @@ def SDIR_EdgeOp : SDIR_Op<"edge", [
 
     let extraClassDeclaration = [{
         static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to, ArrayAttr &assign, StringAttr &condition, Value ref);
+        static EdgeOp create(PatternRewriter &rewriter, Location loc, StateNode &from, StateNode &to);
         static EdgeOp create(Location loc, StateNode &from, StateNode &to, ArrayAttr &assign, StringAttr &condition, Value ref);
     }];
 }

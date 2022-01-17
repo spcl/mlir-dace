@@ -183,6 +183,7 @@ LogicalResult printConstant(arith::ConstantOp &op, JsonEmitter &jemit) {
 }
 
 void translation::prepForTranslation(SDFGNode &op) {
+  // Map arguments to arrays
   if (!(*op).hasAttr("arg_names")) {
     BlockAndValueMapping argToAlloc;
     SmallVector<std::string> typeSymbols;
@@ -407,6 +408,11 @@ LogicalResult translation::translateToSDFG(SDFGNode &op, JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void translation::prepForTranslation(StateNode &op) {
+  // Remove dead loads
+  if (op.body().getBlocks().front().getOperations().size() > 0 &&
+      isa<LoadOp>(op.body().getBlocks().front().back()))
+    op.body().getBlocks().front().back().erase();
+
   // Insert access nodes
   SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
   BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
@@ -710,7 +716,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
       val = std::to_string(iop.value());
     }
 
-    std::string entry = "__out = dace." + type.str() + "(" + val + ")";
+    std::string entry = "__out = " + val;
     jemit.printKVPair("string_data", entry);
     jemit.printKVPair("language", "Python");
     return success();
@@ -721,7 +727,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     Type t = ico.getType();
     Location loc = op.getLoc();
     StringRef resT = translateTypeToSDFG(t, loc);
-    std::string entry = "__out = dace." + resT.str() + "(" + nameArg0 + ")";
+    std::string entry = "__out = " + nameArg0;
     jemit.printKVPair("string_data", entry);
     jemit.printKVPair("language", "Python");
     return success();

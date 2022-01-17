@@ -26,6 +26,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 
     let extraClassDeclaration = [{
         static AllocOp create(PatternRewriter &rewriter, Location loc, Type res);
+        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name);
         static AllocOp create(Location loc, Type res, StringRef name);
         SDFGNode getParentSDFG();
         bool isInState();
@@ -59,6 +60,8 @@ def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
     let results = (outs SDIR_ArrayType:$res);
 
     let extraClassDeclaration = [{
+        static AllocTransientOp create(PatternRewriter &rewriter, Location loc, Type res);
+        static AllocTransientOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name);
         static AllocTransientOp create(Location loc, Type res, StringRef name);
         SDFGNode getParentSDFG();
         bool isInState();

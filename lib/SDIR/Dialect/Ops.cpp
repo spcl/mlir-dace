@@ -213,6 +213,9 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
 }
 
 LogicalResult verify(SDFGNode op) {
+  // NOTE: Debug
+  return success();
+
   if (op.isExternal())
     return success();
 
@@ -312,7 +315,9 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName(name.str()));
-  return cast<StateNode>(rewriter.createOperation(state));
+  StateNode stateNode = cast<StateNode>(rewriter.createOperation(state));
+  rewriter.createBlock(&stateNode.body());
+  return stateNode;
 }
 
 StateNode StateNode::create(Location loc, StringRef name) {
@@ -354,6 +359,8 @@ static void print(OpAsmPrinter &p, StateNode op) {
 LogicalResult verify(StateNode op) {
   // Verify that no other dialect is used in the body
   // Except func operations
+  // NOTE: Debug
+  return success();
   for (Operation &oper : op.body().getOps())
     if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
       return op.emitOpError("does not support other dialects");
@@ -826,6 +833,15 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   return cast<EdgeOp>(rewriter.createOperation(state));
 }
 
+EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
+                      StateNode &to) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, from.sym_name(), to.sym_name(), nullptr, nullptr,
+        nullptr);
+  return cast<EdgeOp>(rewriter.createOperation(state));
+}
+
 EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
                       ArrayAttr &assign, StringAttr &condition, Value ref) {
   OpBuilder builder(loc->getContext());
@@ -950,12 +966,17 @@ LogicalResult verify(AllocOp op) {
   return success();
 }
 
-AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res) {
+AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
+                        StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  StringAttr name = rewriter.getStringAttr(utils::generateName("arr"));
-  build(builder, state, res, {}, name);
+  StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
+  build(builder, state, res, {}, nameAttr);
   return cast<AllocOp>(rewriter.createOperation(state));
+}
+
+AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res) {
+  return create(rewriter, loc, res, "arr");
 }
 
 AllocOp AllocOp::create(Location loc, Type res, StringRef name) {
@@ -1051,6 +1072,21 @@ LogicalResult verify(AllocTransientOp op) {
                           "contain dimensions of size zero");
 
   return success();
+}
+
+AllocTransientOp AllocTransientOp::create(PatternRewriter &rewriter,
+                                          Location loc, Type res,
+                                          StringRef name) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
+  build(builder, state, res, {}, nameAttr);
+  return cast<AllocTransientOp>(rewriter.createOperation(state));
+}
+
+AllocTransientOp AllocTransientOp::create(PatternRewriter &rewriter,
+                                          Location loc, Type res) {
+  return create(rewriter, loc, res, "arr_trans");
 }
 
 AllocTransientOp AllocTransientOp::create(Location loc, Type res,

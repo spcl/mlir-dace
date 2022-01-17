@@ -14,6 +14,10 @@ using namespace mlir;
 using namespace sdir;
 using namespace conversion;
 
+//===----------------------------------------------------------------------===//
+// Target & Converter
+//===----------------------------------------------------------------------===//
+
 struct SDIRTarget : public ConversionTarget {
   SDIRTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
     // Every Op in the SDIR Dialect is legal
@@ -25,7 +29,8 @@ struct SDIRTarget : public ConversionTarget {
       return numOps == 0 || numOps == 1;
     });
     // All other operations are illegal
-    markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
+    // NOTE: Debug
+    // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -59,6 +64,58 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
+                               ArrayRef<Value> vals) {
+  SmallVector<Value> loadedOps;
+  for (Value operand : vals) {
+    if (operand.getDefiningOp() != nullptr &&
+        isa<LoadOp>(operand.getDefiningOp())) {
+      LoadOp load = cast<LoadOp>(operand.getDefiningOp());
+      GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
+      AllocTransientOp alloc =
+          cast<AllocTransientOp>(gao.arr().getDefiningOp());
+
+      GetAccessOp acc =
+          GetAccessOp::create(rewriter, loc, alloc.getType().toMemlet(), alloc);
+      LoadOp loadNew = LoadOp::create(rewriter, loc, acc, ValueRange());
+
+      loadedOps.push_back(loadNew);
+    } else {
+      loadedOps.push_back(operand);
+    }
+  }
+  return loadedOps;
+}
+
+Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
+  SmallVector<Value> loadedOps = {val};
+  return createLoads(rewriter, loc, loadedOps)[0];
+}
+
+void linkToLastState(PatternRewriter &rewriter, Location loc,
+                     StateNode &state) {
+  rewriter.setInsertionPointAfter(state);
+  SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+  StateNode prev =
+      cast<StateNode>(sdfg.body().getBlocks().front().getOperations().front());
+
+  for (StateNode sn : sdfg.body().getOps<StateNode>()) {
+    if (sn == state) {
+      EdgeOp::create(rewriter, loc, prev, state);
+      break;
+    }
+    prev = sn;
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Patterns
+//===----------------------------------------------------------------------===//
+
 class FuncToSDFG : public OpConversionPattern<FuncOp> {
 public:
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -85,34 +142,33 @@ public:
 
     FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
     SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft, op.sym_name());
-    StateNode state = StateNode::create(rewriter, op.getLoc());
-    rewriter.createBlock(&state.body());
-
-    for (unsigned i = 0; i < op.getNumArguments(); ++i) {
-      op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
-    }
+    StateNode state = StateNode::create(rewriter, op.getLoc(), "init");
 
     rewriter.updateRootInPlace(sdfg, [&] {
       sdfg.entryAttr(
           SymbolRefAttr::get(op.getLoc().getContext(), state.sym_name()));
     });
 
-    rewriter.inlineRegionBefore(op.body(), state.body(), state.body().end());
+    for (unsigned i = 0; i < op.getNumArguments(); ++i) {
+      op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
+    }
+
+    rewriter.inlineRegionBefore(op.body(), sdfg.body(), sdfg.body().end());
     rewriter.eraseOp(op);
-    rewriter.mergeBlocks(&state.body().getBlocks().back(),
-                         &state.body().getBlocks().front(),
-                         sdfg.getArguments());
+    rewriter.mergeBlocks(&sdfg.body().getBlocks().back(),
+                         &sdfg.body().getBlocks().front(), sdfg.getArguments());
 
     // hasValue() is inaccessable
-    if (rewriter.convertRegionTypes(&state.body(), *getTypeConverter())
+    if (rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
             .getPointer() == nullptr)
       return failure();
 
-    for (unsigned i = 0; i < state.body().getBlocks().front().getNumArguments();
+    /*for (unsigned i = 0; i <
+    sdfg.body().getBlocks().front().getNumArguments();
          ++i) {
       rewriter.replaceUsesOfBlockArgument(
-          state.body().getBlocks().front().getArgument(i), sdfg.getArgument(i));
-    }
+          sdfg.body().getBlocks().front().getArgument(i), sdfg.getArgument(i));
+    }*/
 
     return success();
   }
@@ -133,6 +189,19 @@ public:
       if (isa<TaskletNode>(op->getParentOp()))
         return failure(); // Operation already in a tasklet
 
+      // NOTE: Hotfix, check if a better solution exists
+      MemrefToMemletConverter memo;
+      Type nt = memo.convertType(op->getResultTypes()[0]);
+      if (MemletType mem = nt.dyn_cast<MemletType>())
+        nt = mem.toArray();
+      else
+        nt = ArrayType::get(op->getLoc().getContext(), nt, {}, {}, {});
+
+      AllocTransientOp alloc =
+          AllocTransientOp::create(rewriter, op->getLoc(), nt, "_tmp");
+
+      StateNode state = StateNode::create(rewriter, op->getLoc());
+
       FunctionType ft =
           rewriter.getFunctionType(op->getOperandTypes(), op->getResultTypes());
       TaskletNode task = TaskletNode::create(rewriter, op->getLoc(), ft);
@@ -148,10 +217,24 @@ public:
                              opClone->getResults());
 
       rewriter.setInsertionPointAfter(task);
-      sdir::CallOp call =
-          sdir::CallOp::create(rewriter, op->getLoc(), task, op->getOperands());
 
-      rewriter.replaceOp(op, call.getResults());
+      SmallVector<Value> loadedOps =
+          createLoads(rewriter, op->getLoc(), operands);
+
+      sdir::CallOp call =
+          sdir::CallOp::create(rewriter, op->getLoc(), task, loadedOps);
+
+      GetAccessOp access = GetAccessOp::create(
+          rewriter, op->getLoc(), nt.cast<ArrayType>().toMemlet(), alloc);
+      StoreOp::create(rewriter, op->getLoc(), call.getResult(0), access,
+                      ValueRange());
+
+      LoadOp load =
+          LoadOp::create(rewriter, op->getLoc(), access, ValueRange());
+
+      rewriter.replaceOp(op, {load});
+
+      linkToLastState(rewriter, op->getLoc(), state);
       return success();
     }
 
@@ -188,11 +271,36 @@ public:
   LogicalResult
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    LoadOp load = LoadOp::create(rewriter, op.getLoc(),
-                                 getTypeConverter()->convertType(op.getType()),
-                                 adaptor.memref(), adaptor.indices());
+    Type type = getTypeConverter()->convertType(op.getType());
+    Type arrT = type;
 
-    rewriter.replaceOp(op, load.getResult());
+    if (MemletType mem = arrT.dyn_cast<MemletType>())
+      arrT = mem.toArray();
+    else
+      arrT = ArrayType::get(op->getLoc().getContext(), arrT, {}, {}, {});
+
+    AllocTransientOp alloc =
+        AllocTransientOp::create(rewriter, op->getLoc(), arrT, "_tmp");
+
+    StateNode state = StateNode::create(rewriter, op->getLoc());
+
+    Value memref = createLoad(rewriter, op.getLoc(), adaptor.memref());
+
+    SmallVector<Value> indices = adaptor.indices();
+    indices = createLoads(rewriter, op.getLoc(), indices);
+
+    LoadOp load = LoadOp::create(rewriter, op.getLoc(), type, memref, indices);
+
+    GetAccessOp access = GetAccessOp::create(
+        rewriter, op->getLoc(), arrT.cast<ArrayType>().toMemlet(), alloc);
+    StoreOp::create(rewriter, op->getLoc(), load, access, ValueRange());
+
+    LoadOp newLoad =
+        LoadOp::create(rewriter, op->getLoc(), access, ValueRange());
+
+    rewriter.replaceOp(op, {newLoad});
+
+    linkToLastState(rewriter, op->getLoc(), state);
     return success();
   }
 };
@@ -204,8 +312,85 @@ public:
   LogicalResult
   matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    StoreOp::create(rewriter, op.getLoc(), adaptor.value(), adaptor.memref(),
-                    adaptor.indices());
+
+    StateNode state = StateNode::create(rewriter, op->getLoc());
+
+    Value val = createLoad(rewriter, op.getLoc(), adaptor.value());
+    Value memref = createLoad(rewriter, op.getLoc(), adaptor.memref());
+
+    SmallVector<Value> indices = adaptor.indices();
+    indices = createLoads(rewriter, op.getLoc(), indices);
+
+    StoreOp::create(rewriter, op.getLoc(), val, memref, indices);
+
+    linkToLastState(rewriter, op.getLoc(), state);
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class SCFForToSDIR2 : public OpConversionPattern<scf::ForOp> {
+public:
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
+  Value mappedValue(Value val) const {
+    if (val.getDefiningOp() != nullptr && isa<LoadOp>(val.getDefiningOp())) {
+      LoadOp load = cast<LoadOp>(val.getDefiningOp());
+      GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
+      return gao.arr();
+    }
+
+    return val;
+  }
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    std::string idxName = utils::generateName("loopIdx");
+
+    StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
+    linkToLastState(rewriter, op.getLoc(), init);
+
+    rewriter.setInsertionPointAfter(init);
+    StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
+
+    rewriter.setInsertionPointAfter(guard);
+
+    for (Operation &nop : op.getLoopBody().getOps()) {
+      Operation *copy = nop.clone();
+      rewriter.insert(copy);
+    }
+
+    StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
+
+    // rewriter.setInsertionPointAfter(guard);
+    // StateNode returnState = StateNode::create(rewriter, op.getLoc(),
+    // "return");
+
+    rewriter.setInsertionPointAfter(op);
+    StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
+
+    rewriter.setInsertionPointAfter(exit);
+    ArrayAttr emptyArr;
+    StringAttr emptyStr;
+    ArrayAttr initArr = rewriter.getStrArrayAttr({idxName + ": ref"});
+    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
+                   mappedValue(adaptor.getLowerBound()));
+
+    StringAttr guardStr = rewriter.getStringAttr(idxName + " < ref");
+    EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
+                   mappedValue(adaptor.getUpperBound()));
+
+    ArrayAttr bodyArr =
+        rewriter.getStrArrayAttr({idxName + ": " + idxName + " + ref"});
+    EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr, emptyStr,
+                   mappedValue(adaptor.getStep()));
+
+    StringAttr exitStr = rewriter.getStringAttr("not(" + idxName + " < ref)");
+    EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
+                   mappedValue(adaptor.getUpperBound()));
+
     rewriter.eraseOp(op);
     return success();
   }
@@ -395,6 +580,10 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Pass
+//===----------------------------------------------------------------------===//
+
 void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
@@ -403,7 +592,7 @@ void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
   patterns.add<EraseTerminators>(1, ctxt);
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
   patterns.add<MemrefStoreToSDIR>(converter, ctxt);
-  patterns.add<SCFForToSDIR>(converter, ctxt);
+  patterns.add<SCFForToSDIR2>(converter, ctxt);
 }
 
 namespace {
@@ -420,7 +609,7 @@ void SAMToSDIRPass::runOnOperation() {
   populateSAMToSDIRConversionPatterns(patterns, converter);
 
   SDIRTarget target(getContext());
-  if (failed(applyFullConversion(module, target, std::move(patterns))))
+  if (failed(applyPartialConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }
 
