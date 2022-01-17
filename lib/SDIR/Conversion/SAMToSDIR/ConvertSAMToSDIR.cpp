@@ -14,7 +14,7 @@ using namespace sdir;
 using namespace conversion;
 
 //===----------------------------------------------------------------------===//
-// Target & Converter
+// Target & Type Converter
 //===----------------------------------------------------------------------===//
 
 struct SDIRTarget : public ConversionTarget {
@@ -325,8 +325,13 @@ public:
     else
       arrT = ArrayType::get(op->getLoc().getContext(), arrT, {}, {}, {});
 
+    SDFGNode sdfg = getTopSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
     AllocTransientOp alloc =
         AllocTransientOp::create(rewriter, op->getLoc(), arrT, "_tmp");
+
+    rewriter.restoreInsertionPoint(ip);
 
     StateNode state = StateNode::create(rewriter, op->getLoc());
 
@@ -398,8 +403,14 @@ public:
   matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     std::string idxName = utils::generateName("loopIdx");
+
+    SDFGNode sdfg = getTopSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
     AllocSymbolOp allocSym =
         AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
+
+    rewriter.restoreInsertionPoint(ip);
 
     StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
     SymOp idxSym = SymOp::create(rewriter, op.getLoc(),
