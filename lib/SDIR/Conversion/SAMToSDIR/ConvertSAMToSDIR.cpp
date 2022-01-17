@@ -98,10 +98,11 @@ Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
 
 void linkToLastState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
-  rewriter.setInsertionPointAfter(state);
   SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
-  StateNode prev =
-      cast<StateNode>(sdfg.body().getBlocks().front().getOperations().front());
+  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+  rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+
+  StateNode prev;
 
   for (StateNode sn : sdfg.body().getOps<StateNode>()) {
     if (sn == state) {
@@ -110,8 +111,43 @@ void linkToLastState(PatternRewriter &rewriter, Location loc,
     }
     prev = sn;
   }
+  rewriter.restoreInsertionPoint(ip);
 }
 
+void linkToNextState(PatternRewriter &rewriter, Location loc,
+                     StateNode &state) {
+  SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+  OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+  rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+
+  bool visitedState = false;
+  for (StateNode sn : sdfg.body().getOps<StateNode>()) {
+    if (visitedState) {
+      EdgeOp::create(rewriter, loc, state, sn);
+      break;
+    }
+
+    if (sn == state)
+      visitedState = true;
+  }
+  rewriter.restoreInsertionPoint(ip);
+}
+
+bool nextOpIsState(StateNode &state) {
+  SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+
+  bool visitedState = false;
+  for (Operation &op : sdfg.body().getOps()) {
+    if (visitedState)
+      return isa<StateNode>(op);
+
+    if (&op == state.getOperation())
+      visitedState = true;
+  }
+
+  printf("didn't find\n");
+  return false;
+}
 //===----------------------------------------------------------------------===//
 // Patterns
 //===----------------------------------------------------------------------===//
@@ -167,7 +203,8 @@ public:
     sdfg.body().getBlocks().front().getNumArguments();
          ++i) {
       rewriter.replaceUsesOfBlockArgument(
-          sdfg.body().getBlocks().front().getArgument(i), sdfg.getArgument(i));
+          sdfg.body().getBlocks().front().getArgument(i),
+    sdfg.getArgument(i));
     }*/
 
     return success();
@@ -189,6 +226,8 @@ public:
       if (isa<TaskletNode>(op->getParentOp()))
         return failure(); // Operation already in a tasklet
 
+      StateNode state = StateNode::create(rewriter, op->getLoc());
+
       // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op->getResultTypes()[0]);
@@ -197,10 +236,13 @@ public:
       else
         nt = ArrayType::get(op->getLoc().getContext(), nt, {}, {}, {});
 
+      SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+      OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
       AllocTransientOp alloc =
           AllocTransientOp::create(rewriter, op->getLoc(), nt, "_tmp");
 
-      StateNode state = StateNode::create(rewriter, op->getLoc());
+      rewriter.restoreInsertionPoint(ip);
 
       FunctionType ft =
           rewriter.getFunctionType(op->getOperandTypes(), op->getResultTypes());
@@ -235,6 +277,9 @@ public:
       rewriter.replaceOp(op, {load});
 
       linkToLastState(rewriter, op->getLoc(), state);
+      if (nextOpIsState(state))
+        linkToNextState(rewriter, op->getLoc(), state);
+
       return success();
     }
 
@@ -356,17 +401,17 @@ public:
     StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
 
     rewriter.setInsertionPointAfter(guard);
+    StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
+
+    rewriter.setInsertionPointAfter(body);
 
     for (Operation &nop : op.getLoopBody().getOps()) {
       Operation *copy = nop.clone();
       rewriter.insert(copy);
     }
 
-    StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
-
-    // rewriter.setInsertionPointAfter(guard);
-    // StateNode returnState = StateNode::create(rewriter, op.getLoc(),
-    // "return");
+    // rewriter.setInsertionPointAfter(body);
+    StateNode returnState = StateNode::create(rewriter, op.getLoc(), "return");
 
     rewriter.setInsertionPointAfter(op);
     StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
@@ -382,10 +427,10 @@ public:
     EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
                    mappedValue(adaptor.getUpperBound()));
 
-    ArrayAttr bodyArr =
+    ArrayAttr returnArr =
         rewriter.getStrArrayAttr({idxName + ": " + idxName + " + ref"});
-    EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr, emptyStr,
-                   mappedValue(adaptor.getStep()));
+    EdgeOp::create(rewriter, op.getLoc(), returnState, guard, returnArr,
+                   emptyStr, mappedValue(adaptor.getStep()));
 
     StringAttr exitStr = rewriter.getStringAttr("not(" + idxName + " < ref)");
     EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
