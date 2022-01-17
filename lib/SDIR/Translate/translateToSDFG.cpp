@@ -471,8 +471,7 @@ void translation::prepForTranslation(StateNode &op) {
     FunctionType ft = FunctionType::get(op.getContext(), load.getOperandTypes(),
                                         load.getType());
 
-    TaskletNode task = TaskletNode::create(
-        op.getLoc(), utils::generateName("indirect_load"), ft);
+    TaskletNode task = TaskletNode::create(op.getLoc(), "indirect_load", ft);
 
     BlockAndValueMapping valMapping;
     valMapping.map(load.getOperands(), task.getArguments());
@@ -504,8 +503,7 @@ void translation::prepForTranslation(StateNode &op) {
     FunctionType ft =
         FunctionType::get(op.getContext(), store.getOperandTypes(), t);
 
-    TaskletNode task = TaskletNode::create(
-        op.getLoc(), utils::generateName("indirect_store"), ft);
+    TaskletNode task = TaskletNode::create(op.getLoc(), "indirect_store", ft);
 
     BlockAndValueMapping valMapping;
     valMapping.map(store.getOperands(), task.getArguments());
@@ -538,9 +536,7 @@ void translation::prepForTranslation(StateNode &op) {
         continue;
 
       FunctionType ft = FunctionType::get(op.getContext(), {}, sym.getType());
-
-      TaskletNode task =
-          TaskletNode::create(op.getLoc(), utils::generateName("sym_task"), ft);
+      TaskletNode task = TaskletNode::create(op.getLoc(), "sym_task", ft);
 
       Operation *copy = sym->clone();
       task.body().getBlocks().front().push_back(copy);

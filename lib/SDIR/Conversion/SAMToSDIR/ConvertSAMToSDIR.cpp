@@ -1,4 +1,3 @@
-// BUG: Remapping of values faulty
 #include "SDIR/Conversion/SAMToSDIR/PassDetail.h"
 #include "SDIR/Conversion/SAMToSDIR/Passes.h"
 #include "SDIR/Dialect/Dialect.h"
@@ -29,8 +28,7 @@ struct SDIRTarget : public ConversionTarget {
       return numOps == 0 || numOps == 1;
     });
     // All other operations are illegal
-    // NOTE: Debug
-    // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
+    markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -201,14 +199,6 @@ public:
     if (rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
             .getPointer() == nullptr)
       return failure();
-
-    /*for (unsigned i = 0; i <
-    sdfg.body().getBlocks().front().getNumArguments();
-         ++i) {
-      rewriter.replaceUsesOfBlockArgument(
-          sdfg.body().getBlocks().front().getArgument(i),
-    sdfg.getArgument(i));
-    }*/
 
     return success();
   }
@@ -407,9 +397,6 @@ public:
   LogicalResult
   matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-
-    // if (!isa<scf::ForOp>(op->getParentOp()))
-    //   return failure();
     std::string idxName = utils::generateName("loopIdx");
     AllocSymbolOp allocSym =
         AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
@@ -500,7 +487,7 @@ void SAMToSDIRPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   populateSAMToSDIRConversionPatterns(patterns, converter);
 
-  if (failed(applyPartialConversion(module, target, std::move(patterns))))
+  if (failed(applyFullConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }
 
