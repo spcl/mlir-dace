@@ -417,8 +417,8 @@ public:
     StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
     SymOp idxSym = SymOp::create(rewriter, op.getLoc(),
                                  op.getInductionVar().getType(), idxName);
-    BlockAndValueMapping idxMapping;
-    idxMapping.map(op.getInductionVar(), idxSym);
+    op.getInductionVar().replaceAllUsesWith(idxSym);
+
     linkToLastState(rewriter, op.getLoc(), init);
 
     rewriter.setInsertionPointAfter(init);
@@ -431,14 +431,13 @@ public:
 
     SmallVector<Operation *> copies;
     for (Operation &nop : op.getLoopBody().getOps())
-      copies.push_back(nop.clone(idxMapping));
+      copies.push_back(&nop);
 
     copies.back()->setAttr("linkToNext", rewriter.getBoolAttr(true));
+    op.moveOutOfLoop(copies);
 
-    for (Operation *copy : copies)
-      rewriter.insert(copy);
-
-    StateNode returnState = StateNode::create(rewriter, op.getLoc(), "return");
+    StateNode returnState =
+        StateNode::create(rewriter, op.getLoc(), "loopReturn");
 
     rewriter.setInsertionPointAfter(op);
     StateNode exitState = StateNode::create(rewriter, op.getLoc(), "exit");
@@ -466,8 +465,7 @@ public:
     if (markedToLink(*op))
       linkToNextState(rewriter, op->getLoc(), exitState);
 
-    // rewriter.eraseOp(op);
-    rewriter.updateRootInPlace(op, [&] {});
+    rewriter.eraseOp(op);
     return success();
   }
 };
