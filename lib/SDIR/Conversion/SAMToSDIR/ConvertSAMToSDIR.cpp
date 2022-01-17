@@ -84,6 +84,11 @@ SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
       LoadOp loadNew = LoadOp::create(rewriter, loc, acc, ValueRange());
 
       loadedOps.push_back(loadNew);
+    } else if (operand.getDefiningOp() != nullptr &&
+               isa<SymOp>(operand.getDefiningOp())) {
+      SymOp sym = cast<SymOp>(operand.getDefiningOp());
+      SymOp symNew = SymOp::create(rewriter, loc, sym.getType(), sym.expr());
+      loadedOps.push_back(symNew);
     } else {
       loadedOps.push_back(operand);
     }
@@ -96,9 +101,18 @@ Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
   return createLoads(rewriter, loc, loadedOps)[0];
 }
 
+SDFGNode getTopSDFG(Operation *op) {
+  Operation *parent = op->getParentOp();
+
+  if (isa<SDFGNode>(parent))
+    return cast<SDFGNode>(parent);
+
+  return getTopSDFG(parent);
+}
+
 void linkToLastState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
-  SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+  SDFGNode sdfg = getTopSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
   rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
 
@@ -116,7 +130,7 @@ void linkToLastState(PatternRewriter &rewriter, Location loc,
 
 void linkToNextState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
-  SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+  SDFGNode sdfg = getTopSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
   rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
 
@@ -133,20 +147,9 @@ void linkToNextState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
-bool nextOpIsState(StateNode &state) {
-  SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
-
-  bool visitedState = false;
-  for (Operation &op : sdfg.body().getOps()) {
-    if (visitedState)
-      return isa<StateNode>(op);
-
-    if (&op == state.getOperation())
-      visitedState = true;
-  }
-
-  printf("didn't find\n");
-  return false;
+bool markedToLink(Operation &op) {
+  return op.hasAttr("linkToNext") &&
+         op.getAttr("linkToNext").cast<BoolAttr>().getValue();
 }
 //===----------------------------------------------------------------------===//
 // Patterns
@@ -236,7 +239,7 @@ public:
       else
         nt = ArrayType::get(op->getLoc().getContext(), nt, {}, {}, {});
 
-      SDFGNode sdfg = cast<SDFGNode>(state->getParentOp());
+      SDFGNode sdfg = getTopSDFG(state);
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
       AllocTransientOp alloc =
@@ -277,7 +280,7 @@ public:
       rewriter.replaceOp(op, {load});
 
       linkToLastState(rewriter, op->getLoc(), state);
-      if (nextOpIsState(state))
+      if (markedToLink(*op))
         linkToNextState(rewriter, op->getLoc(), state);
 
       return success();
@@ -296,11 +299,19 @@ public:
                                 PatternRewriter &rewriter) const override {
 
     if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
+      StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
+      linkToLastState(rewriter, op->getLoc(), state);
+      if (markedToLink(*op))
+        linkToNextState(rewriter, op->getLoc(), state);
       rewriter.eraseOp(op);
       return success();
     }
 
     if (isa<mlir::ReturnOp>(op) && !isa<FuncOp>(op->getParentOp())) {
+      StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
+      linkToLastState(rewriter, op->getLoc(), state);
+      if (markedToLink(*op))
+        linkToNextState(rewriter, op->getLoc(), state);
       rewriter.eraseOp(op);
       return success();
     }
@@ -343,9 +354,11 @@ public:
     LoadOp newLoad =
         LoadOp::create(rewriter, op->getLoc(), access, ValueRange());
 
-    rewriter.replaceOp(op, {newLoad});
-
     linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
+    rewriter.replaceOp(op, {newLoad});
     return success();
   }
 };
@@ -368,13 +381,16 @@ public:
 
     StoreOp::create(rewriter, op.getLoc(), val, memref, indices);
 
-    linkToLastState(rewriter, op.getLoc(), state);
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
     rewriter.eraseOp(op);
     return success();
   }
 };
 
-class SCFForToSDIR2 : public OpConversionPattern<scf::ForOp> {
+class SCFForToSDIR : public OpConversionPattern<scf::ForOp> {
 public:
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
@@ -392,9 +408,17 @@ public:
   matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
+    // if (!isa<scf::ForOp>(op->getParentOp()))
+    //   return failure();
     std::string idxName = utils::generateName("loopIdx");
+    AllocSymbolOp allocSym =
+        AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
 
     StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
+    SymOp idxSym = SymOp::create(rewriter, op.getLoc(),
+                                 op.getInductionVar().getType(), idxName);
+    BlockAndValueMapping idxMapping;
+    idxMapping.map(op.getInductionVar(), idxSym);
     linkToLastState(rewriter, op.getLoc(), init);
 
     rewriter.setInsertionPointAfter(init);
@@ -405,18 +429,21 @@ public:
 
     rewriter.setInsertionPointAfter(body);
 
-    for (Operation &nop : op.getLoopBody().getOps()) {
-      Operation *copy = nop.clone();
-      rewriter.insert(copy);
-    }
+    SmallVector<Operation *> copies;
+    for (Operation &nop : op.getLoopBody().getOps())
+      copies.push_back(nop.clone(idxMapping));
 
-    // rewriter.setInsertionPointAfter(body);
+    copies.back()->setAttr("linkToNext", rewriter.getBoolAttr(true));
+
+    for (Operation *copy : copies)
+      rewriter.insert(copy);
+
     StateNode returnState = StateNode::create(rewriter, op.getLoc(), "return");
 
     rewriter.setInsertionPointAfter(op);
-    StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
+    StateNode exitState = StateNode::create(rewriter, op.getLoc(), "exit");
 
-    rewriter.setInsertionPointAfter(exit);
+    rewriter.setInsertionPointAfter(exitState);
     ArrayAttr emptyArr;
     StringAttr emptyStr;
     ArrayAttr initArr = rewriter.getStrArrayAttr({idxName + ": ref"});
@@ -433,194 +460,14 @@ public:
                    emptyStr, mappedValue(adaptor.getStep()));
 
     StringAttr exitStr = rewriter.getStringAttr("not(" + idxName + " < ref)");
-    EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
+    EdgeOp::create(rewriter, op.getLoc(), guard, exitState, emptyArr, exitStr,
                    mappedValue(adaptor.getUpperBound()));
 
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), exitState);
 
-class SCFForToSDIR : public OpConversionPattern<scf::ForOp> {
-public:
-  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
-
-  void getExternalValues(scf::ForOp &root, scf::ForOp &curr,
-                         SmallVector<Value> &vals,
-                         DenseSet<Value> &valSet) const {
-    for (Operation &nested : curr.getRegion().getOps()) {
-      for (Value v : nested.getOperands()) {
-        if (root.isDefinedOutsideOfLoop(v) && !valSet.contains(v)) {
-          vals.push_back(v);
-          valSet.insert(v);
-        }
-      }
-      if (scf::ForOp fop = dyn_cast<scf::ForOp>(nested)) {
-        getExternalValues(root, fop, vals, valSet);
-      }
-    }
-  }
-
-  bool isNested(scf::ForOp &root, Operation &op) const {
-    for (Operation &nested : root.getRegion().getOps()) {
-      if (&nested == &op)
-        return true;
-
-      if (scf::ForOp fop = dyn_cast<scf::ForOp>(nested)) {
-        return isNested(fop, op);
-      }
-    }
-    return false;
-  }
-
-  LogicalResult
-  matchAndRewrite(scf::ForOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> valsBounds = {
-        adaptor.getLowerBound(), adaptor.getUpperBound(), adaptor.getStep()};
-
-    DenseSet<Value> valSet;
-    for (Value v : valsBounds)
-      valSet.insert(v);
-
-    SmallVector<Value> vals;
-    getExternalValues(op, op, vals, valSet);
-
-    unsigned lowerBoundIdx = 0;
-    unsigned upperBoundIdx = 1;
-    unsigned stepIdx = 2;
-    unsigned boundsLen = 3;
-
-    // SDFG
-    SmallVector<Type> inputs = {valsBounds[0].getType()};
-    if (valsBounds[1].getDefiningOp() == valsBounds[0].getDefiningOp()) {
-      upperBoundIdx = lowerBoundIdx;
-      boundsLen--;
-    } else {
-      inputs.push_back(valsBounds[1].getType());
-    }
-
-    if (valsBounds[2].getDefiningOp() == valsBounds[1].getDefiningOp()) {
-      stepIdx = upperBoundIdx;
-      boundsLen--;
-    } else if (valsBounds[2].getDefiningOp() == valsBounds[0].getDefiningOp()) {
-      stepIdx = lowerBoundIdx;
-      boundsLen--;
-    } else {
-      inputs.push_back(valsBounds[2].getType());
-    }
-
-    for (Value v : vals)
-      inputs.push_back(v.getType());
-
-    SmallVector<Type> inputResults;
-    for (unsigned i = 0; i < inputs.size(); i++) {
-      // NOTE: Hotfix, check if a better solution exists
-      MemrefToMemletConverter memo;
-      Type nt = memo.convertType(inputs[i]);
-      inputResults.push_back(nt);
-    }
-
-    FunctionType ft = rewriter.getFunctionType(inputResults, {});
-    SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft);
-    AllocSymbolOp::create(rewriter, op.getLoc(), "idx");
-    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-
-    // States
-    StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
-    rewriter.createBlock(&init.body());
-
-    rewriter.updateRootInPlace(sdfg, [&] {
-      sdfg.entryAttr(
-          SymbolRefAttr::get(op.getLoc().getContext(), init.sym_name()));
-    });
-
-    rewriter.restoreInsertionPoint(ip);
-    StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
-    rewriter.createBlock(&guard.body());
-
-    rewriter.restoreInsertionPoint(ip);
-    StateNode body = StateNode::create(rewriter, op.getLoc(), "body");
-
-    for (unsigned i = 0; i < vals.size(); ++i) {
-      vals[i].replaceUsesWithIf(
-          sdfg.getArgument(i + boundsLen),
-          [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
-    }
-
-    valsBounds[0].replaceUsesWithIf(
-        sdfg.getArgument(lowerBoundIdx),
-        [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
-
-    valsBounds[1].replaceUsesWithIf(
-        sdfg.getArgument(upperBoundIdx),
-        [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
-
-    valsBounds[2].replaceUsesWithIf(
-        sdfg.getArgument(stepIdx),
-        [&](OpOperand &opop) { return isNested(op, *opop.getOwner()); });
-
-    rewriter.inlineRegionBefore(op.getLoopBody(), body.body(),
-                                body.body().begin());
-    rewriter.eraseOp(op);
-
-    rewriter.setInsertionPointToStart(&body.body().getBlocks().front());
-
-    SymOp symop =
-        SymOp::create(rewriter, op.getLoc(), rewriter.getIndexType(), "idx");
-
-    if (rewriter.convertRegionTypes(&body.body(), *getTypeConverter())
-            .getPointer() == nullptr)
-      return failure();
-
-    rewriter.replaceUsesOfBlockArgument(
-        body.body().getBlocks().front().getArgument(0), symop);
-
-    // TODO: Get rid of block arguments
-    // body.body().getBlocks().front().eraseArgument(0);
-    //   NOTE: Infinite loop
-    //   rewriter.createBlock(&body.body());
-    //   rewriter.mergeBlocks(&body.body().getBlocks().front(),
-    //                       &body.body().getBlocks().back(), {symop});
-
-    rewriter.restoreInsertionPoint(ip);
-    StateNode exit = StateNode::create(rewriter, op.getLoc(), "exit");
-    rewriter.createBlock(&exit.body());
-
-    // Edges
-    rewriter.restoreInsertionPoint(ip);
-
-    ArrayAttr emptyArr;
-    StringAttr emptyStr;
-
-    ArrayAttr initArr = rewriter.getStrArrayAttr({"idx: ref"});
-    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
-                   sdfg.getArgument(lowerBoundIdx));
-
-    StringAttr guardStr = rewriter.getStringAttr("idx < ref");
-    EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
-                   sdfg.getArgument(upperBoundIdx));
-
-    ArrayAttr bodyArr = rewriter.getStrArrayAttr({"idx: idx + ref"});
-    EdgeOp::create(rewriter, op.getLoc(), body, guard, bodyArr, emptyStr,
-                   sdfg.getArgument(stepIdx));
-
-    StringAttr exitStr = rewriter.getStringAttr("not(idx < ref)");
-    EdgeOp::create(rewriter, op.getLoc(), guard, exit, emptyArr, exitStr,
-                   sdfg.getArgument(upperBoundIdx));
-
-    rewriter.setInsertionPointAfter(sdfg);
-    SmallVector<Value> callVals = adaptor.getOperands();
-    SmallVector<Value> callValsReduced = {callVals[lowerBoundIdx]};
-    if (upperBoundIdx != lowerBoundIdx)
-      callValsReduced.push_back(callVals[upperBoundIdx]);
-
-    if (stepIdx != upperBoundIdx && stepIdx != lowerBoundIdx)
-      callValsReduced.push_back(callVals[stepIdx]);
-
-    callValsReduced.append(vals);
-    sdir::CallOp::create(rewriter, op.getLoc(), sdfg, callValsReduced);
-
+    // rewriter.eraseOp(op);
+    rewriter.updateRootInPlace(op, [&] {});
     return success();
   }
 };
@@ -637,7 +484,7 @@ void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
   patterns.add<EraseTerminators>(1, ctxt);
   patterns.add<MemrefLoadToSDIR>(converter, ctxt);
   patterns.add<MemrefStoreToSDIR>(converter, ctxt);
-  patterns.add<SCFForToSDIR2>(converter, ctxt);
+  patterns.add<SCFForToSDIR>(converter, ctxt);
 }
 
 namespace {
@@ -649,11 +496,12 @@ struct SAMToSDIRPass : public SAMToSDIRPassBase<SAMToSDIRPass> {
 void SAMToSDIRPass::runOnOperation() {
   ModuleOp module = getOperation();
 
-  RewritePatternSet patterns(&getContext());
+  SDIRTarget target(getContext());
   MemrefToMemletConverter converter;
+
+  RewritePatternSet patterns(&getContext());
   populateSAMToSDIRConversionPatterns(patterns, converter);
 
-  SDIRTarget target(getContext());
   if (failed(applyPartialConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }

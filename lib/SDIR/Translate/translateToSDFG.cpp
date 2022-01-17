@@ -530,12 +530,12 @@ void translation::prepForTranslation(StateNode &op) {
   }
 
   // Wrap symbolic evaluations
+  SmallVector<SymOp> deadSymbols;
   for (Operation &oper : op.body().getOps()) {
     if (SymOp sym = dyn_cast<SymOp>(oper)) {
-      if (sym.use_empty()) {
-        sym.erase();
+      deadSymbols.push_back(sym);
+      if (sym.use_empty())
         continue;
-      }
 
       FunctionType ft = FunctionType::get(op.getContext(), {}, sym.getType());
 
@@ -572,9 +572,11 @@ void translation::prepForTranslation(StateNode &op) {
       builder.insert(store);
       builder.insert(load);
       sym.replaceAllUsesWith(load.res());
-      sym.erase();
     }
   }
+
+  for (SymOp symOp : deadSymbols)
+    symOp.erase();
 
   for (Operation &oper : op.body().getOps()) {
     // if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper))

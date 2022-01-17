@@ -2359,7 +2359,7 @@ LogicalResult verify(AllocSymbolOp op) {
                           "an alphabetical character");
 
   for (auto c : op.sym())
-    if (!isalnum(c))
+    if (!isalnum(c) && c != '_')
       return op.emitOpError("failed to verify that input string only "
                             "contains alphanumeric characters");
 
