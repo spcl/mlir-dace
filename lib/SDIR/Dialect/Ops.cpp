@@ -569,6 +569,11 @@ std::string TaskletNode::getInputName(unsigned idx) {
   return getName().str() + "_" + name;
 }
 
+std::string TaskletNode::getOutputName(unsigned idx) {
+  // TODO: Implement multiple return values
+  return "__out";
+}
+
 //===----------------------------------------------------------------------===//
 // MapNode
 //===----------------------------------------------------------------------===//

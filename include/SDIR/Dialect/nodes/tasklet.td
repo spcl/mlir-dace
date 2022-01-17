@@ -56,6 +56,7 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         void cloneInto(TaskletNode dest, BlockAndValueMapping &mapper);
         void setID(unsigned id);
         std::string getInputName(unsigned idx);
+        std::string getOutputName(unsigned idx);
 
         //===------------------------------------------------------------------===//
         // CallableOpInterface

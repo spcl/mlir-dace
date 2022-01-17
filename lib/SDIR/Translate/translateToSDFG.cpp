@@ -500,13 +500,22 @@ void translation::prepForTranslation(StateNode &op) {
     if (!t.isa<MemletType>())
       t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
 
-    FunctionType ft =
-        FunctionType::get(op.getContext(), store.getOperandTypes(), t);
+    SmallVector<Value> reducedOps;
+    SmallVector<Type> reducedTypes;
+
+    for (unsigned i = 0; i < store.getNumOperands() - 1; ++i) {
+      reducedOps.push_back(store.getOperand(i));
+      reducedTypes.push_back(store.getOperand(i).getType());
+    }
+
+    FunctionType ft = FunctionType::get(op.getContext(), reducedTypes, t);
 
     TaskletNode task = TaskletNode::create(op.getLoc(), "indirect_store", ft);
 
+    GetAccessOp gao = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
     BlockAndValueMapping valMapping;
-    valMapping.map(store.getOperands(), task.getArguments());
+    valMapping.map(reducedOps, task.getArguments());
+    valMapping.map(store.arr(), gao);
 
     Operation *copy = store.getOperation()->clone(valMapping);
     task.body().getBlocks().front().push_back(copy);
@@ -515,16 +524,17 @@ void translation::prepForTranslation(StateNode &op) {
     task.body().getBlocks().front().push_back(ret);
     builder.insert(task);
 
-    CallOp call = CallOp::create(op.getLoc(), task, store.getOperands());
+    CallOp call = CallOp::create(op.getLoc(), task, reducedOps);
     builder.insert(call);
-
-    GetAccessOp gao = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
     builder.insert(gao);
 
     StoreOp newStore = StoreOp::create(op.getLoc(), call.getResult(0), gao);
     builder.insert(newStore);
 
     store.erase();
+    GetAccessOp oldGao = cast<GetAccessOp>(store.arr().getDefiningOp());
+    if (oldGao.use_empty())
+      oldGao.erase();
   }
 
   // Wrap symbolic evaluations
@@ -731,20 +741,19 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
-  if (isa<StoreOp>(firstOp)) {
+  if (StoreOp store = dyn_cast<StoreOp>(firstOp)) {
     std::string indices;
 
-    for (unsigned i = 0; i < op.getNumArguments() - 2; ++i) {
+    for (unsigned i = 0; i < op.getNumArguments() - 1; ++i) {
       if (i > 0)
         indices.append(", ");
       indices.append(op.getInputName(i));
     }
 
-    std::string valName = op.getInputName(op.getNumArguments() - 2);
-    std::string arrName = op.getInputName(op.getNumArguments() - 1);
+    std::string valName = op.getInputName(op.getNumArguments() - 1);
 
     jemit.printKVPair("string_data",
-                      arrName + "[" + indices + "]" + " = " + valName);
+                      "__out[" + indices + "]" + " = " + valName);
     jemit.printKVPair("language", "Python");
     return success();
   }
@@ -866,7 +875,7 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
   // TODO: Implement multiple return values
   // Takes the form __out_%d
   if (op.getNumResults() == 1) {
-    jemit.printKVPair("__out", "null", /*stringify=*/false);
+    jemit.printKVPair(op.getOutputName(0), "null", /*stringify=*/false);
   } else if (op.getNumResults() > 1) {
     emitError(op.getLoc(), "Multiple return values not implemented yet");
     return failure();
@@ -1263,7 +1272,7 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
       jemit.printKVPair("src", aNode.ID());
       // TODO: Implement multiple return values
       // Takes the form __out_%d
-      jemit.printKVPair("src_connector", "__out");
+      jemit.printKVPair("src_connector", aNode.getOutputName(0));
     } else {
       SDFGNode aNode = call.getSDFG();
       jemit.printKVPair("src", aNode.ID());
@@ -1543,7 +1552,7 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   jemit.printKVPair("src", taskSrc.ID());
   // TODO: Implement multiple return values
   // Takes the form __out_%d
-  jemit.printKVPair("src_connector", "__out");
+  jemit.printKVPair("src_connector", taskSrc.getOutputName(0));
 
   jemit.printKVPair("dst", taskDest.ID());
   jemit.printKVPair("dst_connector", taskDest.getInputName(argIdx));
@@ -1592,7 +1601,7 @@ LogicalResult printTaskletSDFGEdge(TaskletNode &task, SDFGNode &sdfg,
   jemit.printKVPair("src", task.ID());
   // TODO: Implement multiple return values
   // Takes the form __out_%d
-  jemit.printKVPair("src_connector", "__out");
+  jemit.printKVPair("src_connector", task.getOutputName(0));
   jemit.printKVPair("dst", sdfg.ID());
   jemit.printKVPair("dst_connector",
                     getValueName(sdfg.getArgument(argIdx), *sdfg));
