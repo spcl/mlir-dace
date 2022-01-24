@@ -705,9 +705,6 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
   // TODO: Add arith ops
 
   if (arith::ConstantOp oper = dyn_cast<arith::ConstantOp>(firstOp)) {
-    Type t = oper.getType();
-    Location loc = oper.getLoc();
-    StringRef type = translateTypeToSDFG(t, loc);
     std::string val;
 
     if (arith::ConstantFloatOp flop =
@@ -732,9 +729,6 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
 
   if (arith::IndexCastOp ico = dyn_cast<arith::IndexCastOp>(firstOp)) {
     std::string nameArg0 = op.getInputName(0);
-    Type t = ico.getType();
-    Location loc = op.getLoc();
-    StringRef resT = translateTypeToSDFG(t, loc);
     std::string entry = "__out = " + nameArg0;
     jemit.printKVPair("string_data", entry);
     jemit.printKVPair("language", "Python");

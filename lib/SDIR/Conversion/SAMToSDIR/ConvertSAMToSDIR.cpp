@@ -407,8 +407,7 @@ public:
     SDFGNode sdfg = getTopSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
-    AllocSymbolOp allocSym =
-        AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
+    AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
 
     rewriter.restoreInsertionPoint(ip);
 
@@ -432,7 +431,8 @@ public:
       copies.push_back(&nop);
 
     copies.back()->setAttr("linkToNext", rewriter.getBoolAttr(true));
-    op.moveOutOfLoop(copies);
+    if (op.moveOutOfLoop(copies).failed())
+      return failure();
 
     StateNode returnState =
         StateNode::create(rewriter, op.getLoc(), "loopReturn");
