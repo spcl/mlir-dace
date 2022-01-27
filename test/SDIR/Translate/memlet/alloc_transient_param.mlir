@@ -12,6 +12,6 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         }
         %n = sdir.call @five() : () -> index
         %m = sdir.call @twenty() : () -> index
-        %a = sdir.alloc_transient(%n, %m) : !sdir.array<?x?xi32>
+        %a = sdir.alloc{transient}(%n, %m) : !sdir.array<?x?xi32>
     }
 }
