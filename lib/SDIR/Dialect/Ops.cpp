@@ -967,19 +967,21 @@ LogicalResult verify(AllocOp op) {
 }
 
 AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
-                        StringRef name) {
+                        StringRef name, bool transient, bool stream) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
-  build(builder, state, res, {}, nameAttr);
+  build(builder, state, res, {}, nameAttr, transient, stream);
   return cast<AllocOp>(rewriter.createOperation(state));
 }
 
-AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res) {
-  return create(rewriter, loc, res, "arr");
+AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
+                        bool transient, bool stream) {
+  return create(rewriter, loc, res, "arr", transient, stream);
 }
 
-AllocOp AllocOp::create(Location loc, Type res, StringRef name) {
+AllocOp AllocOp::create(Location loc, Type res, StringRef name, bool transient,
+                        bool stream) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = builder.getStringAttr(name);
@@ -990,7 +992,7 @@ AllocOp AllocOp::create(Location loc, Type res, StringRef name) {
     res = ArrayType::get(res.getContext(), res, {}, {}, {});
   }
 
-  build(builder, state, res, {}, nameAttr);
+  build(builder, state, res, {}, nameAttr, transient, stream);
   return cast<AllocOp>(Operation::create(state));
 }
 
@@ -1012,117 +1014,6 @@ bool AllocOp::isInState() {
 }
 
 std::string AllocOp::getName() {
-  if ((*this)->hasAttr("name")) {
-    Attribute nameAttr = (*this)->getAttr("name");
-    if (StringAttr name = nameAttr.cast<StringAttr>())
-      return name.getValue().str();
-  }
-
-  AsmState state(getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  (*this)->getResult(0).printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
-
-  return name;
-}
-
-//===----------------------------------------------------------------------===//
-// AllocTransientOp
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseAllocTransientOp(OpAsmParser &parser,
-                                         OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
-  if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
-    return failure();
-
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
-
-  Type resultType;
-  if (parser.parseColonType(resultType))
-    return failure();
-  result.addTypes(resultType);
-
-  return success();
-}
-
-static void print(OpAsmPrinter &p, AllocTransientOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << "(";
-  p.printOperands(op.params());
-  p << ") : ";
-  p << op.getOperation()->getResultTypes();
-}
-
-LogicalResult verify(AllocTransientOp op) {
-  ArrayType res = op.res().getType().cast<ArrayType>();
-
-  if (res.getUndefRank() != op.params().size())
-    return op.emitOpError("failed to verify that parameter size matches "
-                          "undefined dimensions size");
-
-  if (res.hasZeros())
-    return op.emitOpError("failed to verify that return type doesn't "
-                          "contain dimensions of size zero");
-
-  return success();
-}
-
-AllocTransientOp AllocTransientOp::create(PatternRewriter &rewriter,
-                                          Location loc, Type res,
-                                          StringRef name) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
-  build(builder, state, res, {}, nameAttr);
-  return cast<AllocTransientOp>(rewriter.createOperation(state));
-}
-
-AllocTransientOp AllocTransientOp::create(PatternRewriter &rewriter,
-                                          Location loc, Type res) {
-  return create(rewriter, loc, res, "arr_trans");
-}
-
-AllocTransientOp AllocTransientOp::create(Location loc, Type res,
-                                          StringRef name) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  StringAttr nameAttr = builder.getStringAttr(name);
-
-  if (MemletType mem = res.dyn_cast<MemletType>()) {
-    res = mem.toArray();
-  } else if (!res.isa<ArrayType>()) {
-    res = ArrayType::get(res.getContext(), res, {}, {}, {});
-  }
-
-  build(builder, state, res, {}, nameAttr);
-  return cast<AllocTransientOp>(Operation::create(state));
-}
-
-SDFGNode AllocTransientOp::getParentSDFG() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-
-  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
-    return sdfg;
-
-  Operation *sdfg = sdfgOrState->getParentOp();
-  return dyn_cast<SDFGNode>(sdfg);
-}
-
-bool AllocTransientOp::isInState() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
-    return true;
-  return false;
-}
-
-std::string AllocTransientOp::getName() {
   if ((*this)->hasAttr("name")) {
     Attribute nameAttr = (*this)->getAttr("name");
     if (StringAttr name = nameAttr.cast<StringAttr>())
@@ -1236,16 +1127,8 @@ LogicalResult verify(GetAccessOp op) {
 
 Type GetAccessOp::getAllocType() {
   Operation *alloc = arr().getDefiningOp();
+
   if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
-    return allocArr.getType();
-
-  if (AllocTransientOp allocArr = dyn_cast<AllocTransientOp>(alloc))
-    return allocArr.getType();
-
-  if (AllocStreamOp allocArr = dyn_cast<AllocStreamOp>(alloc))
-    return allocArr.getType();
-
-  if (AllocTransientStreamOp allocArr = dyn_cast<AllocTransientStreamOp>(alloc))
     return allocArr.getType();
 
   return nullptr;
@@ -1314,9 +1197,6 @@ std::string GetAccessOp::getName() {
   Operation *alloc = arr().getDefiningOp();
 
   if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
-    return allocArr.getName();
-
-  if (AllocTransientOp allocArr = dyn_cast<AllocTransientOp>(alloc))
     return allocArr.getName();
 
   AsmState state(getParentSDFG());
@@ -1814,106 +1694,6 @@ static void print(OpAsmPrinter &p, SubviewOp op) {
 }
 
 LogicalResult verify(SubviewOp op) { return success(); }
-
-//===----------------------------------------------------------------------===//
-// AllocStreamOp
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseAllocStreamOp(OpAsmParser &parser,
-                                      OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
-  if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
-    return failure();
-
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
-
-  Type resultType;
-  if (parser.parseColonType(resultType))
-    return failure();
-  result.addTypes(resultType);
-
-  return success();
-}
-
-static void print(OpAsmPrinter &p, AllocStreamOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << "() : ";
-  p << op.getOperation()->getResultTypes();
-}
-
-LogicalResult verify(AllocStreamOp op) { return success(); }
-
-SDFGNode AllocStreamOp::getParentSDFG() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-
-  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
-    return sdfg;
-
-  Operation *sdfg = sdfgOrState->getParentOp();
-  return dyn_cast<SDFGNode>(sdfg);
-}
-
-bool AllocStreamOp::isInState() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
-    return true;
-  return false;
-}
-
-//===----------------------------------------------------------------------===//
-// AllocTransientStreamOp
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseAllocTransientStreamOp(OpAsmParser &parser,
-                                               OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
-  if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
-    return failure();
-
-  if (parser.resolveOperands(paramsOperands, parser.getBuilder().getIndexType(),
-                             result.operands))
-    return failure();
-
-  Type resultType;
-  if (parser.parseColonType(resultType))
-    return failure();
-  result.addTypes(resultType);
-
-  return success();
-}
-
-static void print(OpAsmPrinter &p, AllocTransientStreamOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << "() : ";
-  p << op.getOperation()->getResultTypes();
-}
-
-LogicalResult verify(AllocTransientStreamOp op) { return success(); }
-
-SDFGNode AllocTransientStreamOp::getParentSDFG() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-
-  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
-    return sdfg;
-
-  Operation *sdfg = sdfgOrState->getParentOp();
-  return dyn_cast<SDFGNode>(sdfg);
-}
-
-bool AllocTransientStreamOp::isInState() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
-    return true;
-  return false;
-}
 
 //===----------------------------------------------------------------------===//
 // StreamPopOp

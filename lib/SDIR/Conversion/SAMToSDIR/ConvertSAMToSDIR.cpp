@@ -74,11 +74,10 @@ SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
         isa<LoadOp>(operand.getDefiningOp())) {
       LoadOp load = cast<LoadOp>(operand.getDefiningOp());
       GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
-      AllocTransientOp alloc =
-          cast<AllocTransientOp>(gao.arr().getDefiningOp());
+      AllocOp alloc = cast<AllocOp>(gao.arr().getDefiningOp());
 
-      GetAccessOp acc =
-          GetAccessOp::create(rewriter, loc, alloc.getType().toMemlet(), alloc);
+      GetAccessOp acc = GetAccessOp::create(
+          rewriter, loc, alloc.getType().cast<ArrayType>().toMemlet(), alloc);
       LoadOp loadNew = LoadOp::create(rewriter, loc, acc, ValueRange());
 
       loadedOps.push_back(loadNew);
@@ -232,8 +231,8 @@ public:
       SDFGNode sdfg = getTopSDFG(state);
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
-      AllocTransientOp alloc =
-          AllocTransientOp::create(rewriter, op->getLoc(), nt, "_tmp");
+      AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), nt, "_tmp",
+                                      /*transient=*/true, /*stream=*/false);
 
       rewriter.restoreInsertionPoint(ip);
 
@@ -328,8 +327,8 @@ public:
     SDFGNode sdfg = getTopSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
-    AllocTransientOp alloc =
-        AllocTransientOp::create(rewriter, op->getLoc(), arrT, "_tmp");
+    AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT, "_tmp",
+                                    /*transient=*/true, /*stream=*/false);
 
     rewriter.restoreInsertionPoint(ip);
 

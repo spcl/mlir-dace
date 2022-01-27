@@ -2,58 +2,6 @@
 #define SDIR_StreamOps
 
 //===----------------------------------------------------------------------===//
-// AllocStreamOp
-//===----------------------------------------------------------------------===//
-
-def SDIR_AllocStreamOp : SDIR_Op<"alloc_stream", [
-    ParentOneOf<["SDFGNode", "StateNode"]>
-]> {
-    let summary = "Stream allocation operation";
-    let description = [{
-        Alloc operation to create streams.
-        For example:
-
-        ```mlir
-            %A = sdir.alloc_stream() : !sdir.stream_array<i32>
-        ```
-    }];
-
-    let arguments = (ins Variadic<Index>:$params);
-    let results = (outs SDIR_StreamArrayType);
-
-    let extraClassDeclaration = [{
-        SDFGNode getParentSDFG();
-        bool isInState();
-    }];
-}
-
-//===----------------------------------------------------------------------===//
-// AllocTransientStreamOp
-//===----------------------------------------------------------------------===//
-
-def SDIR_AllocTransientStreamOp : SDIR_Op<"alloc_transient_stream", [
-    ParentOneOf<["SDFGNode", "StateNode"]>
-]> {
-    let summary = "Transient stream allocation operation";
-    let description = [{
-        Alloc operation to create transient streams.
-        For example:
-
-        ```mlir
-            %A = sdir.alloc_transient_stream() : !sdir.stream_array<i32>
-        ```
-    }];
-
-    let arguments = (ins Variadic<Index>:$params);
-    let results = (outs SDIR_StreamArrayType);
-
-    let extraClassDeclaration = [{
-        SDFGNode getParentSDFG();
-        bool isInState();
-    }];
-}
-
-//===----------------------------------------------------------------------===//
 // StreamPopOp
 //===----------------------------------------------------------------------===//
 

@@ -20,54 +20,22 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 
     let arguments = (ins 
         Variadic<Index>:$params,
-        OptionalAttr<StrAttr>:$name
+        OptionalAttr<StrAttr>:$name,
+        UnitAttr:$transient,
+        UnitAttr:$stream
     );
-    let results = (outs SDIR_ArrayType:$res);
+    let results = (outs AnyTypeOf<[SDIR_ArrayType, SDIR_StreamArrayType]>:$res);
 
     let extraClassDeclaration = [{
-        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res);
-        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name);
-        static AllocOp create(Location loc, Type res, StringRef name);
+        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, bool transient, bool stream);
+        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name, bool transient, bool stream);
+        static AllocOp create(Location loc, Type res, StringRef name, bool transient, bool stream);
         SDFGNode getParentSDFG();
         bool isInState();
         std::string getName();
     }];
 }
 
-
-//===----------------------------------------------------------------------===//
-// AllocTransientOp
-//===----------------------------------------------------------------------===//
-
-def SDIR_AllocTransientOp : SDIR_Op<"alloc_transient", [
-    ParentOneOf<["SDFGNode", "StateNode"]>
-]> {
-    let summary = "Transient array allocation operation";
-    let description = [{
-        Alloc operation to create transient arrays and reserve the specified 
-        space.
-        For example:
-
-        ```mlir
-            %A = sdir.alloc_transient() : !sdir.array<i32>
-        ```
-    }];
-
-    let arguments = (ins 
-        Variadic<Index>:$params,
-        OptionalAttr<StrAttr>:$name
-    );
-    let results = (outs SDIR_ArrayType:$res);
-
-    let extraClassDeclaration = [{
-        static AllocTransientOp create(PatternRewriter &rewriter, Location loc, Type res);
-        static AllocTransientOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name);
-        static AllocTransientOp create(Location loc, Type res, StringRef name);
-        SDFGNode getParentSDFG();
-        bool isInState();
-        std::string getName();
-    }];
-}
 
 //===----------------------------------------------------------------------===//
 // LoadOp
