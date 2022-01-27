@@ -90,11 +90,7 @@ SmallVector<std::string> buildStrideList(GetAccessOp &op) {
 }
 
 SmallVector<std::string> buildStrideList(AllocOp &op) {
-  return buildStrideList(op.getType().toMemlet());
-}
-
-SmallVector<std::string> buildStrideList(AllocTransientOp &op) {
-  return buildStrideList(op.getType().toMemlet());
+  return buildStrideList(op.getType().cast<ArrayType>().toMemlet());
 }
 
 void printStrides(SmallVector<std::string> strides, JsonEmitter &jemit) {
@@ -191,7 +187,8 @@ void translation::prepForTranslation(SDFGNode &op) {
     for (BlockArgument bArg : op.getArguments()) {
       std::string name = getValueName(bArg, *op);
 
-      AllocOp aop = AllocOp::create(op.getLoc(), bArg.getType(), name);
+      AllocOp aop = AllocOp::create(op.getLoc(), bArg.getType(), name,
+                                    /*transient=*/false);
       bArg.replaceAllUsesExcept(aop, aop);
       op.body().getBlocks().front().push_front(aop);
       argToAlloc.map(bArg, aop);
@@ -267,34 +264,8 @@ LogicalResult printSDFGNode(SDFGNode &op, JsonEmitter &jemit) {
     if (translateToSDFG(alloc, jemit).failed())
       return failure();
 
-  for (AllocTransientOp alloc : op.body().getOps<AllocTransientOp>())
-    if (translateToSDFG(alloc, jemit).failed())
-      return failure();
-
-  for (AllocStreamOp alloc : op.body().getOps<AllocStreamOp>())
-    if (translateToSDFG(alloc, jemit).failed())
-      return failure();
-
-  for (AllocTransientStreamOp alloc :
-       op.body().getOps<AllocTransientStreamOp>())
-    if (translateToSDFG(alloc, jemit).failed())
-      return failure();
-
   for (StateNode state : op.body().getOps<StateNode>()) {
     for (AllocOp allocOper : state.body().getOps<AllocOp>())
-      if (translateToSDFG(allocOper, jemit).failed())
-        return failure();
-
-    for (AllocTransientOp allocOper : state.body().getOps<AllocTransientOp>())
-      if (translateToSDFG(allocOper, jemit).failed())
-        return failure();
-
-    for (AllocStreamOp allocOper : state.body().getOps<AllocStreamOp>())
-      if (translateToSDFG(allocOper, jemit).failed())
-        return failure();
-
-    for (AllocTransientStreamOp allocOper :
-         state.body().getOps<AllocTransientStreamOp>())
       if (translateToSDFG(allocOper, jemit).failed())
         return failure();
   }
@@ -564,8 +535,9 @@ void translation::prepForTranslation(StateNode &op) {
       if (!t.isa<MemletType>())
         t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
 
-      AllocTransientOp aop = AllocTransientOp::create(
-          op.getLoc(), t, utils::generateName("sym_wrap"));
+      AllocOp aop =
+          AllocOp::create(op.getLoc(), t, utils::generateName("sym_wrap"),
+                          /*transient=*/true);
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, aop);
 
       StoreOp store =
@@ -974,9 +946,6 @@ LogicalResult translation::translateToSDFG(EdgeOp &op, JsonEmitter &jemit) {
   if (!op.refMutable().empty()) {
     if (AllocOp aop = dyn_cast<AllocOp>(op.ref().getDefiningOp())) {
       refname = aop.getName();
-    } else {
-      AllocTransientOp atop = cast<AllocTransientOp>(op.ref().getDefiningOp());
-      refname = atop.getName();
     }
   }
 
@@ -1043,7 +1012,7 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
 
-  Type element = op.getType().getElementType();
+  Type element = op.getType().cast<ArrayType>().getElementType();
   Location loc = op.getLoc();
   StringRef dtype = translateTypeToSDFG(element, loc);
 
@@ -1067,7 +1036,7 @@ LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
 }
 
 LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
-  if (op.getType().getShape().size() == 0)
+  if (op.getType().cast<ArrayType>().getShape().size() == 0)
     return printScalar(op, jemit);
 
   jemit.startNamedObject(op.getName());
@@ -1079,7 +1048,7 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
   printStrides(strideList, jemit);
   jemit.endList(); // strides
 
-  Type element = op.getType().getElementType();
+  Type element = op.getType().cast<ArrayType>().getElementType();
   Location loc = op.getLoc();
   StringRef dtype = translateTypeToSDFG(element, loc);
 
@@ -1096,77 +1065,6 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
   jemit.endList(); // shape
 
   jemit.printKVPair("transient", "false", /*stringify=*/false);
-  printDebuginfo(*op, jemit);
-
-  jemit.endObject(); // attributes
-  jemit.endObject();
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// AllocTransientOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult printScalar(AllocTransientOp &op, JsonEmitter &jemit) {
-  jemit.startNamedObject(op.getName());
-  jemit.printKVPair("type", "Scalar");
-
-  jemit.startNamedObject("attributes");
-
-  Type element = op.getType().getElementType();
-  Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(element, loc);
-
-  if (dtype != "")
-    jemit.printKVPair("dtype", dtype);
-  else
-    return failure();
-
-  jemit.startNamedList("shape");
-  jemit.startEntry();
-  jemit.printInt(1);
-  jemit.endList(); // shape
-
-  jemit.printKVPair("transient", "true", /*stringify=*/false);
-  translation::printDebuginfo(*op, jemit);
-
-  jemit.endObject(); // attributes
-
-  jemit.endObject();
-  return success();
-}
-
-LogicalResult translation::translateToSDFG(AllocTransientOp &op,
-                                           JsonEmitter &jemit) {
-  if (op.getType().getShape().size() == 0)
-    return printScalar(op, jemit);
-
-  jemit.startNamedObject(op.getName());
-  jemit.printKVPair("type", "Array");
-
-  jemit.startNamedObject("attributes");
-  jemit.startNamedList("strides");
-  SmallVector<std::string> strideList = buildStrideList(op);
-  printStrides(strideList, jemit);
-  jemit.endList(); // strides
-
-  Type element = op.getType().getElementType();
-  Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(element, loc);
-
-  if (dtype != "")
-    jemit.printKVPair("dtype", dtype);
-  else
-    return failure();
-
-  jemit.startNamedList("shape");
-  for (std::string s : strideList) {
-    jemit.startEntry();
-    jemit.printString(s);
-  }
-  jemit.endList(); // shape
-
-  jemit.printKVPair("transient", "true", /*stringify=*/false);
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
@@ -1369,66 +1267,6 @@ LogicalResult translation::translateToSDFG(ViewCastOp &op, JsonEmitter &jemit) {
 
 LogicalResult translation::translateToSDFG(SubviewOp &op, JsonEmitter &jemit) {
   // TODO: Implement translateSubviewToSDFG
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// AllocStreamOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult translation::translateToSDFG(AllocStreamOp &op,
-                                           JsonEmitter &jemit) {
-  std::string name = getValueName(op.getResult(), *op.getParentSDFG());
-
-  jemit.startNamedObject(name);
-  jemit.printKVPair("type", "Stream");
-
-  jemit.startNamedObject("attributes");
-
-  Type type = op.getType().getElementType();
-  Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(type, loc);
-
-  if (dtype != "")
-    jemit.printKVPair("dtype", dtype);
-  else
-    return failure();
-
-  jemit.printKVPair("transient", "false", /*stringify=*/false);
-  printDebuginfo(*op, jemit);
-
-  jemit.endObject(); // attributes
-  jemit.endObject();
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// AllocTransientStreamOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult translation::translateToSDFG(AllocTransientStreamOp &op,
-                                           JsonEmitter &jemit) {
-  std::string name = getValueName(op.getResult(), *op.getParentSDFG());
-
-  jemit.startNamedObject(name);
-  jemit.printKVPair("type", "Stream");
-
-  jemit.startNamedObject("attributes");
-
-  Type type = op.getType().getElementType();
-  Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(type, loc);
-
-  if (dtype != "")
-    jemit.printKVPair("dtype", dtype);
-  else
-    return failure();
-
-  jemit.printKVPair("transient", "true", /*stringify=*/false);
-  printDebuginfo(*op, jemit);
-
-  jemit.endObject(); // attributes
-  jemit.endObject();
   return success();
 }
 
@@ -1642,8 +1480,9 @@ void translation::prepForTranslation(sdir::CallOp &op) {
         t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
       }
 
-      AllocTransientOp alloc =
-          AllocTransientOp::create(op.getLoc(), t, utils::generateName("ttt"));
+      AllocOp alloc =
+          AllocOp::create(op.getLoc(), t, utils::generateName("ttt"),
+                          /*transient=*/true);
 
       GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, alloc);
       StoreOp store =

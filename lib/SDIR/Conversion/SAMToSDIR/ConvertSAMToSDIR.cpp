@@ -232,7 +232,7 @@ public:
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
       AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), nt, "_tmp",
-                                      /*transient=*/true, /*stream=*/false);
+                                      /*transient=*/true);
 
       rewriter.restoreInsertionPoint(ip);
 
@@ -328,7 +328,7 @@ public:
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT, "_tmp",
-                                    /*transient=*/true, /*stream=*/false);
+                                    /*transient=*/true);
 
     rewriter.restoreInsertionPoint(ip);
 

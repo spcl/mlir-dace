@@ -4,9 +4,9 @@
 // CHECK: module
 // CHECK: sdir.sdfg
 sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc_stream()
+    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc()
     // CHECK-SAME: !sdir.stream_array<i32>
-    %A = sdir.alloc_stream() : !sdir.stream_array<i32>
+    %A = sdir.alloc() : !sdir.stream_array<i32>
     // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]] = sdir.alloc()
     // CHECK-SAME: !sdir.array<6xi64>
     %C = sdir.alloc() : !sdir.array<6xi64>

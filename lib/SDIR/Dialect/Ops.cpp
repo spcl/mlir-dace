@@ -953,35 +953,35 @@ static void print(OpAsmPrinter &p, AllocOp op) {
 }
 
 LogicalResult verify(AllocOp op) {
-  ArrayType res = op.res().getType().cast<ArrayType>();
+  if (ArrayType res = op.res().getType().dyn_cast<ArrayType>()) {
+    if (res.getUndefRank() != op.params().size())
+      return op.emitOpError("failed to verify that parameter size "
+                            "matches undefined dimensions size");
 
-  if (res.getUndefRank() != op.params().size())
-    return op.emitOpError("failed to verify that parameter size "
-                          "matches undefined dimensions size");
-
-  if (res.hasZeros())
-    return op.emitOpError("failed to verify that return type "
-                          "doesn't contain dimensions of size zero");
+    if (res.hasZeros())
+      return op.emitOpError("failed to verify that return type "
+                            "doesn't contain dimensions of size zero");
+  }
 
   return success();
 }
 
 AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
-                        StringRef name, bool transient, bool stream) {
+                        StringRef name, bool transient) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
-  build(builder, state, res, {}, nameAttr, transient, stream);
+  build(builder, state, res, {}, nameAttr, transient);
   return cast<AllocOp>(rewriter.createOperation(state));
 }
 
 AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
-                        bool transient, bool stream) {
-  return create(rewriter, loc, res, "arr", transient, stream);
+                        bool transient) {
+  return create(rewriter, loc, res, "arr", transient);
 }
 
-AllocOp AllocOp::create(Location loc, Type res, StringRef name, bool transient,
-                        bool stream) {
+AllocOp AllocOp::create(Location loc, Type res, StringRef name,
+                        bool transient) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = builder.getStringAttr(name);
@@ -992,7 +992,7 @@ AllocOp AllocOp::create(Location loc, Type res, StringRef name, bool transient,
     res = ArrayType::get(res.getContext(), res, {}, {}, {});
   }
 
-  build(builder, state, res, {}, nameAttr, transient, stream);
+  build(builder, state, res, {}, nameAttr, transient);
   return cast<AllocOp>(Operation::create(state));
 }
 

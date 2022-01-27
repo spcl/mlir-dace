@@ -6,9 +6,9 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {
-        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.alloc_transient()
+        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.alloc {transient}()
         // CHECK-SAME: !sdir.array<i32>
-        %A = sdir.alloc_transient() : !sdir.array<i32>
+        %A = sdir.alloc {transient}() : !sdir.array<i32>
     }
 }
 

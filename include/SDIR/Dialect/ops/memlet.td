@@ -21,15 +21,14 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
     let arguments = (ins 
         Variadic<Index>:$params,
         OptionalAttr<StrAttr>:$name,
-        UnitAttr:$transient,
-        UnitAttr:$stream
+        UnitAttr:$transient
     );
     let results = (outs AnyTypeOf<[SDIR_ArrayType, SDIR_StreamArrayType]>:$res);
 
     let extraClassDeclaration = [{
-        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, bool transient, bool stream);
-        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name, bool transient, bool stream);
-        static AllocOp create(Location loc, Type res, StringRef name, bool transient, bool stream);
+        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, bool transient);
+        static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name, bool transient);
+        static AllocOp create(Location loc, Type res, StringRef name, bool transient);
         SDFGNode getParentSDFG();
         bool isInState();
         std::string getName();
