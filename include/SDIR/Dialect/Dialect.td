@@ -147,6 +147,10 @@ def SDIR_StreamArrayType : SDIR_Type<"StreamArray">{
         
         return get($_ctxt, elementType, symbols, integers, shape);
     }];
+
+    let extraClassDeclaration = [{
+        MemletType toMemlet();
+    }];
 }
 
 //===----------------------------------------------------------------------===//

@@ -144,3 +144,12 @@ ArrayType MemletType::toArray() {
   return ArrayType::get(getContext(), getElementType(), getSymbols(),
                         getIntegers(), getShape());
 }
+
+//===----------------------------------------------------------------------===//
+// StreamArrayType
+//===----------------------------------------------------------------------===//
+
+MemletType StreamArrayType::toMemlet() {
+  return MemletType::get(getContext(), getElementType(), getSymbols(),
+                         getIntegers(), getShape());
+}

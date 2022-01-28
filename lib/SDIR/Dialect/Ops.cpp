@@ -1006,6 +1006,26 @@ SDFGNode AllocOp::getParentSDFG() {
   return dyn_cast<SDFGNode>(sdfg);
 }
 
+Type AllocOp::getElementType() {
+  if (ArrayType t = getType().dyn_cast<ArrayType>())
+    return t.getElementType();
+
+  if (StreamArrayType t = getType().dyn_cast<StreamArrayType>())
+    return t.getElementType();
+
+  return Type();
+}
+
+bool AllocOp::isScalar() {
+  if (ArrayType t = getType().dyn_cast<ArrayType>())
+    return t.getShape().empty();
+
+  if (StreamArrayType t = getType().dyn_cast<StreamArrayType>())
+    return t.getShape().empty();
+
+  return false;
+}
+
 bool AllocOp::isInState() {
   Operation *sdfgOrState = (*this)->getParentOp();
   if (StateNode state = dyn_cast<StateNode>(sdfgOrState))

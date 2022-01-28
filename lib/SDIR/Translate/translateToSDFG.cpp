@@ -90,7 +90,13 @@ SmallVector<std::string> buildStrideList(GetAccessOp &op) {
 }
 
 SmallVector<std::string> buildStrideList(AllocOp &op) {
-  return buildStrideList(op.getType().cast<ArrayType>().toMemlet());
+  if (ArrayType t = op.getType().dyn_cast<ArrayType>())
+    return buildStrideList(t.toMemlet());
+
+  if (StreamArrayType t = op.getType().dyn_cast<StreamArrayType>())
+    return buildStrideList(t.toMemlet());
+
+  return SmallVector<std::string>();
 }
 
 void printStrides(SmallVector<std::string> strides, JsonEmitter &jemit) {
@@ -1006,51 +1012,23 @@ LogicalResult translation::translateToSDFG(EdgeOp &op, JsonEmitter &jemit) {
 // AllocOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult printScalar(AllocOp &op, JsonEmitter &jemit) {
-  jemit.startNamedObject(op.getName());
-  jemit.printKVPair("type", "Scalar");
-
-  jemit.startNamedObject("attributes");
-
-  Type element = op.getType().cast<ArrayType>().getElementType();
-  Location loc = op.getLoc();
-  StringRef dtype = translateTypeToSDFG(element, loc);
-
-  if (dtype != "")
-    jemit.printKVPair("dtype", dtype);
-  else
-    return failure();
-
-  jemit.startNamedList("shape");
-  jemit.startEntry();
-  jemit.printInt(1);
-  jemit.endList(); // shape
-
-  jemit.printKVPair("transient", "false", /*stringify=*/false);
-  translation::printDebuginfo(*op, jemit);
-
-  jemit.endObject(); // attributes
-
-  jemit.endObject();
-  return success();
-}
-
 LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
-  if (op.getType().cast<ArrayType>().getShape().size() == 0)
-    return printScalar(op, jemit);
-
   jemit.startNamedObject(op.getName());
   jemit.printKVPair("type", "Array");
 
   jemit.startNamedObject("attributes");
-  jemit.startNamedList("strides");
-  SmallVector<std::string> strideList = buildStrideList(op);
-  printStrides(strideList, jemit);
-  jemit.endList(); // strides
 
-  Type element = op.getType().cast<ArrayType>().getElementType();
+  Type element = op.getElementType();
   Location loc = op.getLoc();
   StringRef dtype = translateTypeToSDFG(element, loc);
+  SmallVector<std::string> strideList;
+
+  if (!op.isScalar()) {
+    jemit.startNamedList("strides");
+    strideList = buildStrideList(op);
+    printStrides(strideList, jemit);
+    jemit.endList(); // strides
+  }
 
   if (dtype != "")
     jemit.printKVPair("dtype", dtype);
@@ -1062,9 +1040,15 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
     jemit.startEntry();
     jemit.printString(s);
   }
+
+  if (op.isScalar()) {
+    jemit.startEntry();
+    jemit.printInt(1);
+  }
   jemit.endList(); // shape
 
-  jemit.printKVPair("transient", "false", /*stringify=*/false);
+  jemit.printKVPair("transient", op.transient() ? "true" : "false",
+                    /*stringify=*/false);
   printDebuginfo(*op, jemit);
 
   jemit.endObject(); // attributes
