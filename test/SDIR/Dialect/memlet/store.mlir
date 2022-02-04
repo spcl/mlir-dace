@@ -16,11 +16,8 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         }
         // CHECK: [[NAMEC:%[a-zA-Z0-9_]*]] = sdir.call @one()
         %1 = sdir.call @one() : () -> i32
-        // CHECK-NEXT: [[NAMEB:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
-        // CHECK-SAME: !sdir.array<i32> -> !sdir.memlet<i32>
-        %a = sdir.get_access %A : !sdir.array<i32> -> !sdir.memlet<i32>
-        // CHECK-NEXT: sdir.store [[NAMEC]], [[NAMEB]][]
-        // CHECK-SAME: i32 -> !sdir.memlet<i32>
-        sdir.store %1, %a[] : i32 -> !sdir.memlet<i32>
+        // CHECK-NEXT: sdir.store [[NAMEC]], [[NAMEA]][]
+        // CHECK-SAME: i32 -> !sdir.array<i32>
+        sdir.store %1, %A[] : i32 -> !sdir.array<i32>
     }
 }

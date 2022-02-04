@@ -18,11 +18,8 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         }
         // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdir.call @one()
         %1 = sdir.call @one() : () -> i32
-        // CHECK-NEXT: [[NAMEa:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
-        // CHECK-SAME: !sdir.array<12x12xi32> -> !sdir.memlet<12x12xi32>
-        %a = sdir.get_access %A : !sdir.array<12x12xi32> -> !sdir.memlet<12x12xi32>
-        // CHECK-NEXT: sdir.store [[NAME1]], [[NAMEa]][0, sym("N")]
-        // CHECK-SAME: i32 -> !sdir.memlet<12x12xi32>
-        sdir.store %1, %a[0, sym("N")] : i32 -> !sdir.memlet<12x12xi32>
+        // CHECK-NEXT: sdir.store [[NAME1]], [[NAMEA]][0, sym("N")]
+        // CHECK-SAME: i32 -> !sdir.array<12x12xi32>
+        sdir.store %1, %A[0, sym("N")] : i32 -> !sdir.array<12x12xi32>
     }
 }

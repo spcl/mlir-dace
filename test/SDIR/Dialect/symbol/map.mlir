@@ -25,9 +25,6 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         %0 = sdir.call @zero() : () -> index
         // CHECK-NEXT: [[NAME1:%[a-zA-Z0-9_]*]] = sdir.call @one()
         %1 = sdir.call @one() : () -> index
-        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.get_access [[NAMEA]] 
-        // CHECK-SAME: !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        %a = sdir.get_access %A : !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
         // CHECK: sdir.map
         // CHECK-SAME: ([[NAME1]], 0) to (2, sym("N")) step ([[NAME0]], sym("N+2"))
         sdir.map (%i, %j) = (%1, 0) to (2, sym("N")) step (%0, sym("N+2")) {

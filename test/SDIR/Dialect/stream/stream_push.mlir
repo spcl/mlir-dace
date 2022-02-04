@@ -4,8 +4,8 @@
 // CHECK: sdir.sdfg
 sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc()
-    // CHECK-SAME: !sdir.stream_array<i32>
-    %A = sdir.alloc() : !sdir.stream_array<i32>
+    // CHECK-SAME: !sdir.stream<i32>
+    %A = sdir.alloc() : !sdir.stream<i32>
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {
@@ -16,11 +16,8 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         }
         // CHECK: [[NAMEB:%[a-zA-Z0-9_]*]] = sdir.call @zero()
         %0 = sdir.call @zero() : () -> i32
-        // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
-        // CHECK-SAME: !sdir.stream_array<i32> -> !sdir.stream<i32>
-        %a = sdir.get_access %A : !sdir.stream_array<i32> -> !sdir.stream<i32>
-        // CHECK-NEXT: sdir.stream_push [[NAMEB]], [[NAMEC]]
+        // CHECK-NEXT: sdir.stream_push [[NAMEB]], [[NAMEA]]
         // CHECK-SAME: i32 -> !sdir.stream<i32>
-        sdir.stream_push %0, %a : i32 -> !sdir.stream<i32>
+        sdir.stream_push %0, %A : i32 -> !sdir.stream<i32>
     }
 }

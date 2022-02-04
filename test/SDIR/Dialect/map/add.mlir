@@ -15,15 +15,6 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {
-        // CHECK-NEXT: [[NAMEa:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEA]] 
-        // CHECK-SAME: !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        %a = sdir.get_access %A : !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        // CHECK-NEXT: [[NAMEb:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEB]] 
-        // CHECK-SAME: !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        %b = sdir.get_access %B : !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        // CHECK-NEXT: [[NAMEc:%[a-zA-Z0-9_]*]] = sdir.get_access [[NAMEC]] 
-        // CHECK-SAME: !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
-        %c = sdir.get_access %C : !sdir.array<2x6xi32> -> !sdir.memlet<2x6xi32>
         // CHECK: sdir.tasklet @add
         sdir.tasklet @add(%x: i32, %y: i32) -> i32{
             %z = arith.addi %x, %y : i32
@@ -32,18 +23,18 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK: sdir.map 
         // CHECK-SAME: [[NAMEi:%[a-zA-Z0-9_]*]], [[NAMEj:%[a-zA-Z0-9_]*]]
         sdir.map (%i, %j) = (0, 0) to (2, 2) step (1, 1) {
-            // CHECK-NEXT: [[NAMEa_ij:%[a-zA-Z0-9_]*]] = sdir.load [[NAMEa]]
+            // CHECK-NEXT: [[NAMEa_ij:%[a-zA-Z0-9_]*]] = sdir.load [[NAMEA]]
             // CHECK-SAME: [[NAMEi]], [[NAMEj]]
-            %a_ij = sdir.load %a[%i, %j] : !sdir.memlet<2x6xi32> -> i32
-            // CHECK-NEXT: [[NAMEb_ij:%[a-zA-Z0-9_]*]] = sdir.load [[NAMEb]]
+            %a_ij = sdir.load %A[%i, %j] : !sdir.array<2x6xi32> -> i32
+            // CHECK-NEXT: [[NAMEb_ij:%[a-zA-Z0-9_]*]] = sdir.load [[NAMEB]]
             // CHECK-SAME: [[NAMEi]], [[NAMEj]]
-            %b_ij = sdir.load %b[%i, %j] : !sdir.memlet<2x6xi32> -> i32
+            %b_ij = sdir.load %B[%i, %j] : !sdir.array<2x6xi32> -> i32
             // CHECK-NEXT: [[NAMEres:%[a-zA-Z0-9_]*]] = sdir.call @add
             // CHECK-SAME: [[NAMEa_ij]], [[NAMEb_ij]]
             %res = sdir.call @add(%a_ij, %b_ij) : (i32, i32) -> i32
-            // CHECK-NEXT: sdir.store [[NAMEres]], [[NAMEc]]
+            // CHECK-NEXT: sdir.store [[NAMEres]], [[NAMEC]]
             // CHECK-SAME: [[NAMEi]], [[NAMEj]]
-            sdir.store %res, %c[%i, %j] : i32 -> !sdir.memlet<2x6xi32>
+            sdir.store %res, %C[%i, %j] : i32 -> !sdir.array<2x6xi32>
         }
     }
 }
