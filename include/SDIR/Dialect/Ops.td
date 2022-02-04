@@ -33,6 +33,5 @@ include "SDIR/Dialect/ops/memlet.td"
 include "SDIR/Dialect/ops/stream.td"
 include "SDIR/Dialect/ops/symbol.td"
 include "SDIR/Dialect/ops/edge.td"
-include "SDIR/Dialect/ops/get_access.td"
 
 #endif // SDIR_OPS

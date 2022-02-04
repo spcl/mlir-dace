@@ -67,7 +67,7 @@ LogicalResult printIndices(Location loc, Attribute attr, JsonEmitter &jemit) {
   return success();
 }
 
-SmallVector<std::string> buildStrideList(MemletType mem) {
+SmallVector<std::string> buildStrideList(ArrayType mem) {
   ArrayRef<bool> shape = mem.getShape();
   ArrayRef<int64_t> integers = mem.getIntegers();
   ArrayRef<StringAttr> symbols = mem.getSymbols();
@@ -85,16 +85,13 @@ SmallVector<std::string> buildStrideList(MemletType mem) {
   return strideList;
 }
 
-SmallVector<std::string> buildStrideList(GetAccessOp &op) {
-  return buildStrideList(op.getType().cast<MemletType>());
-}
-
 SmallVector<std::string> buildStrideList(AllocOp &op) {
   if (ArrayType t = op.getType().dyn_cast<ArrayType>())
-    return buildStrideList(t.toMemlet());
+    return buildStrideList(t);
 
-  if (StreamArrayType t = op.getType().dyn_cast<StreamArrayType>())
-    return buildStrideList(t.toMemlet());
+  // TODO: Implement super class
+  /*   if (StreamType t = op.getType().dyn_cast<StreamType>())
+      return buildStrideList(t.toArray()); */
 
   return SmallVector<std::string>();
 }
@@ -199,7 +196,7 @@ void translation::prepForTranslation(SDFGNode &op) {
       op.body().getBlocks().front().push_front(aop);
       argToAlloc.map(bArg, aop);
 
-      if (MemletType mem = bArg.getType().dyn_cast<MemletType>())
+      if (ArrayType mem = bArg.getType().dyn_cast<ArrayType>())
         for (StringAttr sa : mem.getSymbols())
           typeSymbols.push_back(sa.str());
     }
@@ -390,46 +387,6 @@ void translation::prepForTranslation(StateNode &op) {
       isa<LoadOp>(op.body().getBlocks().front().back()))
     op.body().getBlocks().front().back().erase();
 
-  // Insert access nodes
-  SDFGNode sdfg = cast<SDFGNode>(op->getParentOp());
-  BlockAndValueMapping argToAlloc = allocMaps.lookup(sdfg);
-
-  for (BlockArgument bArg : sdfg.getArguments()) {
-    Value alloc = argToAlloc.lookup<Value>(bArg);
-    DenseSet<Operation *> users;
-
-    for (Operation *nop : alloc.getUsers()) {
-      if (StateNode state = dyn_cast<StateNode>(nop->getParentOp())) {
-        if (state == op)
-          users.insert(nop);
-      }
-    }
-
-    if (!users.empty()) {
-      GetAccessOp gao =
-          GetAccessOp::create(op.getLoc(), alloc.getType(), alloc);
-      op.body().getBlocks().front().push_front(gao);
-
-      alloc.replaceUsesWithIf(gao, [&](OpOperand &opop) {
-        return users.contains(opop.getOwner());
-      });
-    }
-  }
-
-  // Add access nodes for stores
-  for (StoreOp store : op.body().getOps<StoreOp>()) {
-    if (store.arr().hasOneUse() || store.isIndirect())
-      continue;
-
-    OpBuilder builder(op.getLoc().getContext());
-    builder.setInsertionPoint(store);
-
-    GetAccessOp gao = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
-    builder.insert(gao);
-
-    store.setOperand(store.getNumOperands() - 1, gao);
-  }
-
   // separate operations requiring indirects
   SmallVector<LoadOp> indirectsLoads;
   SmallVector<StoreOp> indirectsStores;
@@ -474,8 +431,8 @@ void translation::prepForTranslation(StateNode &op) {
     builder.setInsertionPoint(store);
 
     Type t = store.arr().getType();
-    if (!t.isa<MemletType>())
-      t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+    if (!t.isa<ArrayType>())
+      t = ArrayType::get(op.getLoc().getContext(), t, {}, {}, {});
 
     SmallVector<Value> reducedOps;
     SmallVector<Type> reducedTypes;
@@ -489,10 +446,10 @@ void translation::prepForTranslation(StateNode &op) {
 
     TaskletNode task = TaskletNode::create(op.getLoc(), "indirect_store", ft);
 
-    GetAccessOp gao = cast<GetAccessOp>(store.arr().getDefiningOp()->clone());
+    AllocOp aop = cast<AllocOp>(store.arr().getDefiningOp());
     BlockAndValueMapping valMapping;
     valMapping.map(reducedOps, task.getArguments());
-    valMapping.map(store.arr(), gao);
+    valMapping.map(store.arr(), aop);
 
     Operation *copy = store.getOperation()->clone(valMapping);
     task.body().getBlocks().front().push_back(copy);
@@ -503,15 +460,11 @@ void translation::prepForTranslation(StateNode &op) {
 
     CallOp call = CallOp::create(op.getLoc(), task, reducedOps);
     builder.insert(call);
-    builder.insert(gao);
 
-    StoreOp newStore = StoreOp::create(op.getLoc(), call.getResult(0), gao);
+    StoreOp newStore = StoreOp::create(op.getLoc(), call.getResult(0), aop);
     builder.insert(newStore);
 
     store.erase();
-    GetAccessOp oldGao = cast<GetAccessOp>(store.arr().getDefiningOp());
-    if (oldGao.use_empty())
-      oldGao.erase();
   }
 
   // Wrap symbolic evaluations
@@ -538,20 +491,18 @@ void translation::prepForTranslation(StateNode &op) {
       builder.setInsertionPointAfter(sym);
 
       Type t = sym.getType();
-      if (!t.isa<MemletType>())
-        t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+      if (!t.isa<ArrayType>())
+        t = ArrayType::get(op.getLoc().getContext(), t, {}, {}, {});
 
       AllocOp aop =
           AllocOp::create(op.getLoc(), t, utils::generateName("sym_wrap"),
                           /*transient=*/true);
-      GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, aop);
 
       StoreOp store =
-          StoreOp::create(op.getLoc(), call.getResult(0), gao, ValueRange());
-      LoadOp load = LoadOp::create(op.getLoc(), gao, {});
+          StoreOp::create(op.getLoc(), call.getResult(0), aop, ValueRange());
+      LoadOp load = LoadOp::create(op.getLoc(), aop, {});
 
       builder.insert(aop);
-      builder.insert(gao);
       builder.insert(call);
       builder.insert(store);
       builder.insert(load);
@@ -563,9 +514,6 @@ void translation::prepForTranslation(StateNode &op) {
     symOp.erase();
 
   for (Operation &oper : op.body().getOps()) {
-    // if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper))
-    //   prepForTranslation(sdfg);
-
     if (CallOp call = dyn_cast<CallOp>(oper))
       prepForTranslation(call);
   }
@@ -594,12 +542,6 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
     if (SDFGNode sdfg = dyn_cast<SDFGNode>(oper)) {
       sdfg.setID(nodeID++);
       if (translateToSDFG(sdfg, jemit).failed())
-        return failure();
-    }
-
-    if (GetAccessOp acc = dyn_cast<GetAccessOp>(oper)) {
-      acc.setID(nodeID++);
-      if (translateToSDFG(acc, jemit).failed())
         return failure();
     }
 
@@ -1060,9 +1002,9 @@ LogicalResult translation::translateToSDFG(AllocOp &op, JsonEmitter &jemit) {
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult translation::translateToSDFG(GetAccessOp &op,
-                                           JsonEmitter &jemit) {
-  jemit.startObject();
+// LogicalResult translation::translateToSDFG(GetAccessOp &op,
+//                                            JsonEmitter &jemit) {
+/*   jemit.startObject();
   jemit.printKVPair("type", "AccessNode");
   jemit.printKVPair("label", op.getName());
 
@@ -1072,14 +1014,14 @@ LogicalResult translation::translateToSDFG(GetAccessOp &op,
   jemit.endObject(); // in_connectors
   jemit.startNamedObject("out_connectors");
   jemit.endObject(); // out_connectors
-  jemit.endObject(); // attributes
+  jemit.endObject(); // attributes */
 
-  jemit.printKVPair("id", op.ID(), /*stringify=*/false);
-  jemit.printKVPair("scope_entry", "null", /*stringify=*/false);
-  jemit.printKVPair("scope_exit", "null", /*stringify=*/false);
-  jemit.endObject();
-  return success();
-}
+// jemit.printKVPair("id", op.ID(), /*stringify=*/false);
+// jemit.printKVPair("scope_entry", "null", /*stringify=*/false);
+// jemit.printKVPair("scope_exit", "null", /*stringify=*/false);
+/*   jemit.endObject();
+  return success(); */
+//}
 
 //===----------------------------------------------------------------------===//
 // LoadOp
@@ -1098,7 +1040,7 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   bool fullRange = op->getAttr("isFullRange") != nullptr &&
                    op->getAttr("isFullRange").cast<BoolAttr>().getValue();
 
-  GetAccessOp gao = cast<GetAccessOp>(op.arr().getDefiningOp());
+  AllocOp aop = cast<AllocOp>(op.arr().getDefiningOp());
 
   jemit.startObject();
   jemit.printKVPair("type", "MultiConnectorEdge");
@@ -1108,12 +1050,12 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  jemit.printKVPair("data", gao.getName());
+  jemit.printKVPair("data", aop.getName());
   jemit.printKVPair("volume", 1);
 
   if (!fullRange) {
     jemit.startNamedList("strides");
-    SmallVector<std::string> strideList = buildStrideList(gao);
+    SmallVector<std::string> strideList = buildStrideList(aop);
     printStrides(strideList, jemit);
     jemit.endList(); // strides
 
@@ -1157,8 +1099,9 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
       jemit.printKVPair("src_connector", "__return");
     }
   } else if (LoadOp load = dyn_cast<LoadOp>(op.val().getDefiningOp())) {
-    GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
-    jemit.printKVPair("src", gao.ID());
+    AllocOp aop = cast<AllocOp>(load.arr().getDefiningOp());
+    // TODO: Emit ID
+    // jemit.printKVPair("src", aop.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
     mlir::emitError(op.getLoc(),
@@ -1166,11 +1109,12 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
     return failure();
   }
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.arr().getDefiningOp())) {
-    jemit.printKVPair("dst", aNode.ID());
+  if (AllocOp aNode = dyn_cast<AllocOp>(op.arr().getDefiningOp())) {
+    // TODO: Emit ID
+    // jemit.printKVPair("dst", aNode.ID());
     jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
   } else {
-    mlir::emitError(op.getLoc(), "Array must be defined by a GetAccessOp");
+    mlir::emitError(op.getLoc(), "Array must be defined by an AllocOp");
     return failure();
   }
 
@@ -1191,12 +1135,11 @@ LogicalResult translation::translateToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
+  if (AllocOp aNode = dyn_cast<AllocOp>(op.src().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
     jemit.printKVPair("volume", 1);
   } else {
-    mlir::emitError(op.getLoc(),
-                    "Source array must be defined by a GetAccessOp");
+    mlir::emitError(op.getLoc(), "Source array must be defined by an AllocOp");
     return failure();
   }
 
@@ -1204,21 +1147,22 @@ LogicalResult translation::translateToSDFG(CopyOp &op, JsonEmitter &jemit) {
   jemit.endObject(); // data
   jemit.endObject(); // attributes
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.src().getDefiningOp())) {
-    jemit.printKVPair("src", aNode.ID());
+  if (AllocOp aNode = dyn_cast<AllocOp>(op.src().getDefiningOp())) {
+    // TODO: Emit ID
+    // jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
-    mlir::emitError(op.getLoc(),
-                    "Source array must be defined by a GetAccessOp");
+    mlir::emitError(op.getLoc(), "Source array must be defined by an AllocOp");
     return failure();
   }
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(op.dest().getDefiningOp())) {
-    jemit.printKVPair("dst", aNode.ID());
+  if (AllocOp aNode = dyn_cast<AllocOp>(op.dest().getDefiningOp())) {
+    // TODO: Emit ID
+    // jemit.printKVPair("dst", aNode.ID());
     jemit.printKVPair("dst_connector", "null", /*stringify=*/false);
   } else {
     mlir::emitError(op.getLoc(),
-                    "Destination array must be defined by a GetAccessOp");
+                    "Destination array must be defined by an AllocOp");
     return failure();
   }
 
@@ -1290,16 +1234,16 @@ LogicalResult translation::translateToSDFG(StreamLengthOp &op,
 
 LogicalResult printLoadEdgeAttr(LoadOp &load, JsonEmitter &jemit) {
   jemit.startNamedList("strides");
-  GetAccessOp aop = cast<GetAccessOp>(load.arr().getDefiningOp());
+  AllocOp aop = cast<AllocOp>(load.arr().getDefiningOp());
   SmallVector<std::string> strideList = buildStrideList(aop);
   printStrides(strideList, jemit);
   jemit.endList(); // strides
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
+  if (AllocOp aNode = dyn_cast<AllocOp>(load.arr().getDefiningOp())) {
     jemit.printKVPair("data", aNode.getName());
     jemit.printKVPair("volume", 1);
   } else {
-    mlir::emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
+    mlir::emitError(load.getLoc(), "Array must be defined by an AllocOp");
     return failure();
   }
 
@@ -1345,11 +1289,12 @@ LogicalResult printLoadTaskletEdge(LoadOp &load, TaskletNode &task, int argIdx,
     return failure();
   printMultiConnectorAttrEnd(jemit);
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
-    jemit.printKVPair("src", aNode.ID());
+  if (AllocOp aNode = dyn_cast<AllocOp>(load.arr().getDefiningOp())) {
+    // TODO: Emit ID
+    // jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
-    mlir::emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
+    mlir::emitError(load.getLoc(), "Array must be defined by an AllocOp");
     return failure();
   }
 
@@ -1377,7 +1322,7 @@ LogicalResult printTaskletTaskletEdge(TaskletNode &taskSrc,
   return success();
 }
 
-LogicalResult printAccessTaskletEdge(GetAccessOp &access, TaskletNode &task,
+/* LogicalResult printAccessTaskletEdge(GetAccessOp &access, TaskletNode &task,
                                      int argIdx, JsonEmitter &jemit) {
   printMultiConnectorStart(jemit);
   jemit.printKVPair("data", access.getName());
@@ -1385,14 +1330,14 @@ LogicalResult printAccessTaskletEdge(GetAccessOp &access, TaskletNode &task,
   printMultiConnectorAttrEnd(jemit);
 
   jemit.printKVPair("src", access.ID());
-  jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  jemit.printKVPair("src_connector", "null", false);
   jemit.printKVPair("dst", task.ID());
   jemit.printKVPair("dst_connector", task.getInputName(argIdx));
   printMultiConnectorEnd(jemit);
   return success();
-}
+} */
 
-LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
+/* LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
                                   int argIdx, JsonEmitter &jemit) {
   printMultiConnectorStart(jemit);
   jemit.printKVPair("data", access.getName());
@@ -1400,14 +1345,14 @@ LogicalResult printAccessSDFGEdge(GetAccessOp &access, SDFGNode &sdfg,
   printMultiConnectorAttrEnd(jemit);
 
   jemit.printKVPair("src", access.ID());
-  jemit.printKVPair("src_connector", "null", /*stringify=*/false);
+  jemit.printKVPair("src_connector", "null", false);
   jemit.printKVPair("dst", sdfg.ID());
   jemit.printKVPair("dst_connector",
                     getValueName(sdfg.getArgument(argIdx), *sdfg));
 
   printMultiConnectorEnd(jemit);
   return success();
-}
+} */
 
 LogicalResult printTaskletSDFGEdge(TaskletNode &task, SDFGNode &sdfg,
                                    int argIdx, JsonEmitter &jemit) {
@@ -1433,11 +1378,12 @@ LogicalResult printLoadSDFGEdge(LoadOp &load, SDFGNode &sdfg, int argIdx,
     return failure();
   printMultiConnectorAttrEnd(jemit);
 
-  if (GetAccessOp aNode = dyn_cast<GetAccessOp>(load.arr().getDefiningOp())) {
-    jemit.printKVPair("src", aNode.ID());
+  if (AllocOp aNode = dyn_cast<AllocOp>(load.arr().getDefiningOp())) {
+    // TODO: Emit ID
+    // jemit.printKVPair("src", aNode.ID());
     jemit.printKVPair("src_connector", "null", /*stringify=*/false);
   } else {
-    mlir::emitError(load.getLoc(), "Array must be defined by a GetAccessOp");
+    mlir::emitError(load.getLoc(), "Array must be defined by an AllocOp");
     return failure();
   }
 
@@ -1460,22 +1406,20 @@ void translation::prepForTranslation(sdir::CallOp &op) {
 
       // TODO: Only one output supported
       Type t = ft.getResult(0);
-      if (!t.isa<MemletType>()) {
-        t = MemletType::get(op.getLoc().getContext(), t, {}, {}, {});
+      if (!t.isa<ArrayType>()) {
+        t = ArrayType::get(op.getLoc().getContext(), t, {}, {}, {});
       }
 
       AllocOp alloc =
           AllocOp::create(op.getLoc(), t, utils::generateName("ttt"),
                           /*transient=*/true);
-
-      GetAccessOp gao = GetAccessOp::create(op.getLoc(), t, alloc);
       StoreOp store =
-          StoreOp::create(op.getLoc(), call.getResult(0), gao, ValueRange());
-      LoadOp load = LoadOp::create(op.getLoc(), gao, {});
+          StoreOp::create(op.getLoc(), call.getResult(0), alloc, ValueRange());
+      LoadOp load = LoadOp::create(op.getLoc(), alloc, {});
 
       builder.setInsertionPointAfter(call);
       builder.insert(alloc);
-      builder.insert(gao);
+      ;
       builder.insert(store);
       builder.insert(load);
 
@@ -1500,10 +1444,11 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
           return failure();
-      } else if (GetAccessOp acc = dyn_cast<GetAccessOp>(val.getDefiningOp())) {
-        if (printAccessTaskletEdge(acc, task, i, jemit).failed())
-          return failure();
-      } else {
+      } /* else if (GetAccessOp acc =
+      dyn_cast<GetAccessOp>(val.getDefiningOp())) { if
+      (printAccessTaskletEdge(acc, task, i, jemit).failed()) return failure();
+      }  */
+      else {
         mlir::emitError(op.getLoc(), "Operands must be results of GetAccessOp, "
                                      "LoadOp or TaskletNode");
         return failure();
@@ -1514,11 +1459,10 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
     SDFGNode sdfg = op.getSDFG();
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
       Value val = op.getOperand(i);
-      if (GetAccessOp acc = dyn_cast<GetAccessOp>(val.getDefiningOp())) {
-        if (printAccessSDFGEdge(acc, sdfg, i, jemit).failed())
-          return failure();
-      } else if (sdir::CallOp call =
-                     dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
+      /*       if (GetAccessOp acc = dyn_cast<GetAccessOp>(val.getDefiningOp()))
+         { if (printAccessSDFGEdge(acc, sdfg, i, jemit).failed()) return
+         failure(); } else */
+      if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletSDFGEdge(taskSrc, sdfg, i, jemit).failed())
           return failure();

@@ -59,7 +59,7 @@ def SDIR_ArrayType : SDIR_Type<"Array">{
     }];
 
     let extraClassDeclaration = [{
-        MemletType toMemlet();
+        size_t getRank(){ return getShape().size(); }
 
         size_t getUndefRank(){ 
             size_t undefSize = 0;
@@ -71,85 +71,6 @@ def SDIR_ArrayType : SDIR_Type<"Array">{
             for(int64_t dim : getIntegers()) if(dim == 0) return true;
             return false;
         }
-    }];
-}
-
-//===----------------------------------------------------------------------===//
-// MemletType
-//===----------------------------------------------------------------------===//
-
-def SDIR_MemletType : SDIR_Type<"Memlet">{
-    let mnemonic = "memlet";
-    let summary = "A memlet type";
-    let description = [{
-        A type representing a memlet.
-    }];
-
-    let parameters = (ins
-        "Type":$elementType,
-        ArrayRefParameter<"StringAttr">:$symbols,
-        ArrayRefParameter<"int64_t">:$integers, 
-        ArrayRefParameter<"bool">:$shape 
-    );
-
-    let printer = [{
-        printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
-                        getImpl()->integers, getImpl()->shape);
-    }];
-
-    let parser = [{
-        Type elementType;
-        SmallVector<StringAttr> symbols;
-        SmallVector<int64_t> integers;
-        SmallVector<bool> shape;
-        if(parseDimensionList($_parser, elementType, symbols, integers, shape))
-            return Type();
-        
-        return get($_ctxt, elementType, symbols, integers, shape);
-    }];
-
-    let extraClassDeclaration = [{
-        ArrayType toArray();
-        size_t getRank(){ return getShape().size(); }
-    }];
-}
-
-//===----------------------------------------------------------------------===//
-// StreamArrayType
-//===----------------------------------------------------------------------===//
-
-def SDIR_StreamArrayType : SDIR_Type<"StreamArray">{
-    let mnemonic = "stream_array";
-    let summary = "A stream array type";
-    let description = [{
-        A type representing a stream array.
-    }];
-
-    let parameters = (ins
-        "Type":$elementType,
-        ArrayRefParameter<"StringAttr">:$symbols,
-        ArrayRefParameter<"int64_t">:$integers, 
-        ArrayRefParameter<"bool">:$shape 
-    );
-
-    let printer = [{
-        printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
-                        getImpl()->integers, getImpl()->shape);
-    }];
-
-    let parser = [{
-        Type elementType;
-        SmallVector<StringAttr> symbols;
-        SmallVector<int64_t> integers;
-        SmallVector<bool> shape;
-        if(parseDimensionList($_parser, elementType, symbols, integers, shape))
-            return Type();
-        
-        return get($_ctxt, elementType, symbols, integers, shape);
-    }];
-
-    let extraClassDeclaration = [{
-        MemletType toMemlet();
     }];
 }
 

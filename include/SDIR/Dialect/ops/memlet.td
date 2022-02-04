@@ -23,7 +23,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
         OptionalAttr<StrAttr>:$name,
         UnitAttr:$transient
     );
-    let results = (outs AnyTypeOf<[SDIR_ArrayType, SDIR_StreamArrayType]>:$res);
+    let results = (outs AnyTypeOf<[SDIR_ArrayType, SDIR_StreamType]>:$res);
 
     let extraClassDeclaration = [{
         static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, bool transient);
@@ -45,7 +45,7 @@ def SDIR_AllocOp : SDIR_Op<"alloc", [
 def SDIR_LoadOp : SDIR_Op<"load", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"result type matches element type of 'memlet'", "arr", "res",
-                    "$_self.cast<MemletType>().getElementType()">
+                    "$_self.cast<ArrayType>().getElementType()">
 ]> {
     let summary = "Memlet load operation";
     let description = [{
@@ -62,12 +62,12 @@ def SDIR_LoadOp : SDIR_Op<"load", [
         ```
     }];
 
-    let arguments = (ins Variadic<Index>:$indices, SDIR_MemletType:$arr);
+    let arguments = (ins Variadic<Index>:$indices, SDIR_ArrayType:$arr);
     let results = (outs AnyType:$res);
 
     let extraClassDeclaration = [{
-        static LoadOp create(PatternRewriter &rewriter, Location loc, GetAccessOp acc, ValueRange indices);
-        static LoadOp create(Location loc, GetAccessOp acc, ValueRange indices);
+        static LoadOp create(PatternRewriter &rewriter, Location loc, AllocOp alloc, ValueRange indices);
+        static LoadOp create(Location loc, AllocOp alloc, ValueRange indices);
         static LoadOp create(PatternRewriter &rewriter, Location loc, Type t, Value mem, ValueRange indices);
         static LoadOp create(Location loc, Type t, Value mem, ValueRange indices);
         bool isIndirect();
@@ -82,7 +82,7 @@ def SDIR_LoadOp : SDIR_Op<"load", [
 def SDIR_StoreOp : SDIR_Op<"store", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"value type matches element type of 'memlet'", "arr", "val",
-                    "$_self.cast<MemletType>().getElementType()">
+                    "$_self.cast<ArrayType>().getElementType()">
 ]> {
     let summary = "Memlet store operation";
     let description = [{
@@ -103,7 +103,7 @@ def SDIR_StoreOp : SDIR_Op<"store", [
     let arguments = (ins 
         Variadic<Index>:$indices, 
         AnyType:$val, 
-        SDIR_MemletType:$arr
+        SDIR_ArrayType:$arr
     );
 
     let extraClassDeclaration = [{
@@ -137,7 +137,7 @@ def SDIR_CopyOp : SDIR_Op<"copy", [
         ```
     }];
 
-    let arguments = (ins SDIR_MemletType:$src, SDIR_MemletType:$dest);
+    let arguments = (ins SDIR_ArrayType:$src, SDIR_ArrayType:$dest);
 }
 
 //===----------------------------------------------------------------------===//
@@ -161,8 +161,8 @@ def SDIR_MemletCastOp : SDIR_Op<"memlet_cast", [
         ```
     }];
 
-    let arguments = (ins SDIR_MemletType:$src);
-    let results = (outs SDIR_MemletType:$res);
+    let arguments = (ins SDIR_ArrayType:$src);
+    let results = (outs SDIR_ArrayType:$res);
 }
 
 //===----------------------------------------------------------------------===//
@@ -186,8 +186,8 @@ def SDIR_ViewCastOp : SDIR_Op<"view_cast", [
         ```
     }];
 
-    let arguments = (ins SDIR_MemletType:$src);
-    let results = (outs SDIR_MemletType:$res);
+    let arguments = (ins SDIR_ArrayType:$src);
+    let results = (outs SDIR_ArrayType:$res);
 }
 
 //===----------------------------------------------------------------------===//
@@ -214,12 +214,12 @@ def SDIR_SubviewOp : SDIR_Op<"subview", [
 
     let arguments = (ins 
         Variadic<Index>:$ranges,
-        SDIR_MemletType:$src,
+        SDIR_ArrayType:$src,
         ArrayAttr:$offsets,
         ArrayAttr:$sizes,
         ArrayAttr:$strides
     );
-    let results = (outs SDIR_MemletType:$res);
+    let results = (outs SDIR_ArrayType:$res);
 }
 
 #endif // SDIR_MemletOps

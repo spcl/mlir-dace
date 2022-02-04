@@ -55,8 +55,8 @@ public:
           shape.push_back(true);
         }
       }
-      return MemletType::get(mem.getContext(), mem.getElementType(), symbols,
-                             ints, shape);
+      return ArrayType::get(mem.getContext(), mem.getElementType(), symbols,
+                            ints, shape);
     }
     return llvm::None;
   }
@@ -73,12 +73,8 @@ SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
     if (operand.getDefiningOp() != nullptr &&
         isa<LoadOp>(operand.getDefiningOp())) {
       LoadOp load = cast<LoadOp>(operand.getDefiningOp());
-      GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
-      AllocOp alloc = cast<AllocOp>(gao.arr().getDefiningOp());
-
-      GetAccessOp acc = GetAccessOp::create(
-          rewriter, loc, alloc.getType().cast<ArrayType>().toMemlet(), alloc);
-      LoadOp loadNew = LoadOp::create(rewriter, loc, acc, ValueRange());
+      AllocOp alloc = cast<AllocOp>(load.arr().getDefiningOp());
+      LoadOp loadNew = LoadOp::create(rewriter, loc, alloc, ValueRange());
 
       loadedOps.push_back(loadNew);
     } else if (operand.getDefiningOp() != nullptr &&
@@ -223,10 +219,7 @@ public:
       // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op->getResultTypes()[0]);
-      if (MemletType mem = nt.dyn_cast<MemletType>())
-        nt = mem.toArray();
-      else
-        nt = ArrayType::get(op->getLoc().getContext(), nt, {}, {}, {});
+      nt = ArrayType::get(op->getLoc().getContext(), nt, {}, {}, {});
 
       SDFGNode sdfg = getTopSDFG(state);
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
@@ -258,13 +251,10 @@ public:
       sdir::CallOp call =
           sdir::CallOp::create(rewriter, op->getLoc(), task, loadedOps);
 
-      GetAccessOp access = GetAccessOp::create(
-          rewriter, op->getLoc(), nt.cast<ArrayType>().toMemlet(), alloc);
-      StoreOp::create(rewriter, op->getLoc(), call.getResult(0), access,
+      StoreOp::create(rewriter, op->getLoc(), call.getResult(0), alloc,
                       ValueRange());
 
-      LoadOp load =
-          LoadOp::create(rewriter, op->getLoc(), access, ValueRange());
+      LoadOp load = LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
 
       rewriter.replaceOp(op, {load});
 
@@ -318,11 +308,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     Type type = getTypeConverter()->convertType(op.getType());
     Type arrT = type;
-
-    if (MemletType mem = arrT.dyn_cast<MemletType>())
-      arrT = mem.toArray();
-    else
-      arrT = ArrayType::get(op->getLoc().getContext(), arrT, {}, {}, {});
+    arrT = ArrayType::get(op->getLoc().getContext(), arrT, {}, {}, {});
 
     SDFGNode sdfg = getTopSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
@@ -341,12 +327,10 @@ public:
 
     LoadOp load = LoadOp::create(rewriter, op.getLoc(), type, memref, indices);
 
-    GetAccessOp access = GetAccessOp::create(
-        rewriter, op->getLoc(), arrT.cast<ArrayType>().toMemlet(), alloc);
-    StoreOp::create(rewriter, op->getLoc(), load, access, ValueRange());
+    StoreOp::create(rewriter, op->getLoc(), load, alloc, ValueRange());
 
     LoadOp newLoad =
-        LoadOp::create(rewriter, op->getLoc(), access, ValueRange());
+        LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
 
     linkToLastState(rewriter, op->getLoc(), state);
     if (markedToLink(*op))
@@ -391,8 +375,8 @@ public:
   Value mappedValue(Value val) const {
     if (val.getDefiningOp() != nullptr && isa<LoadOp>(val.getDefiningOp())) {
       LoadOp load = cast<LoadOp>(val.getDefiningOp());
-      GetAccessOp gao = cast<GetAccessOp>(load.arr().getDefiningOp());
-      return gao.arr();
+      AllocOp alloc = cast<AllocOp>(load.arr().getDefiningOp());
+      return alloc;
     }
 
     return val;

@@ -986,9 +986,7 @@ AllocOp AllocOp::create(Location loc, Type res, StringRef name,
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = builder.getStringAttr(name);
 
-  if (MemletType mem = res.dyn_cast<MemletType>()) {
-    res = mem.toArray();
-  } else if (!res.isa<ArrayType>()) {
+  if (!res.isa<ArrayType>()) {
     res = ArrayType::get(res.getContext(), res, {}, {}, {});
   }
 
@@ -1010,7 +1008,7 @@ Type AllocOp::getElementType() {
   if (ArrayType t = getType().dyn_cast<ArrayType>())
     return t.getElementType();
 
-  if (StreamArrayType t = getType().dyn_cast<StreamArrayType>())
+  if (StreamType t = getType().dyn_cast<StreamType>())
     return t.getElementType();
 
   return Type();
@@ -1020,7 +1018,7 @@ bool AllocOp::isScalar() {
   if (ArrayType t = getType().dyn_cast<ArrayType>())
     return t.getShape().empty();
 
-  if (StreamArrayType t = getType().dyn_cast<StreamArrayType>())
+  if (StreamType t = getType().dyn_cast<StreamType>())
     return t.getShape().empty();
 
   return false;
@@ -1053,10 +1051,9 @@ std::string AllocOp::getName() {
 // GetAccessOp
 //===----------------------------------------------------------------------===//
 
-GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc, Type t,
-                                Value arr) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
+/* GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc, Type
+t, Value arr) { OpBuilder builder(loc->getContext()); OperationState state(loc,
+getOperationName());
 
   if (ArrayType art = t.dyn_cast<ArrayType>()) {
     t = art.toMemlet();
@@ -1107,10 +1104,10 @@ static ParseResult parseGetAccessOp(OpAsmParser &parser,
     return failure();
 
   return success();
-}
+} */
 
-static void print(OpAsmPrinter &p, GetAccessOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
+/* static void print(OpAsmPrinter &p, GetAccessOp op) {
+  p.printOptionalAttrDict(op->getAttrs(), {"ID"});
   p << ' ' << op.arr();
   p << " : ";
   p << ArrayRef<Type>(op.arr().getType());
@@ -1232,15 +1229,15 @@ void GetAccessOp::setID(unsigned id) {
   Builder builder(*this);
   IntegerAttr intAttr = builder.getI32IntegerAttr(id);
   IDAttr(intAttr);
-}
+} */
 
 //===----------------------------------------------------------------------===//
 // LoadOp
 //===----------------------------------------------------------------------===//
 
-LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, GetAccessOp acc,
+LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, AllocOp alloc,
                       ValueRange indices) {
-  return create(rewriter, loc, acc.getAllocType(), acc, indices);
+  return create(rewriter, loc, alloc.getType(), alloc, indices);
 }
 
 LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
@@ -1251,7 +1248,7 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
   if (ArrayType arr = t.dyn_cast<ArrayType>())
     t = arr.getElementType();
 
-  else if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+  else if (StreamType arr = t.dyn_cast<StreamType>())
     t = arr.getElementType();
 
   SmallVector<Attribute> numList;
@@ -1269,8 +1266,8 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
   return cast<LoadOp>(rewriter.createOperation(state));
 }
 
-LoadOp LoadOp::create(Location loc, GetAccessOp acc, ValueRange indices) {
-  return create(loc, acc.getAllocType(), acc, indices);
+LoadOp LoadOp::create(Location loc, AllocOp alloc, ValueRange indices) {
+  return create(loc, alloc.getType(), alloc, indices);
 }
 
 LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
@@ -1280,7 +1277,7 @@ LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
   if (ArrayType arr = t.dyn_cast<ArrayType>())
     t = arr.getElementType();
 
-  else if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
+  else if (StreamType arr = t.dyn_cast<StreamType>())
     t = arr.getElementType();
 
   SmallVector<Attribute> numList;
@@ -1345,7 +1342,7 @@ static void print(OpAsmPrinter &p, LoadOp op) {
 
 LogicalResult verify(LoadOp op) {
   size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size = op.arr().getType().cast<MemletType>().getRank();
+  size_t mem_size = op.arr().getType().cast<ArrayType>().getRank();
   if (idx_size != mem_size)
     return op.emitOpError("incorrect number of indices for load");
 
@@ -1501,7 +1498,7 @@ static void print(OpAsmPrinter &p, StoreOp op) {
 
 LogicalResult verify(StoreOp op) {
   size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size = op.arr().getType().cast<MemletType>().getRank();
+  size_t mem_size = op.arr().getType().cast<ArrayType>().getRank();
   if (idx_size != mem_size)
     return op.emitOpError("incorrect number of indices for store");
 
@@ -1598,8 +1595,8 @@ static void print(OpAsmPrinter &p, MemletCastOp op) {
 }
 
 LogicalResult verify(MemletCastOp op) {
-  size_t src_size = op.src().getType().cast<MemletType>().getRank();
-  size_t res_size = op.res().getType().cast<MemletType>().getRank();
+  size_t src_size = op.src().getType().cast<ArrayType>().getRank();
+  size_t res_size = op.res().getType().cast<ArrayType>().getRank();
   if (src_size != res_size)
     return op.emitOpError("incorrect rank for memlet_cast");
 
@@ -1647,8 +1644,8 @@ static void print(OpAsmPrinter &p, ViewCastOp op) {
 }
 
 LogicalResult verify(ViewCastOp op) {
-  size_t src_size = op.src().getType().cast<MemletType>().getRank();
-  size_t res_size = op.res().getType().cast<MemletType>().getRank();
+  size_t src_size = op.src().getType().cast<ArrayType>().getRank();
+  size_t res_size = op.res().getType().cast<ArrayType>().getRank();
   if (src_size != res_size)
     return op.emitOpError("incorrect rank for view_cast");
 
