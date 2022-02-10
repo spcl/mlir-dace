@@ -1,7 +1,5 @@
-// XFAIL: *
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: not sdir-opt %s 2>&1 | FileCheck %s
+// CHECK: expects parent op 'sdir.sdfg'
 
-// CHECK: sdir.state @state_0
 sdir.state @state_0{
-
 }

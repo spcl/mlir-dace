@@ -1,8 +1,6 @@
-// XFAIL: *
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: not sdir-opt %s 2>&1 | FileCheck %s
+// CHECK: expected '{' to begin a region
 
-// CHECK: sdir.sdfg
 sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK: sdir.state @state_0
     sdir.state @state_0
 }

@@ -1,20 +1,12 @@
-// XFAIL: *
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: not sdir-opt %s 2>&1 | FileCheck %s
+// CHECK: requires a 'src' symbol reference attribute
 
-// CHECK: module
-// CHECK: sdir.sdfg
 sdir.sdfg @sdfg_0 {
-    // CHECK: sdir.state [[STATE0:@[a-zA-Z0-9_]*]]
     sdir.state @state_0{
-
     }
 
-    // CHECK: sdir.state [[STATE1:@[a-zA-Z0-9_]*]]
     sdir.state @state_1{
-
     }
 
-    // CHECK: sdir.edge
-    // CHECK-SAME: [[STATE0]] -> [[STATE1]]
     sdir.edge{assign=["i: 1"], condition=""} @state_0 -> @state_1
 }
