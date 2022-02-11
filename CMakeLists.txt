@@ -32,4 +32,5 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(sdir-opt)
-add_subdirectory(sdir-translate)
+# NOTE: Temporarily Disabled
+# add_subdirectory(sdir-translate)

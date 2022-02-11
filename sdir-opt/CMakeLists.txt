@@ -6,7 +6,8 @@ set(LIBS
   ${conversion_libs} 
   MLIROptLib 
   MLIR_SDIR
-  SAMToSDIR
+  # NOTE: Temporarly disabled
+  # SAMToSDIR
 )
 
 add_llvm_executable(sdir-opt sdir-opt.cpp)

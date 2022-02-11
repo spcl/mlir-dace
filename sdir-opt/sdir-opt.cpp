@@ -12,7 +12,8 @@ int main(int argc, char **argv) {
   mlir::registerAllPasses();
 
   // Register SDIR passes
-  mlir::sdir::conversion::registerSAMToSDIRPasses();
+  // NOTE: Temporarily disabled
+  // mlir::sdir::conversion::registerSAMToSDIRPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::sdir::SDIRDialect>();

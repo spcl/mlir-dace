@@ -34,65 +34,6 @@ def SDIR_ReturnOp : SDIR_Op<"return", [
 }
 
 //===----------------------------------------------------------------------===//
-// CallOp
-//===----------------------------------------------------------------------===//
-
-def SDIR_CallOp : SDIR_Op<"call", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
-    CallOpInterface, 
-    MemRefsNormalizable,
-    DeclareOpInterfaceMethods<SymbolUserOpInterface>
-]> {
-    let summary = "call operation";
-    let description = [{
-        The `call` operation represents a direct call to a tasklet function that 
-        is within the same symbol scope as the call. The operands and result 
-        types of the call must match the specified function type. 
-        For example:
-
-        ```mlir
-        %2 = sdir.call @add(%0, %1) : (f32, f32) -> f32
-        ```
-    }];
-
-    let arguments = (ins FlatSymbolRefAttr:$callee, 
-                        Variadic<AnyType>:$operands);
-    let results = (outs Variadic<AnyType>);
-
-    let extraClassDeclaration = [{
-        static sdir::CallOp create(PatternRewriter &rewriter, Location loc, TypeRange types, ValueRange operands, StringRef name);
-        static sdir::CallOp create(PatternRewriter &rewriter, Location loc, TaskletNode task, ValueRange operands);
-        static sdir::CallOp create(PatternRewriter &rewriter, Location loc, SDFGNode sdfg, ValueRange operands);
-        static sdir::CallOp create(Location loc, TypeRange types, ValueRange operands, StringRef name);
-        static sdir::CallOp create(Location loc, TaskletNode task, ValueRange operands);
-        static sdir::CallOp create(Location loc, SDFGNode sdfg, ValueRange operands);
-        StateNode getParentState();
-        TaskletNode getTasklet();
-        SDFGNode getSDFG();
-        bool callsTasklet();
-        StringRef getCallee() { return callee(); }
-
-        FunctionType getCalleeType() {
-            return FunctionType::get(getContext(), getOperandTypes(), 
-                                    getResultTypes());
-        }
-
-        /// Get the argument operands to the called function.
-        operand_range getArgOperands() {
-            return {arg_operand_begin(), arg_operand_end()};
-        }
-
-        operand_iterator arg_operand_begin() { return operand_begin(); }
-        operand_iterator arg_operand_end() { return operand_end(); }
-
-        /// Return the callee of this operation.
-        CallInterfaceCallable getCallableForCallee() {
-            return (*this)->getAttrOfType<SymbolRefAttr>("callee");
-        }
-    }];
-}
-
-//===----------------------------------------------------------------------===//
 // LibCallOp
 //===----------------------------------------------------------------------===//
 

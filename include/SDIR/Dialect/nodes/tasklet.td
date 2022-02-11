@@ -5,7 +5,6 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     HasParent<"StateNode">,
     AffineScope, 
     AutomaticAllocationScope, 
-    CallableOpInterface, 
     FunctionLike,
     IsolatedFromAbove, 
     Symbol
@@ -25,51 +24,19 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     let arguments = (ins
         I32Attr:$ID,
         SymbolNameAttr:$sym_name, 
-        TypeAttr:$type, 
-        OptionalAttr<StrAttr>:$sym_visibility
+        TypeAttr:$signature
     );
+    let results = (outs Variadic<AnyType>:$res);
     let regions = (region AnyRegion:$body);
 
-    let builders = [OpBuilder<(ins
-        "StringRef":$name, "FunctionType":$type,
-        CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-        CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)
-    >];
 
     let extraClassDeclaration = [{
         static TaskletNode create(PatternRewriter &rewriter, Location location,  FunctionType type);
         static TaskletNode create(Location location,  StringRef name, FunctionType type);
-        static TaskletNode create(Location location, StringRef name,
-                                  FunctionType type, 
-                                  ArrayRef<NamedAttribute> attrs);
-        static TaskletNode create(Location location, StringRef name, 
-                                  FunctionType type, 
-                                  Operation::dialect_attr_range attrs);
-        static TaskletNode create(Location location, StringRef name, 
-                                  FunctionType type,
-                                  ArrayRef<NamedAttribute> attrs,
-                                  ArrayRef<DictionaryAttr> argAttrs);
 
-        TaskletNode clone(BlockAndValueMapping &mapper);
-        TaskletNode clone();
-
-        void cloneInto(TaskletNode dest, BlockAndValueMapping &mapper);
         void setID(unsigned id);
         std::string getInputName(unsigned idx);
         std::string getOutputName(unsigned idx);
-
-        //===------------------------------------------------------------------===//
-        // CallableOpInterface
-        //===------------------------------------------------------------------===//
-
-        /// Returns the region on the current operation that is callable. This may
-        /// return null in the case of an external callable object, e.g. an external
-        /// function.
-        Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
-
-        /// Returns the results types that the callable region produces when
-        /// executed.
-        ArrayRef<Type> getCallableResults() { return getType().getResults(); }
 
         //===------------------------------------------------------------------===//
         // SymbolOpInterface Methods
@@ -83,10 +50,10 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
 
         /// Returns the number of arguments. This is a hook for
         /// OpTrait::FunctionLike.
-        unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+        unsigned getNumFuncArguments() { return FunctionLike::getType().getInputs().size(); }
 
         /// Returns the number of results. This is a hook for OpTrait::FunctionLike.
-        unsigned getNumFuncResults() { return getType().getResults().size(); }
+        unsigned getNumFuncResults() { return FunctionLike::getType().getResults().size(); }
 
         LogicalResult verifyType() {
             auto type = getTypeAttr().getValue();

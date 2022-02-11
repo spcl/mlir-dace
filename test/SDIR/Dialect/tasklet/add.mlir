@@ -9,7 +9,7 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
         // CHECK-SAME: @add
         // CHECK-SAME: [[NAMEA:%[a-zA-Z0-9_]*]]
         // CHECK-SAME: [[NAMEB:%[a-zA-Z0-9_]*]]
-        sdir.tasklet @add(%a: i32, %b: i32) -> i32{
+        %res = sdir.tasklet @add(%a: i32, %b: i32) -> i32 {
             // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]]
             // CHECK-SAME: [[NAMEA]] 
             // CHECK-SAME: [[NAMEB]]

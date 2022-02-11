@@ -393,7 +393,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, TaskletNode op) {
-  FunctionType fnType = op.getType();
+  FunctionType fnType = op.FunctionLike::getType();
   ArrayRef<Type> argTypes = fnType.getInputs();
   ArrayRef<Type> resultTypes = fnType.getResults();
   bool isVariadic = false;
@@ -420,7 +420,7 @@ LogicalResult verify(TaskletNode op) {
   // Verify that the argument list of the function and the arg list of the
   // entry block line up. The trait already verified that the number of
   // arguments is the same between the signature and the block.
-  ArrayRef<Type> fnInputTypes = op.getType().getInputs();
+  ArrayRef<Type> fnInputTypes = op.FunctionLike::getType().getInputs();
   Block &entryBlock = op.front();
 
   for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
@@ -437,8 +437,8 @@ TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
                                 FunctionType type) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
-  build(builder, state, utils::generateID(), utils::generateName("task"), type,
-        builder.getStringAttr("private"));
+  build(builder, state, type.getResults(), utils::generateID(),
+        utils::generateName("task"), type);
   TaskletNode task = cast<TaskletNode>(rewriter.createOperation(state));
   rewriter.createBlock(&task.getRegion(), {}, type.getInputs());
   return task;
@@ -448,109 +448,11 @@ TaskletNode TaskletNode::create(Location location, StringRef name,
                                 FunctionType type) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
-  build(builder, state, utils::generateID(), utils::generateName(name.str()),
-        type, builder.getStringAttr("private"));
+  build(builder, state, type.getResults(), utils::generateID(),
+        utils::generateName(name.str()), type);
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
   builder.createBlock(&task.body(), {}, type.getInputs());
   return task;
-}
-
-TaskletNode TaskletNode::create(Location location, StringRef name,
-                                FunctionType type,
-                                ArrayRef<NamedAttribute> attrs) {
-  OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
-  build(builder, state, name, type, attrs);
-  return cast<TaskletNode>(Operation::create(state));
-}
-
-TaskletNode TaskletNode::create(Location location, StringRef name,
-                                FunctionType type,
-                                Operation::dialect_attr_range attrs) {
-  SmallVector<NamedAttribute, 8> attrRef(attrs);
-  return create(location, name, type, makeArrayRef(attrRef));
-}
-
-TaskletNode TaskletNode::create(Location location, StringRef name,
-                                FunctionType type,
-                                ArrayRef<NamedAttribute> attrs,
-                                ArrayRef<DictionaryAttr> argAttrs) {
-  TaskletNode func = create(location, name, type, attrs);
-  func.setAllArgAttrs(argAttrs);
-  return func;
-}
-
-void TaskletNode::build(OpBuilder &builder, OperationState &state,
-                        StringRef name, FunctionType type,
-                        ArrayRef<NamedAttribute> attrs,
-                        ArrayRef<DictionaryAttr> argAttrs) {
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
-  state.addAttribute(getTypeAttrName(), TypeAttr::get(type));
-  state.attributes.append(attrs.begin(), attrs.end());
-  state.addRegion();
-
-  if (argAttrs.empty())
-    return;
-  assert(type.getNumInputs() == argAttrs.size());
-  function_like_impl::addArgAndResultAttrs(builder, state, argAttrs,
-                                           /*resultAttrs=*/None);
-}
-
-void TaskletNode::cloneInto(TaskletNode dest, BlockAndValueMapping &mapper) {
-  llvm::MapVector<StringAttr, Attribute> newAttrMap;
-  for (const auto &attr : dest->getAttrs())
-    newAttrMap.insert({attr.getName(), attr.getValue()});
-  for (const auto &attr : (*this)->getAttrs())
-    newAttrMap.insert({attr.getName(), attr.getValue()});
-
-  auto newAttrs = llvm::to_vector(llvm::map_range(
-      newAttrMap, [](std::pair<StringAttr, Attribute> attrPair) {
-        return NamedAttribute(attrPair.first, attrPair.second);
-      }));
-  dest->setAttrs(DictionaryAttr::get(getContext(), newAttrs));
-
-  // Clone the body.
-  getBody().cloneInto(&dest.getBody(), mapper);
-}
-
-TaskletNode TaskletNode::clone(BlockAndValueMapping &mapper) {
-  TaskletNode newFunc =
-      cast<TaskletNode>(getOperation()->cloneWithoutRegions());
-
-  if (!isExternal()) {
-    FunctionType oldType = getType();
-
-    unsigned oldNumArgs = oldType.getNumInputs();
-    SmallVector<Type, 4> newInputs;
-    newInputs.reserve(oldNumArgs);
-
-    for (unsigned i = 0; i < oldNumArgs; ++i)
-      if (!mapper.contains(getArgument(i)))
-        newInputs.push_back(oldType.getInput(i));
-
-    if (newInputs.size() != oldNumArgs) {
-      newFunc.setType(FunctionType::get(oldType.getContext(), newInputs,
-                                        oldType.getResults()));
-
-      if (ArrayAttr argAttrs = getAllArgAttrs()) {
-        SmallVector<Attribute> newArgAttrs;
-        newArgAttrs.reserve(newInputs.size());
-        for (unsigned i = 0; i < oldNumArgs; ++i)
-          if (!mapper.contains(getArgument(i)))
-            newArgAttrs.push_back(argAttrs[i]);
-        newFunc.setAllArgAttrs(newArgAttrs);
-      }
-    }
-  }
-
-  cloneInto(newFunc, mapper);
-  return newFunc;
-}
-
-TaskletNode TaskletNode::clone() {
-  BlockAndValueMapping mapper;
-  return clone(mapper);
 }
 
 void TaskletNode::setID(unsigned id) {
@@ -1351,7 +1253,7 @@ LogicalResult verify(LoadOp op) {
 
 bool LoadOp::isIndirect() {
   for (Value v : indices())
-    if (!isa<sdir::CallOp>(v.getDefiningOp()))
+    if (!isa<sdir::TaskletNode>(v.getDefiningOp()))
       return true;
 
   return false;
@@ -1507,7 +1409,7 @@ LogicalResult verify(StoreOp op) {
 
 bool StoreOp::isIndirect() {
   for (Value v : indices())
-    if (!isa<sdir::CallOp>(v.getDefiningOp()))
+    if (!isa<sdir::TaskletNode>(v.getDefiningOp()))
       return true;
 
   return false;
@@ -1906,159 +1808,6 @@ sdir::ReturnOp sdir::ReturnOp::create(Location loc, mlir::ValueRange input) {
   build(builder, state, input);
   return cast<sdir::ReturnOp>(Operation::create(state));
 }
-
-//===----------------------------------------------------------------------===//
-// CallOp
-//===----------------------------------------------------------------------===//
-
-sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
-                                  TypeRange types, ValueRange operands,
-                                  StringRef name) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  build(builder, state, types, name, operands);
-  return cast<sdir::CallOp>(rewriter.createOperation(state));
-}
-
-sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
-                                  TaskletNode task, ValueRange operands) {
-  return create(rewriter, loc, TypeRange(task.getCallableResults()), operands,
-                task.sym_name());
-}
-
-sdir::CallOp sdir::CallOp::create(PatternRewriter &rewriter, Location loc,
-                                  SDFGNode sdfg, ValueRange operands) {
-  return create(rewriter, loc, TypeRange(sdfg.getCallableResults()), operands,
-                sdfg.sym_name());
-}
-
-sdir::CallOp sdir::CallOp::create(Location loc, TypeRange types,
-                                  ValueRange operands, StringRef name) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  build(builder, state, types, name, operands);
-  return cast<sdir::CallOp>(Operation::create(state));
-}
-
-sdir::CallOp sdir::CallOp::create(Location loc, TaskletNode task,
-                                  ValueRange operands) {
-  return create(loc, TypeRange(task.getCallableResults()), operands,
-                task.sym_name());
-}
-
-sdir::CallOp sdir::CallOp::create(Location loc, SDFGNode sdfg,
-                                  ValueRange operands) {
-  return create(loc, TypeRange(sdfg.getCallableResults()), operands,
-                sdfg.sym_name());
-}
-
-static ParseResult parseCallOp(OpAsmParser &parser, OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  Attribute calleeAttr;
-  if (parser.parseAttribute(calleeAttr, parser.getBuilder().getNoneType(),
-                            "callee", result.attributes))
-    return failure();
-
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  if (parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren))
-    return failure();
-
-  FunctionType func;
-  if (parser.parseColonType(func))
-    return failure();
-
-  ArrayRef<Type> operandsTypes = func.getInputs();
-  ArrayRef<Type> resultTypes = func.getResults();
-  result.addTypes(resultTypes);
-
-  if (parser.resolveOperands(operands, operandsTypes,
-                             parser.getCurrentLocation(), result.operands))
-    return failure();
-
-  return success();
-}
-
-static void print(OpAsmPrinter &p, sdir::CallOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
-  p << ' ';
-  p.printAttributeWithoutType(op.calleeAttr());
-  p << "(" << op.operands() << ")";
-  p << " : ";
-  p.printFunctionalType(op.operands().getTypes(),
-                        op.getOperation()->getResultTypes());
-}
-
-LogicalResult verify(sdir::CallOp op) { return success(); }
-
-LogicalResult
-sdir::CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
-  // Check that the callee attribute was specified.
-  FlatSymbolRefAttr fnAttr =
-      (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
-  if (!fnAttr)
-    return emitOpError("requires a 'callee' symbol reference attribute");
-
-  TaskletNode fnT =
-      symbolTable.lookupNearestSymbolFrom<TaskletNode>(*this, fnAttr);
-  SDFGNode fnS = symbolTable.lookupNearestSymbolFrom<SDFGNode>(*this, fnAttr);
-
-  if (!fnT && !fnS) {
-    return emitOpError() << "'" << fnAttr.getValue()
-                         << "' does not reference a valid tasklet or SDFG";
-  }
-  // Verify that the operand and result types match the callee.
-  FunctionType fnType = !fnT ? fnS.getType() : fnT.getType();
-  if (fnType.getNumInputs() != getNumOperands())
-    return emitOpError("incorrect number of operands for callee");
-
-  for (unsigned i = 0; i < fnType.getNumInputs(); ++i)
-    if (getOperand(i).getType() != fnType.getInput(i))
-      return emitOpError("operand type mismatch: expected operand type ")
-             << fnType.getInput(i) << ", but provided "
-             << getOperand(i).getType() << " for operand number " << i;
-
-  if (fnType.getNumResults() != getNumResults())
-    return emitOpError("incorrect number of results for callee");
-
-  for (unsigned i = 0; i < fnType.getNumResults(); ++i)
-    if (getResult(i).getType() != fnType.getResult(i)) {
-      InFlightDiagnostic diag = emitOpError("result type mismatch at index ")
-                                << i;
-      diag.attachNote() << "      op result types: " << getResultTypes();
-      diag.attachNote() << "function result types: " << fnType.getResults();
-      return diag;
-    }
-
-  return success();
-}
-
-StateNode sdir::CallOp::getParentState() {
-  Operation *stateOrMapConsume = (*this)->getParentOp();
-
-  if (StateNode state = dyn_cast<StateNode>(stateOrMapConsume))
-    return state;
-
-  Operation *state = stateOrMapConsume->getParentOp();
-  return dyn_cast<StateNode>(state);
-}
-
-TaskletNode sdir::CallOp::getTasklet() {
-  StateNode state = getParentState();
-  Operation *task = state.lookupSymbol(callee());
-  TaskletNode tasklet = dyn_cast<TaskletNode>(task);
-  return tasklet;
-}
-
-SDFGNode sdir::CallOp::getSDFG() {
-  StateNode state = getParentState();
-  Operation *op = state.lookupSymbol(callee());
-  SDFGNode sdfg = dyn_cast<SDFGNode>(op);
-  return sdfg;
-}
-
-bool sdir::CallOp::callsTasklet() { return getTasklet() != nullptr; }
 
 //===----------------------------------------------------------------------===//
 // LibCallOp
