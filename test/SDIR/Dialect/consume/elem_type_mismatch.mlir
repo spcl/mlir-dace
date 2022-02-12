@@ -6,12 +6,6 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     %C = sdir.alloc() : !sdir.array<6xi64>
 
     sdir.state @state_0 {
-        sdir.tasklet @add_one(%x: i64) -> i64{
-            %1 = arith.constant 1 : i64
-            %res = arith.addi %x, %1 : i64
-            sdir.return %res : i64
-        }
-
         builtin.func @empty(%x: !sdir.stream<i32>) -> i1{
             %0 = arith.constant 0 : i32
             %length = sdir.stream_length %x : !sdir.stream<i32> -> i32
@@ -19,14 +13,18 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
             return %isZero : i1
         }
 
-        sdir.tasklet @zero() -> index{
-            %0 = arith.constant 0 : index
-            sdir.return %0 : index
-        }
-
         sdir.consume{num_pes=5, condition=@empty} (%A : !sdir.stream<i32>) -> (pe: %p, elem: %e) {
-            %res = sdir.call @add_one(%e) : (i64) -> i64
-            %0 = sdir.call @zero() : () -> index
+            %res = sdir.tasklet @add_one(%e: i64) -> i64{
+                %1 = arith.constant 1 : i64
+                %res = arith.addi %e, %1 : i64
+                sdir.return %res : i64
+            }
+
+            %0 = sdir.tasklet @zero() -> index{
+                %0 = arith.constant 0 : index
+                sdir.return %0 : index
+            }
+
             sdir.store{wcr="add"} %res, %C[%0] : i64 -> !sdir.array<6xi64>
         }
     }

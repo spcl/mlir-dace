@@ -14,10 +14,10 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
 
         // CHECK: sdir.tasklet @add
         // CHECK-SAME: [[NAMEC]] as [[NAMEB:%[a-zA-Z0-9_]*]]
-        %s = sdir.tasklet @add(%c: i32) -> i32{
+        %s = sdir.tasklet @add(%c as %b: i32) -> i32{
             // CHECK-NEXT: [[NAMER:%[a-zA-Z0-9_]*]]
             // CHECK-SAME: [[NAMEB]], [[NAMEB]]
-            %r = arith.addi %c, %c : i32
+            %r = arith.addi %b, %b : i32
             // CHECK-NEXT: sdir.return [[NAMER]]
             sdir.return %r : i32
         }

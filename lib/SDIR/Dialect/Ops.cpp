@@ -456,44 +456,31 @@ static void print(OpAsmPrinter &p, TaskletNode op) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
-LogicalResult verify(TaskletNode op) {
-  // Verify that the argument list of the function and the arg list of the
-  // entry block line up.
+LogicalResult verify(TaskletNode op) { return success(); }
 
-  /*   ArrayRef<Type> fnInputTypes = op.FunctionLike::getType().getInputs();
-    Block &entryBlock = op.getRegion().getBlocks().front();
-
-    for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
-      if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-        return op.emitOpError("type of entry block argument #")
-               << i << '(' << entryBlock.getArgument(i).getType()
-               << ") must match the type of the corresponding argument in "
-               << "function signature(" << fnInputTypes[i] << ')'; */
-
-  return success();
-}
-
-/* TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
-                                FunctionType type) {
+TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+                                ValueRange operands, TypeRange results) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
-  build(builder, state, type.getResults(), utils::generateID(),
-        utils::generateName("task"), type);
+  build(builder, state, results, utils::generateID(),
+        utils::generateName("task"), operands);
+
   TaskletNode task = cast<TaskletNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&task.getRegion(), {}, type.getInputs());
+  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes());
   return task;
 }
 
 TaskletNode TaskletNode::create(Location location, StringRef name,
-                                FunctionType type) {
+                                ValueRange operands, TypeRange results) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
-  build(builder, state, type.getResults(), utils::generateID(),
-        utils::generateName(name.str()), type);
+  build(builder, state, results, utils::generateID(),
+        utils::generateName(name.str()), operands);
+
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
-  builder.createBlock(&task.body(), {}, type.getInputs());
+  builder.createBlock(&task.body(), {}, operands.getTypes());
   return task;
-} */
+}
 
 void TaskletNode::setID(unsigned id) {
   Builder builder(*this);
@@ -1831,7 +1818,14 @@ static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
   }
 }
 
-LogicalResult verify(sdir::ReturnOp op) { return success(); }
+LogicalResult verify(sdir::ReturnOp op) {
+  TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp());
+
+  if (task.getResultTypes() != op.getOperandTypes())
+    return op.emitOpError("must match tasklet return types");
+
+  return success();
+}
 
 sdir::ReturnOp sdir::ReturnOp::create(PatternRewriter &rewriter, Location loc,
                                       mlir::ValueRange input) {

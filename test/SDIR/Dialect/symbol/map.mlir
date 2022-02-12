@@ -11,20 +11,16 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     sdir.state @state_0 {
         // CHECK-NEXT: sdir.alloc_symbol("N")
         sdir.alloc_symbol("N")
-        // CHECK: sdir.tasklet @zero
-        sdir.tasklet @zero() -> index{
+        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdir.tasklet @zero
+        %0 = sdir.tasklet @zero() -> index{
             %0 = arith.constant 0 : index
             sdir.return %0 : index
         }
-        // CHECK: sdir.tasklet @one
-        sdir.tasklet @one() -> index{
+        // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdir.tasklet @one
+        %1 = sdir.tasklet @one() -> index{
             %1 = arith.constant 1 : index
             sdir.return %1 : index
         }
-        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdir.call @zero()
-        %0 = sdir.call @zero() : () -> index
-        // CHECK-NEXT: [[NAME1:%[a-zA-Z0-9_]*]] = sdir.call @one()
-        %1 = sdir.call @one() : () -> index
         // CHECK: sdir.map
         // CHECK-SAME: ([[NAME1]], 0) to (2, sym("N")) step ([[NAME0]], sym("N+2"))
         sdir.map (%i, %j) = (%1, 0) to (2, sym("N")) step (%0, sym("N+2")) {

@@ -2,7 +2,7 @@
 #define SDIR_TaskletNode
 
 def SDIR_TaskletNode : SDIR_Op<"tasklet", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode","MapNode","ConsumeNode"]>,
     AffineScope, 
     AutomaticAllocationScope, 
     IsolatedFromAbove, 
@@ -25,13 +25,15 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
         SymbolNameAttr:$sym_name, 
         Variadic<AnyType>:$operands
     );
-    
+
     let results = (outs Variadic<AnyType>);
     let regions = (region AnyRegion:$body);
 
     let extraClassDeclaration = [{
-        static TaskletNode create(PatternRewriter &rewriter, Location location, FunctionType type);
-        static TaskletNode create(Location location, StringRef name, FunctionType type);
+        static TaskletNode create(PatternRewriter &rewriter, Location location, 
+                                  ValueRange operands, TypeRange results);
+        static TaskletNode create(Location location, StringRef name,
+                                  ValueRange operands, TypeRange results);
 
         void setID(unsigned id);
         std::string getInputName(unsigned idx);

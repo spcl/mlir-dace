@@ -3,12 +3,10 @@
 
 sdir.sdfg{entry=@state_0} @sdfg_0 {
     sdir.state @state_0{
-        sdir.tasklet @five() -> index{
+        %n = sdir.tasklet @five() -> index{
             %5 = arith.constant 5 : index
             sdir.return %5 : index
         }
-
-        %n = sdir.call @five() : () -> index
         %a = sdir.alloc(%n) : !sdir.array<?x?xi32>
     }
 }

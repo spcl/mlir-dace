@@ -15,11 +15,6 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdir.state
     // CHECK-SAME: @state_0
     sdir.state @state_0 {
-        // CHECK: sdir.tasklet @add
-        sdir.tasklet @add(%x: i32, %y: i32) -> i32{
-            %z = arith.addi %x, %y : i32
-            sdir.return %z : i32
-        }
         // CHECK: sdir.map 
         // CHECK-SAME: [[NAMEi:%[a-zA-Z0-9_]*]], [[NAMEj:%[a-zA-Z0-9_]*]]
         sdir.map (%i, %j) = (0, 0) to (2, 2) step (1, 1) {
@@ -29,10 +24,14 @@ sdir.sdfg{entry=@state_0} @sdfg_0 {
             // CHECK-NEXT: [[NAMEb_ij:%[a-zA-Z0-9_]*]] = sdir.load [[NAMEB]]
             // CHECK-SAME: [[NAMEi]], [[NAMEj]]
             %b_ij = sdir.load %B[%i, %j] : !sdir.array<2x6xi32> -> i32
-            // CHECK-NEXT: [[NAMEres:%[a-zA-Z0-9_]*]] = sdir.call @add
-            // CHECK-SAME: [[NAMEa_ij]], [[NAMEb_ij]]
-            %res = sdir.call @add(%a_ij, %b_ij) : (i32, i32) -> i32
-            // CHECK-NEXT: sdir.store [[NAMEres]], [[NAMEC]]
+            // CHECK: [[NAMEres:%[a-zA-Z0-9_]*]] = sdir.tasklet @add
+            // CHECK-SAME: [[NAMEa_ij]]
+            // CHECK-SAME: [[NAMEb_ij]]
+            %res = sdir.tasklet @add(%a_ij: i32, %b_ij: i32) -> i32{
+                %z = arith.addi %a_ij, %b_ij : i32
+                sdir.return %z : i32
+            }
+            // CHECK: sdir.store [[NAMEres]], [[NAMEC]]
             // CHECK-SAME: [[NAMEi]], [[NAMEj]]
             sdir.store %res, %C[%i, %j] : i32 -> !sdir.array<2x6xi32>
         }
