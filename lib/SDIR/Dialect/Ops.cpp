@@ -381,59 +381,99 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
-  auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results,
-                          function_like_impl::VariadicFlag, std::string &) {
-    return builder.getFunctionType(argTypes, results);
-  };
+  StringAttr sym_nameAttr;
+  if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
+    return failure();
 
-  return function_like_impl::parseFunctionLikeOp(parser, result,
-                                                 /*allowVariadic=*/false,
-                                                 buildFuncType);
-}
+  SmallVector<OpAsmParser::OperandType, 4> args;
+  SmallVector<Type, 4> argTypes;
 
-static void print(OpAsmPrinter &p, TaskletNode op) {
-  FunctionType fnType = op.FunctionLike::getType();
-  ArrayRef<Type> argTypes = fnType.getInputs();
-  ArrayRef<Type> resultTypes = fnType.getResults();
-  bool isVariadic = false;
-  StringRef visibilityAttrName = SymbolTable::getVisibilityAttrName();
+  if (parser.parseLParen())
+    return failure();
 
-  p << ' ';
-  p.printSymbolName(op.sym_name());
+  while (parser.parseOptionalRParen().failed()) {
+    if (result.operands.size() > 0)
+      if (parser.parseComma())
+        return failure();
 
-  function_like_impl::printFunctionSignature(p, op, argTypes, isVariadic,
-                                             resultTypes);
-  function_like_impl::printFunctionAttributes(
-      p, op, argTypes.size(), resultTypes.size(), {"ID", visibilityAttrName});
-  // Print the body if this is not an external function.
-  Region &body = op->getRegion(0);
-  if (!body.empty())
-    p.printRegion(body, /*printEntryBlockArgs=*/false,
-                  /*printBlockTerminators=*/true);
-}
+    OpAsmParser::OperandType operand;
+    OpAsmParser::OperandType arg;
+    Type opType;
 
-LogicalResult verify(TaskletNode op) {
-  if (op.isExternal())
-    return success();
+    if (parser.parseOperand(operand))
+      return failure();
 
-  // Verify that the argument list of the function and the arg list of the
-  // entry block line up. The trait already verified that the number of
-  // arguments is the same between the signature and the block.
-  ArrayRef<Type> fnInputTypes = op.FunctionLike::getType().getInputs();
-  Block &entryBlock = op.front();
+    if (parser.parseOptionalKeyword("as").succeeded())
+      if (parser.parseRegionArgument(arg))
+        return failure();
 
-  for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
-    if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-      return op.emitOpError("type of entry block argument #")
-             << i << '(' << entryBlock.getArgument(i).getType()
-             << ") must match the type of the corresponding argument in "
-             << "function signature(" << fnInputTypes[i] << ')';
+    if (parser.parseColonType(opType))
+      return failure();
+
+    if (parser.resolveOperand(operand, opType, result.operands))
+      return failure();
+
+    if (arg.location.isValid())
+      args.push_back(arg);
+    else
+      args.push_back(operand);
+
+    argTypes.push_back(opType);
+  }
+
+  Type retType;
+  if (parser.parseArrow() || parser.parseType(retType))
+    return failure();
+  result.addTypes(retType);
+
+  Region *body = result.addRegion();
+  if (parser.parseRegion(*body, args, argTypes, /*enableNameShadowing=*/true))
+    return failure();
+
+  if (body->empty())
+    return parser.emitError(parser.getCurrentLocation(),
+                            "expected non-empty tasklet body");
 
   return success();
 }
 
-TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+static void print(OpAsmPrinter &p, TaskletNode op) {
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{"ID", "sym_name"});
+  p << ' ';
+  p.printSymbolName(op.sym_name());
+  p << '(';
+
+  for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+    if (i > 0)
+      p << ", ";
+    p << op.getOperand(i) << " as " << op.body().getArgument(i) << " : "
+      << op.getOperandTypes()[i];
+  }
+
+  p << ") -> " << op.getType(0);
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
+}
+
+LogicalResult verify(TaskletNode op) {
+  // Verify that the argument list of the function and the arg list of the
+  // entry block line up.
+
+  /*   ArrayRef<Type> fnInputTypes = op.FunctionLike::getType().getInputs();
+    Block &entryBlock = op.getRegion().getBlocks().front();
+
+    for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
+      if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
+        return op.emitOpError("type of entry block argument #")
+               << i << '(' << entryBlock.getArgument(i).getType()
+               << ") must match the type of the corresponding argument in "
+               << "function signature(" << fnInputTypes[i] << ')'; */
+
+  return success();
+}
+
+/* TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
                                 FunctionType type) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
@@ -453,7 +493,7 @@ TaskletNode TaskletNode::create(Location location, StringRef name,
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
   builder.createBlock(&task.body(), {}, type.getInputs());
   return task;
-}
+} */
 
 void TaskletNode::setID(unsigned id) {
   Builder builder(*this);
@@ -462,11 +502,10 @@ void TaskletNode::setID(unsigned id) {
 }
 
 std::string TaskletNode::getInputName(unsigned idx) {
-  BlockArgument bArg = getArgument(idx);
   AsmState state(*this);
   std::string name;
   llvm::raw_string_ostream nameStream(name);
-  bArg.printAsOperand(nameStream, state);
+  getOperand(idx).printAsOperand(nameStream, state);
   name.erase(0, 1); // Remove %-sign
   return getName().str() + "_" + name;
 }

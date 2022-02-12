@@ -5,7 +5,6 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     HasParent<"StateNode">,
     AffineScope, 
     AutomaticAllocationScope, 
-    FunctionLike,
     IsolatedFromAbove, 
     Symbol
 ]> {
@@ -24,44 +23,19 @@ def SDIR_TaskletNode : SDIR_Op<"tasklet", [
     let arguments = (ins
         I32Attr:$ID,
         SymbolNameAttr:$sym_name, 
-        TypeAttr:$signature
+        Variadic<AnyType>:$operands
     );
-    let results = (outs Variadic<AnyType>:$res);
+    
+    let results = (outs Variadic<AnyType>);
     let regions = (region AnyRegion:$body);
 
-
     let extraClassDeclaration = [{
-        static TaskletNode create(PatternRewriter &rewriter, Location location,  FunctionType type);
-        static TaskletNode create(Location location,  StringRef name, FunctionType type);
+        static TaskletNode create(PatternRewriter &rewriter, Location location, FunctionType type);
+        static TaskletNode create(Location location, StringRef name, FunctionType type);
 
         void setID(unsigned id);
         std::string getInputName(unsigned idx);
         std::string getOutputName(unsigned idx);
-
-        //===------------------------------------------------------------------===//
-        // SymbolOpInterface Methods
-        //===------------------------------------------------------------------===//
-
-        bool isDeclaration() { return isExternal(); }
-
-        private:
-        // This trait needs access to the hooks defined below.
-        friend class OpTrait::FunctionLike<TaskletNode>;
-
-        /// Returns the number of arguments. This is a hook for
-        /// OpTrait::FunctionLike.
-        unsigned getNumFuncArguments() { return FunctionLike::getType().getInputs().size(); }
-
-        /// Returns the number of results. This is a hook for OpTrait::FunctionLike.
-        unsigned getNumFuncResults() { return FunctionLike::getType().getResults().size(); }
-
-        LogicalResult verifyType() {
-            auto type = getTypeAttr().getValue();
-            if (!type.isa<FunctionType>())
-                return emitOpError("requires '" + getTypeAttrName() 
-                                    + "' attribute of function type");
-            return success();
-        }
     }];
 }
 
