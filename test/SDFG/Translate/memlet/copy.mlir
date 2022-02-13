@@ -1,11 +1,11 @@
-// RUN: sdir-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
+// RUN: sdfg-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
 
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    %A = sdir.alloc() : !sdir.array<i32>
-    %B = sdir.alloc() : !sdir.array<i32>
-    sdir.state @state_0 {
-        %a = sdir.get_access %A : !sdir.array<i32> -> !sdir.memlet<i32>
-        %b = sdir.get_access %B : !sdir.array<i32> -> !sdir.memlet<i32>
-        sdir.copy %a -> %b : !sdir.memlet<i32>
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    %A = sdfg.alloc() : !sdfg.array<i32>
+    %B = sdfg.alloc() : !sdfg.array<i32>
+    sdfg.state @state_0 {
+        %a = sdfg.get_access %A : !sdfg.array<i32> -> !sdfg.memlet<i32>
+        %b = sdfg.get_access %B : !sdfg.array<i32> -> !sdfg.memlet<i32>
+        sdfg.copy %a -> %b : !sdfg.memlet<i32>
     }
 }

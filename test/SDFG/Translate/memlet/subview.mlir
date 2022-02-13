@@ -1,9 +1,9 @@
-// RUN: sdir-translate --mlir-to-sdfg %s | not python %S/../import_translation_test.py 2>&1 | FileCheck %s
+// RUN: sdfg-translate --mlir-to-sdfg %s | not python %S/../import_translation_test.py 2>&1 | FileCheck %s
 // CHECK: Isolated node
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    %A = sdir.alloc() : !sdir.array<8x16x4xi32>
-    sdir.state @state_0 {
-        %a = sdir.get_access %A : !sdir.array<8x16x4xi32> -> !sdir.memlet<8x16x4xi32>
-        %a_s = sdir.subview %a[3, 4, 2][1, 6, 3][1, 1, 1] : !sdir.memlet<8x16x4xi32> -> !sdir.memlet<6x3xi32>
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    %A = sdfg.alloc() : !sdfg.array<8x16x4xi32>
+    sdfg.state @state_0 {
+        %a = sdfg.get_access %A : !sdfg.array<8x16x4xi32> -> !sdfg.memlet<8x16x4xi32>
+        %a_s = sdfg.subview %a[3, 4, 2][1, 6, 3][1, 1, 1] : !sdfg.memlet<8x16x4xi32> -> !sdfg.memlet<6x3xi32>
     }
 }

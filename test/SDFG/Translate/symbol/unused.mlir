@@ -1,7 +1,7 @@
-// RUN: sdir-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    sdir.state @state_0{
-        sdir.alloc_symbol("N")
-        %res = sdir.sym("3*N+2") : i64
+// RUN: sdfg-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    sdfg.state @state_0{
+        sdfg.alloc_symbol("N")
+        %res = sdfg.sym("3*N+2") : i64
     }
 }

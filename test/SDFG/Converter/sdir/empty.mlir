@@ -1,1 +1,1 @@
-// RUN: sdir-opt --convert-to-sdir %s
+// RUN: sdfg-opt --convert-to-sdfg %s

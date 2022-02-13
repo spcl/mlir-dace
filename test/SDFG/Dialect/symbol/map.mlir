@@ -1,29 +1,29 @@
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
 // CHECK: module
-// CHECK: sdir.sdfg
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc()
-    // CHECK-SAME: !sdir.array<2x6xi32>
-    %A = sdir.alloc() : !sdir.array<2x6xi32>
-    // CHECK: sdir.state
+// CHECK: sdfg.sdfg
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+    // CHECK-SAME: !sdfg.array<2x6xi32>
+    %A = sdfg.alloc() : !sdfg.array<2x6xi32>
+    // CHECK: sdfg.state
     // CHECK-SAME: @state_0
-    sdir.state @state_0 {
-        // CHECK-NEXT: sdir.alloc_symbol("N")
-        sdir.alloc_symbol("N")
-        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdir.tasklet @zero
-        %0 = sdir.tasklet @zero() -> index{
+    sdfg.state @state_0 {
+        // CHECK-NEXT: sdfg.alloc_symbol("N")
+        sdfg.alloc_symbol("N")
+        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdfg.tasklet @zero
+        %0 = sdfg.tasklet @zero() -> index{
             %0 = arith.constant 0 : index
-            sdir.return %0 : index
+            sdfg.return %0 : index
         }
-        // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdir.tasklet @one
-        %1 = sdir.tasklet @one() -> index{
+        // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdfg.tasklet @one
+        %1 = sdfg.tasklet @one() -> index{
             %1 = arith.constant 1 : index
-            sdir.return %1 : index
+            sdfg.return %1 : index
         }
-        // CHECK: sdir.map
+        // CHECK: sdfg.map
         // CHECK-SAME: ([[NAME1]], 0) to (2, sym("N")) step ([[NAME0]], sym("N+2"))
-        sdir.map (%i, %j) = (%1, 0) to (2, sym("N")) step (%0, sym("N+2")) {
+        sdfg.map (%i, %j) = (%1, 0) to (2, sym("N")) step (%0, sym("N+2")) {
         }
     }
 }

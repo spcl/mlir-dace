@@ -1,4 +1,4 @@
-// RUN: sdir-opt --convert-to-sdir %s
+// RUN: sdfg-opt --convert-to-sdfg %s
 func private @kernel_2mm(%1: index, %arg6: memref<?x900xi32>){
   %c0 = arith.constant 0 : index
   %8 = memref.load %arg6[%c0, %1] : memref<?x900xi32>

@@ -1,7 +1,7 @@
-// RUN: sdir-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
+// RUN: sdfg-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
 
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    %a = sdir.alloc() : !sdir.stream_array<67x45xi32>
-    sdir.state @state_0{
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    %a = sdfg.alloc() : !sdfg.stream_array<67x45xi32>
+    sdfg.state @state_0{
     }
 }

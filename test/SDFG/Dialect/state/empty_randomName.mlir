@@ -1,10 +1,10 @@
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
 // CHECK: module
-// CHECK: sdir.sdfg
-sdir.sdfg{entry=@randomName} @sdfg_0 {
-    // CHECK: sdir.state @randomName
-    sdir.state @randomName{
+// CHECK: sdfg.sdfg
+sdfg.sdfg{entry=@randomName} @sdfg_0 {
+    // CHECK: sdfg.state @randomName
+    sdfg.state @randomName{
 
     }
 }

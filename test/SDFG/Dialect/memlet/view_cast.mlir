@@ -1,16 +1,16 @@
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
 // CHECK: module
-// CHECK: sdir.sdfg
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdir.alloc()
-    // CHECK-SAME: !sdir.array<2x12xi32>
-    %A = sdir.alloc() : !sdir.array<2x12xi32>
-    // CHECK: sdir.state
+// CHECK: sdfg.sdfg
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+    // CHECK-SAME: !sdfg.array<2x12xi32>
+    %A = sdfg.alloc() : !sdfg.array<2x12xi32>
+    // CHECK: sdfg.state
     // CHECK-SAME: @state_0
-    sdir.state @state_0 {
-        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.view_cast [[NAMEA]] 
-        // CHECK-SAME: !sdir.array<2x12xi32> -> !sdir.array<2x12xi32>
-        %b = sdir.view_cast %A : !sdir.array<2x12xi32> -> !sdir.array<2x12xi32>
+    sdfg.state @state_0 {
+        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdfg.view_cast [[NAMEA]] 
+        // CHECK-SAME: !sdfg.array<2x12xi32> -> !sdfg.array<2x12xi32>
+        %b = sdfg.view_cast %A : !sdfg.array<2x12xi32> -> !sdfg.array<2x12xi32>
     }
 } 

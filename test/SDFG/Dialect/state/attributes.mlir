@@ -1,13 +1,13 @@
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
 // CHECK: module
-// CHECK: sdir.sdfg
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK: sdir.state
+// CHECK: sdfg.sdfg
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    // CHECK: sdfg.state
     // CHECK-DAG: nosync = false
     // CHECK-DAG: instrument = "No_Instrumentation"
     // CHECK-SAME: @state_0
-    sdir.state {
+    sdfg.state {
         nosync=false,
         instrument="No_Instrumentation"
     } @state_0 {

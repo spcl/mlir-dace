@@ -1,4 +1,4 @@
-// RUN: sdir-opt --convert-to-sdir %s
+// RUN: sdfg-opt --convert-to-sdfg %s
 func private @kernel_2mm(%arg6: memref<?x900xf64>) {
   %4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index

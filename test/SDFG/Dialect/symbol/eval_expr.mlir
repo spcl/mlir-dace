@@ -1,13 +1,13 @@
-// RUN: sdir-opt %s | sdir-opt | FileCheck %s
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
 // CHECK: module
-// CHECK: sdir.sdfg
-sdir.sdfg{entry=@state_0} @sdfg_0 {
-    // CHECK: sdir.state @state_0
-    sdir.state @state_0{
-        // CHECK-NEXT: sdir.alloc_symbol("N")
-        sdir.alloc_symbol("N")
-        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdir.sym("3*N+2") : i64
-        %res = sdir.sym("3*N+2") : i64
+// CHECK: sdfg.sdfg
+sdfg.sdfg{entry=@state_0} @sdfg_0 {
+    // CHECK: sdfg.state @state_0
+    sdfg.state @state_0{
+        // CHECK-NEXT: sdfg.alloc_symbol("N")
+        sdfg.alloc_symbol("N")
+        // CHECK-NEXT: {{%[a-zA-Z0-9_]*}} = sdfg.sym("3*N+2") : i64
+        %res = sdfg.sym("3*N+2") : i64
     }
 }

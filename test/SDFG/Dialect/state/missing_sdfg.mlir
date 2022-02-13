@@ -1,5 +1,5 @@
-// RUN: not sdir-opt %s 2>&1 | FileCheck %s
-// CHECK: expects parent op 'sdir.sdfg'
+// RUN: not sdfg-opt %s 2>&1 | FileCheck %s
+// CHECK: expects parent op 'sdfg.sdfg'
 
-sdir.state @state_0{
+sdfg.state @state_0{
 }

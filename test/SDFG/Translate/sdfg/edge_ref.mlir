@@ -1,20 +1,20 @@
-// RUN: sdir-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
+// RUN: sdfg-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
 module  {
-  sdir.sdfg {entry = @state_1} @kernel_2mm(%arg0: index) {
-    sdir.state @state_1 {
+  sdfg.sdfg {entry = @state_1} @kernel_2mm(%arg0: index) {
+    sdfg.state @state_1 {
     }
   
-    sdir.state @state_2 {
+    sdfg.state @state_2 {
     }
 
-    sdir.state @state_3 {
+    sdfg.state @state_3 {
     }
 
-    sdir.state @state_4 {
+    sdfg.state @state_4 {
     }
 
-    sdir.edge {assign = ["idx: ref"]} (ref: %arg0: index) @state_1 -> @state_2
-    sdir.edge {condition = "idx < ref"} (ref: %arg0: index) @state_2 -> @state_3
-    sdir.edge {condition = "not(idx < ref)"} (ref: %arg0: index) @state_2 -> @state_4    
+    sdfg.edge {assign = ["idx: ref"]} (ref: %arg0: index) @state_1 -> @state_2
+    sdfg.edge {condition = "idx < ref"} (ref: %arg0: index) @state_2 -> @state_3
+    sdfg.edge {condition = "not(idx < ref)"} (ref: %arg0: index) @state_2 -> @state_4    
   }
 }
