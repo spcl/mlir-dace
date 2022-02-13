@@ -1,7 +1,7 @@
 #ifndef SDFG_Conversion_GenericToSDFG_PassDetail_H
 #define SDFG_Conversion_GenericToSDFG_PassDetail_H
 
-#include "GenericToSDFG/Dialect/Dialect.h"
+#include "SDFG/Dialect/Dialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
