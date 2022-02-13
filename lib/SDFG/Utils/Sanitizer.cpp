@@ -1,7 +1,7 @@
-#include "SDIR/Utils/Sanitizer.h"
+#include "SDFG/Utils/Sanitizer.h"
 
 using namespace mlir;
-using namespace sdir;
+using namespace sdfg;
 
 void utils::sanitizeName(std::string &name) {
   for (unsigned i = 0; i < name.size(); ++i) {

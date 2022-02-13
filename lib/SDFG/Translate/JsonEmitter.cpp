@@ -1,9 +1,9 @@
-#include "SDIR/Translate/JsonEmitter.h"
+#include "SDFG/Translate/JsonEmitter.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Types.h"
 
 using namespace mlir;
-using namespace sdir;
+using namespace sdfg;
 using namespace emitter;
 
 JsonEmitter::JsonEmitter(raw_ostream &os) : os(os) {

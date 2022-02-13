@@ -5,10 +5,10 @@ add_mlir_translation_library(
   JsonEmitter.cpp
 
   ADDITIONAL_HEADER_DIRS 
-  ${PROJECT_SOURCE_DIR}/include/SDIR
+  ${PROJECT_SOURCE_DIR}/include/SDFG
 
   LINK_LIBS PUBLIC
   MLIRIR
   MLIRTranslation
-  SDIR_UTILS
+  SDFG_UTILS
 )

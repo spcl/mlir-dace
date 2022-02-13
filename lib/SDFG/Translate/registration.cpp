@@ -1,4 +1,4 @@
-#include "SDIR/Translate/Translation.h"
+#include "SDFG/Translate/Translation.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Translation.h"
 
@@ -6,14 +6,14 @@
 // SDFG registration
 //===----------------------------------------------------------------------===//
 
-void mlir::sdir::translation::registerToSDFGTranslation() {
+void mlir::sdfg::translation::registerToSDFGTranslation() {
   mlir::TranslateFromMLIRRegistration registration(
       "mlir-to-sdfg",
       [](mlir::ModuleOp module, llvm::raw_ostream &output) {
-        mlir::sdir::emitter::JsonEmitter jemit(output);
+        mlir::sdfg::emitter::JsonEmitter jemit(output);
 
         mlir::LogicalResult res =
-            mlir::sdir::translation::translateToSDFG(module, jemit);
+            mlir::sdfg::translation::translateToSDFG(module, jemit);
         mlir::LogicalResult jRes = jemit.finish();
 
         if (res.failed()) {
@@ -26,7 +26,7 @@ void mlir::sdir::translation::registerToSDFGTranslation() {
         return mlir::success();
       },
       [](mlir::DialectRegistry &registry) {
-        registry.insert<mlir::sdir::SDIRDialect>();
+        registry.insert<mlir::sdfg::SDFGDialect>();
         registry.insert<mlir::StandardOpsDialect>();
         registry.insert<mlir::arith::ArithmeticDialect>();
       });

@@ -1,5 +1,5 @@
-#include "SDIR/Dialect/Dialect.h"
-#include "SDIR/Utils/Utils.h"
+#include "SDFG/Dialect/Dialect.h"
+#include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -8,7 +8,7 @@
 #include "llvm/ADT/MapVector.h"
 
 using namespace mlir;
-using namespace sdir;
+using namespace sdfg;
 
 //===----------------------------------------------------------------------===//
 // InlineSymbol
@@ -1279,7 +1279,7 @@ LogicalResult verify(LoadOp op) {
 
 bool LoadOp::isIndirect() {
   for (Value v : indices())
-    if (!isa<sdir::TaskletNode>(v.getDefiningOp()))
+    if (!isa<sdfg::TaskletNode>(v.getDefiningOp()))
       return true;
 
   return false;
@@ -1435,7 +1435,7 @@ LogicalResult verify(StoreOp op) {
 
 bool StoreOp::isIndirect() {
   for (Value v : indices())
-    if (!isa<sdir::TaskletNode>(v.getDefiningOp()))
+    if (!isa<sdfg::TaskletNode>(v.getDefiningOp()))
       return true;
 
   return false;
@@ -1809,7 +1809,7 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
+static void print(OpAsmPrinter &p, sdfg::ReturnOp op) {
   p.printOptionalAttrDict(op->getAttrs());
   if (!op.input().empty()) {
     p << ' ' << op.input();
@@ -1818,7 +1818,7 @@ static void print(OpAsmPrinter &p, sdir::ReturnOp op) {
   }
 }
 
-LogicalResult verify(sdir::ReturnOp op) {
+LogicalResult verify(sdfg::ReturnOp op) {
   TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp());
 
   if (task.getResultTypes() != op.getOperandTypes())
@@ -1827,19 +1827,19 @@ LogicalResult verify(sdir::ReturnOp op) {
   return success();
 }
 
-sdir::ReturnOp sdir::ReturnOp::create(PatternRewriter &rewriter, Location loc,
+sdfg::ReturnOp sdfg::ReturnOp::create(PatternRewriter &rewriter, Location loc,
                                       mlir::ValueRange input) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, input);
-  return cast<sdir::ReturnOp>(rewriter.createOperation(state));
+  return cast<sdfg::ReturnOp>(rewriter.createOperation(state));
 }
 
-sdir::ReturnOp sdir::ReturnOp::create(Location loc, mlir::ValueRange input) {
+sdfg::ReturnOp sdfg::ReturnOp::create(Location loc, mlir::ValueRange input) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, input);
-  return cast<sdir::ReturnOp>(Operation::create(state));
+  return cast<sdfg::ReturnOp>(Operation::create(state));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1996,4 +1996,4 @@ LogicalResult verify(SymOp op) { return success(); }
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "SDIR/Dialect/Ops.cpp.inc"
+#include "SDFG/Dialect/Ops.cpp.inc"

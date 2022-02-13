@@ -1,5 +1,5 @@
-#include "SDIR/Translate/Translation.h"
-#include "SDIR/Utils/Utils.h"
+#include "SDFG/Translate/Translation.h"
+#include "SDFG/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -8,7 +8,7 @@
 #include <string>
 
 using namespace mlir;
-using namespace sdir;
+using namespace sdfg;
 using namespace emitter;
 using namespace translation;
 
@@ -573,7 +573,7 @@ LogicalResult translation::translateToSDFG(StateNode &op, JsonEmitter &jemit) {
       if (translateToSDFG(edge, jemit).failed())
         return failure();
 
-    if (sdir::CallOp edge = dyn_cast<sdir::CallOp>(oper))
+    if (sdfg::CallOp edge = dyn_cast<sdfg::CallOp>(oper))
       if (translateToSDFG(edge, jemit).failed())
         return failure();
   }
@@ -695,7 +695,7 @@ LogicalResult liftToPython(TaskletNode &op, JsonEmitter &jemit) {
     return success();
   }
 
-  if (isa<sdir::ReturnOp>(firstOp)) {
+  if (isa<sdfg::ReturnOp>(firstOp)) {
     std::string nameArg0 = op.getInputName(0);
     jemit.printKVPair("string_data", "__out = " + nameArg0);
     jemit.printKVPair("language", "Python");
@@ -751,10 +751,10 @@ LogicalResult translation::translateToSDFG(TaskletNode &op,
       llvm::raw_string_ostream codeLineStream(codeLine);
       oper.print(codeLineStream);
 
-      // SDIR is not a core dialect. Therefore "sdir.return" does not exist
+      // SDFG is not a core dialect. Therefore "sdfg.return" does not exist
       // Replace it with the standard "return"
-      if (sdir::ReturnOp ret = dyn_cast<sdir::ReturnOp>(oper))
-        codeLine.replace(codeLine.find("sdir.return"), 11, "return");
+      if (sdfg::ReturnOp ret = dyn_cast<sdfg::ReturnOp>(oper))
+        codeLine.replace(codeLine.find("sdfg.return"), 11, "return");
 
       codeLine.append("\\n");
       code.append(codeLine);
@@ -1084,7 +1084,7 @@ LogicalResult translation::translateToSDFG(StoreOp &op, JsonEmitter &jemit) {
 
   // Get the ID of the tasklet/SDFG if this StoreOp represents
   // a tasklet/nested SDFG -> access node edge
-  if (sdir::CallOp call = dyn_cast<sdir::CallOp>(op.val().getDefiningOp())) {
+  if (sdfg::CallOp call = dyn_cast<sdfg::CallOp>(op.val().getDefiningOp())) {
     if (call.callsTasklet()) {
       TaskletNode aNode = call.getTasklet();
       jemit.printKVPair("src", aNode.ID());
@@ -1395,11 +1395,11 @@ LogicalResult printLoadSDFGEdge(LoadOp &load, SDFGNode &sdfg, int argIdx,
   return success();
 }
 
-void translation::prepForTranslation(sdir::CallOp &op) {
+void translation::prepForTranslation(sdfg::CallOp &op) {
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Value val = op.getOperand(i);
 
-    if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
+    if (sdfg::CallOp call = dyn_cast<sdfg::CallOp>(val.getDefiningOp())) {
       OpBuilder builder(op.getLoc().getContext());
       FunctionType ft = builder.getFunctionType(call.getOperandTypes(),
                                                 call.getResultTypes());
@@ -1428,7 +1428,7 @@ void translation::prepForTranslation(sdir::CallOp &op) {
   }
 }
 
-LogicalResult translation::translateToSDFG(sdir::CallOp &op,
+LogicalResult translation::translateToSDFG(sdfg::CallOp &op,
                                            JsonEmitter &jemit) {
   // TODO: This can be refactored to avoid code duplication
   if (op.callsTasklet()) {
@@ -1439,8 +1439,8 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
         if (printLoadTaskletEdge(load, task, i, jemit).failed())
           return failure();
 
-      } else if (sdir::CallOp call =
-                     dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
+      } else if (sdfg::CallOp call =
+                     dyn_cast<sdfg::CallOp>(val.getDefiningOp())) {
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletTaskletEdge(taskSrc, task, i, jemit).failed())
           return failure();
@@ -1462,7 +1462,7 @@ LogicalResult translation::translateToSDFG(sdir::CallOp &op,
       /*       if (GetAccessOp acc = dyn_cast<GetAccessOp>(val.getDefiningOp()))
          { if (printAccessSDFGEdge(acc, sdfg, i, jemit).failed()) return
          failure(); } else */
-      if (sdir::CallOp call = dyn_cast<sdir::CallOp>(val.getDefiningOp())) {
+      if (sdfg::CallOp call = dyn_cast<sdfg::CallOp>(val.getDefiningOp())) {
         TaskletNode taskSrc = call.getTasklet();
         if (printTaskletSDFGEdge(taskSrc, sdfg, i, jemit).failed())
           return failure();

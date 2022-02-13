@@ -1,7 +1,7 @@
-#include "SDIR/Conversion/SAMToSDIR/PassDetail.h"
-#include "SDIR/Conversion/SAMToSDIR/Passes.h"
-#include "SDIR/Dialect/Dialect.h"
-#include "SDIR/Utils/Utils.h"
+#include "SDFG/Conversion/GenericToSDFG/PassDetail.h"
+#include "SDFG/Conversion/GenericToSDFG/Passes.h"
+#include "SDFG/Dialect/Dialect.h"
+#include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -10,17 +10,17 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 
 using namespace mlir;
-using namespace sdir;
+using namespace sdfg;
 using namespace conversion;
 
 //===----------------------------------------------------------------------===//
 // Target & Type Converter
 //===----------------------------------------------------------------------===//
 
-struct SDIRTarget : public ConversionTarget {
-  SDIRTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
-    // Every Op in the SDIR Dialect is legal
-    addLegalDialect<SDIRDialect>();
+struct SDFGTarget : public ConversionTarget {
+  SDFGTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
+    // Every Op in the SDFG Dialect is legal
+    addLegalDialect<SDFGDialect>();
     // Implicit top level module operation is legal
     // if it is empty or only contains a single SDFGNode
     addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
@@ -240,7 +240,7 @@ public:
       rewriter.updateRootInPlace(
           task, [&] { task.body().getBlocks().front().push_front(opClone); });
 
-      sdir::ReturnOp::create(rewriter, opClone->getLoc(),
+      sdfg::ReturnOp::create(rewriter, opClone->getLoc(),
                              opClone->getResults());
 
       rewriter.setInsertionPointAfter(task);
@@ -248,8 +248,8 @@ public:
       SmallVector<Value> loadedOps =
           createLoads(rewriter, op->getLoc(), operands);
 
-      sdir::CallOp call =
-          sdir::CallOp::create(rewriter, op->getLoc(), task, loadedOps);
+      sdfg::CallOp call =
+          sdfg::CallOp::create(rewriter, op->getLoc(), task, loadedOps);
 
       StoreOp::create(rewriter, op->getLoc(), call.getResult(0), alloc,
                       ValueRange());
@@ -299,7 +299,7 @@ public:
   }
 };
 
-class MemrefLoadToSDIR : public OpConversionPattern<memref::LoadOp> {
+class MemrefLoadToSDFG : public OpConversionPattern<memref::LoadOp> {
 public:
   using OpConversionPattern<memref::LoadOp>::OpConversionPattern;
 
@@ -341,7 +341,7 @@ public:
   }
 };
 
-class MemrefStoreToSDIR : public OpConversionPattern<memref::StoreOp> {
+class MemrefStoreToSDFG : public OpConversionPattern<memref::StoreOp> {
 public:
   using OpConversionPattern<memref::StoreOp>::OpConversionPattern;
 
@@ -368,7 +368,7 @@ public:
   }
 };
 
-class SCFForToSDIR : public OpConversionPattern<scf::ForOp> {
+class SCFForToSDFG : public OpConversionPattern<scf::ForOp> {
 public:
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
@@ -455,36 +455,36 @@ public:
 // Pass
 //===----------------------------------------------------------------------===//
 
-void populateSAMToSDIRConversionPatterns(RewritePatternSet &patterns,
+void populateSAMToSDFGConversionPatterns(RewritePatternSet &patterns,
                                          TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
   patterns.add<EraseTerminators>(1, ctxt);
-  patterns.add<MemrefLoadToSDIR>(converter, ctxt);
-  patterns.add<MemrefStoreToSDIR>(converter, ctxt);
-  patterns.add<SCFForToSDIR>(converter, ctxt);
+  patterns.add<MemrefLoadToSDFG>(converter, ctxt);
+  patterns.add<MemrefStoreToSDFG>(converter, ctxt);
+  patterns.add<SCFForToSDFG>(converter, ctxt);
 }
 
 namespace {
-struct SAMToSDIRPass : public SAMToSDIRPassBase<SAMToSDIRPass> {
+struct SAMToSDFGPass : public SAMToSDFGPassBase<SAMToSDFGPass> {
   void runOnOperation() override;
 };
 } // namespace
 
-void SAMToSDIRPass::runOnOperation() {
+void SAMToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
-  SDIRTarget target(getContext());
+  SDFGTarget target(getContext());
   MemrefToMemletConverter converter;
 
   RewritePatternSet patterns(&getContext());
-  populateSAMToSDIRConversionPatterns(patterns, converter);
+  populateSAMToSDFGConversionPatterns(patterns, converter);
 
   if (failed(applyFullConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }
 
-std::unique_ptr<Pass> conversion::createSAMToSDIRPass() {
-  return std::make_unique<SAMToSDIRPass>();
+std::unique_ptr<Pass> conversion::createGenericToSDFGPass() {
+  return std::make_unique<GenericToSDFGPass>();
 }

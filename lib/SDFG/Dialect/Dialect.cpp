@@ -1,30 +1,30 @@
-#include "SDIR/Dialect/Dialect.h"
+#include "SDFG/Dialect/Dialect.h"
 #include "mlir/IR/Builders.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
-using namespace sdir;
+using namespace sdfg;
 
-#include "SDIR/Dialect/OpsDialect.cpp.inc"
+#include "SDFG/Dialect/OpsDialect.cpp.inc"
 
 //===----------------------------------------------------------------------===//
-// SDIR Dialect
+// SDFG Dialect
 //===----------------------------------------------------------------------===//
 
-void SDIRDialect::initialize() {
+void SDFGDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
-#include "SDIR/Dialect/Ops.cpp.inc"
+#include "SDFG/Dialect/Ops.cpp.inc"
       >();
 
   addTypes<
 #define GET_TYPEDEF_LIST
-#include "SDIR/Dialect/OpsTypes.cpp.inc"
+#include "SDFG/Dialect/OpsTypes.cpp.inc"
       >();
 }
 
 //===----------------------------------------------------------------------===//
-// SDIR Types
+// SDFG Types
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
@@ -102,9 +102,9 @@ static void printDimensionList(AsmPrinter &printer, Type &elemType,
 }
 
 #define GET_TYPEDEF_CLASSES
-#include "SDIR/Dialect/OpsTypes.cpp.inc"
+#include "SDFG/Dialect/OpsTypes.cpp.inc"
 
-Type SDIRDialect::parseType(DialectAsmParser &parser) const {
+Type SDFGDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
   if (parser.parseKeyword(&mnemonic))
     return Type();
@@ -116,12 +116,12 @@ Type SDIRDialect::parseType(DialectAsmParser &parser) const {
     return genType;
 
   llvm::SMLoc typeLoc = parser.getCurrentLocation();
-  parser.emitError(typeLoc, "unknown type in SDIR dialect");
+  parser.emitError(typeLoc, "unknown type in SDFG dialect");
 
   return Type();
 }
 
-void SDIRDialect::printType(Type type, DialectAsmPrinter &os) const {
+void SDFGDialect::printType(Type type, DialectAsmPrinter &os) const {
   LogicalResult logRes = generatedTypePrinter(type, os);
   if (logRes.failed())
     emitError(nullptr, "Failed to print dialect type");
