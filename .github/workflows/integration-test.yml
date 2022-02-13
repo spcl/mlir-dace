@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-sdir-integration:
+  check-sdfg-integration:
     runs-on: ubuntu-latest
 
     steps:
@@ -45,6 +45,6 @@ jobs:
         mkdir build
         cd build
         cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
-        ninja check-sdir-integration
+        ninja check-sdfg-integration
 
       

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-sdir-opt:
+  check-sdfg-opt:
     runs-on: ubuntu-latest
 
     steps:
@@ -43,6 +43,6 @@ jobs:
         mkdir build
         cd build
         cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
-        ninja check-sdir-converter
+        ninja check-sdfg-converter
 
       

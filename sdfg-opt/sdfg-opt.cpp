@@ -5,18 +5,18 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-#include "SDIR/Conversion/SAMToSDIR/Passes.h"
-#include "SDIR/Dialect/Dialect.h"
+#include "SDFG/Conversion/GenericToSDFG/Passes.h"
+#include "SDFG/Dialect/Dialect.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
 
-  // Register SDIR passes
+  // Register SDFG passes
   // NOTE: Temporarily disabled
-  // mlir::sdir::conversion::registerSAMToSDIRPasses();
+  // mlir::sdfg::conversion::registerGenericToSDFGPasses();
 
   mlir::DialectRegistry registry;
-  registry.insert<mlir::sdir::SDIRDialect>();
+  registry.insert<mlir::sdfg::SDFGDialect>();
   registry.insert<mlir::StandardOpsDialect>();
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that
@@ -24,5 +24,5 @@ int main(int argc, char **argv) {
   registerAllDialects(registry);
 
   return mlir::asMainReturnCode(
-      mlir::MlirOptMain(argc, argv, "SDIR optimizer driver\n", registry));
+      mlir::MlirOptMain(argc, argv, "SDFG optimizer driver\n", registry));
 }

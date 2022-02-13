@@ -80,4 +80,4 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
     }];
 }
 
-#endif // SDIR_SDFGNode
+#endif // SDFG_SDFGNode

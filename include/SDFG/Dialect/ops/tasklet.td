@@ -28,8 +28,8 @@ def SDFG_ReturnOp : SDFG_Op<"return", [
     let arguments = (ins Variadic<AnyType>:$input);
 
     let extraClassDeclaration = [{
-        static sdir::ReturnOp create(PatternRewriter &rewriter, Location loc, mlir::ValueRange input);
-        static sdir::ReturnOp create(Location loc, mlir::ValueRange input);
+        static sdfg::ReturnOp create(PatternRewriter &rewriter, Location loc, mlir::ValueRange input);
+        static sdfg::ReturnOp create(Location loc, mlir::ValueRange input);
     }];
 }
 

@@ -5,13 +5,13 @@ set(LIBS
   ${dialect_libs}
   ${conversion_libs} 
   MLIROptLib 
-  MLIR_SDIR
+  MLIR_SDFG
   # NOTE: Temporarly disabled
-  # SAMToSDIR
+  # GenericToSDFG
 )
 
-add_llvm_executable(sdir-opt sdir-opt.cpp)
-llvm_update_compile_flags(sdir-opt)
+add_llvm_executable(sdfg-opt sdfg-opt.cpp)
+llvm_update_compile_flags(sdfg-opt)
 
-target_link_libraries(sdir-opt PRIVATE ${LIBS})
-mlir_check_all_link_libraries(sdir-opt)
+target_link_libraries(sdfg-opt PRIVATE ${LIBS})
+mlir_check_all_link_libraries(sdfg-opt)

@@ -2,7 +2,7 @@
 #define SDFG_Conversion_GenericToSDFG
 
 include "mlir/Pass/PassBase.td"
-include "SDIR/Dialect/Dialect.td"
+include "SDFG/Dialect/Dialect.td"
 
 def GenericToSDFGPass : Pass<"convert-to-sdfg", "ModuleOp"> {
   let summary = "Convert SCF, Arith and Memref dialect to SDFG dialect";

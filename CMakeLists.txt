@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13.4)
-project(sdir-opt LANGUAGES CXX C)
+project(sdfg-opt LANGUAGES CXX C)
 
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 
@@ -31,6 +31,6 @@ add_definitions(${LLVM_DEFINITIONS})
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
-add_subdirectory(sdir-opt)
+add_subdirectory(sdfg-opt)
 # NOTE: Temporarily Disabled
-# add_subdirectory(sdir-translate)
+# add_subdirectory(sdfg-translate)

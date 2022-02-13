@@ -3,11 +3,11 @@
 #include "mlir/Translation.h"
 #include "llvm/IR/LLVMContext.h"
 
-#include "SDIR/Translate/Translation.h"
+#include "SDFG/Translate/Translation.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllTranslations();
-  mlir::sdir::translation::registerToSDFGTranslation();
+  mlir::sdfg::translation::registerToSDFGTranslation();
 
   return mlir::failed(
       mlir::mlirTranslateMain(argc, argv, "MLIR-DaCe Translation Tool"));

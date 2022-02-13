@@ -16,7 +16,7 @@ from lit.llvm.subst import FindTool
 # Configuration file for the 'lit' test runner.
 
 # name: The name of this test suite.
-config.name = 'SDIR-CONVERT'
+config.name = 'SDFG-CONVERT'
 
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
@@ -27,7 +27,7 @@ config.suffixes = ['.mlir']
 config.test_source_root = os.path.dirname(__file__)
 
 # test_exec_root: The root path where tests should be run.
-config.test_exec_root = os.path.join(config.sdir_obj_root, 'test')
+config.test_exec_root = os.path.join(config.sdfg_obj_root, 'test')
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%shlibext', config.llvm_shlib_ext))
@@ -47,13 +47,13 @@ config.excludes = [
 config.test_source_root = os.path.dirname(__file__)
 
 # test_exec_root: The root path where tests should be run.
-config.test_exec_root = os.path.join(config.sdir_obj_root, 'test')
-config.sdir_tools_dir = os.path.join(config.sdir_obj_root, 'bin')
+config.test_exec_root = os.path.join(config.sdfg_obj_root, 'test')
+config.sdfg_tools_dir = os.path.join(config.sdfg_obj_root, 'bin')
 
 # Tweak the PATH to include the tools dir.
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
-tool_dirs = [config.sdir_tools_dir, config.llvm_tools_dir]
-tools = ['sdir-opt']
+tool_dirs = [config.sdfg_tools_dir, config.llvm_tools_dir]
+tools = ['sdfg-opt']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
