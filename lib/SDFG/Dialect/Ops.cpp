@@ -670,8 +670,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   Region *body = result.addRegion();
   SmallVector<Type, 4> types;
   types.push_back(parser.getBuilder().getIndexType());
-  types.push_back(
-      streamType.cast<StreamType>().getDimensions().getElementType());
+  types.push_back(utils::getSizedType(streamType).getElementType());
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
@@ -882,15 +881,15 @@ static void print(OpAsmPrinter &p, AllocOp op) {
 }
 
 LogicalResult verify(AllocOp op) {
-  if (ArrayType res = op.res().getType().dyn_cast<ArrayType>()) {
-    if (res.getDimensions().getUndefRank() != op.params().size())
-      return op.emitOpError("failed to verify that parameter size "
-                            "matches undefined dimensions size");
+  SizedType res = utils::getSizedType(op.res().getType());
 
-    if (res.getDimensions().hasZeros())
-      return op.emitOpError("failed to verify that return type "
-                            "doesn't contain dimensions of size zero");
-  }
+  if (res.getUndefRank() != op.params().size())
+    return op.emitOpError("failed to verify that parameter size "
+                          "matches undefined dimensions size");
+
+  if (res.hasZeros())
+    return op.emitOpError("failed to verify that return type "
+                          "doesn't contain dimensions of size zero");
 
   return success();
 }
@@ -935,23 +934,11 @@ SDFGNode AllocOp::getParentSDFG() {
 }
 
 Type AllocOp::getElementType() {
-  if (ArrayType t = getType().dyn_cast<ArrayType>())
-    return t.getDimensions().getElementType();
-
-  if (StreamType t = getType().dyn_cast<StreamType>())
-    return t.getDimensions().getElementType();
-
-  return Type();
+  return utils::getSizedType(getType()).getElementType();
 }
 
 bool AllocOp::isScalar() {
-  if (ArrayType t = getType().dyn_cast<ArrayType>())
-    return t.getDimensions().getShape().empty();
-
-  if (StreamType t = getType().dyn_cast<StreamType>())
-    return t.getDimensions().getShape().empty();
-
-  return false;
+  return utils::getSizedType(getType()).getShape().empty();
 }
 
 bool AllocOp::isInState() {
@@ -978,190 +965,6 @@ std::string AllocOp::getName() {
 }
 
 //===----------------------------------------------------------------------===//
-// GetAccessOp
-//===----------------------------------------------------------------------===//
-
-/* GetAccessOp GetAccessOp::create(PatternRewriter &rewriter, Location loc, Type
-t, Value arr) { OpBuilder builder(loc->getContext()); OperationState state(loc,
-getOperationName());
-
-  if (ArrayType art = t.dyn_cast<ArrayType>()) {
-    t = art.toMemlet();
-  }
-
-  build(builder, state, t, utils::generateID(), arr);
-  return cast<GetAccessOp>(rewriter.createOperation(state));
-}
-
-GetAccessOp GetAccessOp::create(Location loc, Type t, Value arr) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-
-  if (ArrayType art = t.dyn_cast<ArrayType>()) {
-    t = art.toMemlet();
-  }
-
-  build(builder, state, t, utils::generateID(), arr);
-  return cast<GetAccessOp>(Operation::create(state));
-}
-
-static ParseResult parseGetAccessOp(OpAsmParser &parser,
-                                    OperationState &result) {
-  IntegerAttr intAttr =
-      parser.getBuilder().getI32IntegerAttr(utils::generateID());
-  result.addAttribute("ID", intAttr);
-
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  OpAsmParser::OperandType arrStrOperand;
-  if (parser.parseOperand(arrStrOperand))
-    return failure();
-
-  Type srcType;
-  if (parser.parseColonType(srcType))
-    return failure();
-
-  if (parser.parseArrow())
-    return failure();
-
-  Type destType;
-  if (parser.parseType(destType))
-    return failure();
-  result.addTypes(destType);
-
-  if (parser.resolveOperand(arrStrOperand, srcType, result.operands))
-    return failure();
-
-  return success();
-} */
-
-/* static void print(OpAsmPrinter &p, GetAccessOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), {"ID"});
-  p << ' ' << op.arr();
-  p << " : ";
-  p << ArrayRef<Type>(op.arr().getType());
-  p << " -> ";
-  p << ArrayRef<Type>(op.res().getType());
-}
-
-LogicalResult verify(GetAccessOp op) {
-  Type arr = op.arr().getType();
-  Type res = op.res().getType();
-
-  if (arr.isa<ArrayType>() && res.isa<MemletType>())
-    if (arr.cast<ArrayType>().getElementType() !=
-        res.cast<MemletType>().getElementType())
-      return op.emitOpError("failed to verify that result element type "
-                            "matches element type of 'array'");
-
-  if (arr.isa<StreamArrayType>() && res.isa<StreamType>())
-    if (arr.cast<StreamArrayType>().getElementType() !=
-        res.cast<StreamType>().getElementType())
-      return op.emitOpError("failed to verify that result element type "
-                            "matches element type of 'stream_array'");
-
-  if (arr.isa<ArrayType>() && res.isa<StreamType>())
-    return op.emitOpError("failed to verify that result type matches "
-                          "derived type of 'array'");
-
-  if (arr.isa<StreamArrayType>() && res.isa<MemletType>())
-    return op.emitOpError("failed to verify that result type matches "
-                          "derived type of 'stream_array'");
-
-  return success();
-}
-
-Type GetAccessOp::getAllocType() {
-  Operation *alloc = arr().getDefiningOp();
-
-  if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
-    return allocArr.getType();
-
-  return nullptr;
-}
-
-ArrayRef<StringAttr> GetAccessOp::getSymbols() {
-  Type t = getAllocType();
-
-  if (ArrayType arr = t.dyn_cast<ArrayType>())
-    return arr.getSymbols();
-
-  if (MemletType arr = t.dyn_cast<MemletType>())
-    return arr.getSymbols();
-
-  if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
-    return arr.getSymbols();
-
-  if (StreamType arr = t.dyn_cast<StreamType>())
-    return arr.getSymbols();
-
-  return {};
-}
-
-ArrayRef<int64_t> GetAccessOp::getIntegers() {
-  Type t = getAllocType();
-
-  if (ArrayType arr = t.dyn_cast<ArrayType>())
-    return arr.getIntegers();
-
-  if (MemletType arr = t.dyn_cast<MemletType>())
-    return arr.getIntegers();
-
-  if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
-    return arr.getIntegers();
-
-  if (StreamType arr = t.dyn_cast<StreamType>())
-    return arr.getIntegers();
-
-  return {};
-}
-
-ArrayRef<bool> GetAccessOp::getShape() {
-  Type t = getAllocType();
-
-  if (ArrayType arr = t.dyn_cast<ArrayType>())
-    return arr.getShape();
-
-  if (MemletType arr = t.dyn_cast<MemletType>())
-    return arr.getShape();
-
-  if (StreamArrayType arr = t.dyn_cast<StreamArrayType>())
-    return arr.getShape();
-
-  if (StreamType arr = t.dyn_cast<StreamType>())
-    return arr.getShape();
-
-  return {};
-}
-
-SDFGNode GetAccessOp::getParentSDFG() {
-  Operation *sdfg = (*this)->getParentOp()->getParentOp();
-  return dyn_cast<SDFGNode>(sdfg);
-}
-
-std::string GetAccessOp::getName() {
-  Operation *alloc = arr().getDefiningOp();
-
-  if (AllocOp allocArr = dyn_cast<AllocOp>(alloc))
-    return allocArr.getName();
-
-  AsmState state(getParentSDFG());
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  arr().printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
-
-  return name;
-}
-
-void GetAccessOp::setID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  IDAttr(intAttr);
-} */
-
-//===----------------------------------------------------------------------===//
 // LoadOp
 //===----------------------------------------------------------------------===//
 
@@ -1174,12 +977,7 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
                       Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-
-  if (ArrayType arr = t.dyn_cast<ArrayType>())
-    t = arr.getDimensions().getElementType();
-
-  else if (StreamType arr = t.dyn_cast<StreamType>())
-    t = arr.getDimensions().getElementType();
+  t = utils::getSizedType(t).getElementType();
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
@@ -1203,12 +1001,7 @@ LoadOp LoadOp::create(Location loc, AllocOp alloc, ValueRange indices) {
 LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-
-  if (ArrayType arr = t.dyn_cast<ArrayType>())
-    t = arr.getDimensions().getElementType();
-
-  else if (StreamType arr = t.dyn_cast<StreamType>())
-    t = arr.getDimensions().getElementType();
+  t = utils::getSizedType(t).getElementType();
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
@@ -1272,8 +1065,8 @@ static void print(OpAsmPrinter &p, LoadOp op) {
 
 LogicalResult verify(LoadOp op) {
   size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size =
-      op.arr().getType().cast<ArrayType>().getDimensions().getRank();
+  size_t mem_size = utils::getSizedType(op.arr().getType()).getRank();
+
   if (idx_size != mem_size)
     return op.emitOpError("incorrect number of indices for load");
 
@@ -1429,8 +1222,8 @@ static void print(OpAsmPrinter &p, StoreOp op) {
 
 LogicalResult verify(StoreOp op) {
   size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size =
-      op.arr().getType().cast<ArrayType>().getDimensions().getRank();
+  size_t mem_size = utils::getSizedType(op.arr().getType()).getRank();
+
   if (idx_size != mem_size)
     return op.emitOpError("incorrect number of indices for store");
 
@@ -1527,10 +1320,9 @@ static void print(OpAsmPrinter &p, MemletCastOp op) {
 }
 
 LogicalResult verify(MemletCastOp op) {
-  size_t src_size =
-      op.src().getType().cast<ArrayType>().getDimensions().getRank();
-  size_t res_size =
-      op.res().getType().cast<ArrayType>().getDimensions().getRank();
+  size_t src_size = utils::getSizedType(op.src().getType()).getRank();
+  size_t res_size = utils::getSizedType(op.res().getType()).getRank();
+
   if (src_size != res_size)
     return op.emitOpError("incorrect rank for memlet_cast");
 
@@ -1578,10 +1370,9 @@ static void print(OpAsmPrinter &p, ViewCastOp op) {
 }
 
 LogicalResult verify(ViewCastOp op) {
-  size_t src_size =
-      op.src().getType().cast<ArrayType>().getDimensions().getRank();
-  size_t res_size =
-      op.res().getType().cast<ArrayType>().getDimensions().getRank();
+  size_t src_size = utils::getSizedType(op.src().getType()).getRank();
+  size_t res_size = utils::getSizedType(op.res().getType()).getRank();
+
   if (src_size != res_size)
     return op.emitOpError("incorrect rank for view_cast");
 
@@ -1738,14 +1529,7 @@ static void print(OpAsmPrinter &p, StreamPushOp op) {
   p << ArrayRef<Type>(op.str().getType());
 }
 
-LogicalResult verify(StreamPushOp op) {
-  if (op.val().getType() !=
-      op.str().getType().cast<StreamType>().getDimensions().getElementType())
-    op.emitOpError("failed to verify that value type "
-                   "matches element type of 'stream'");
-
-  return success();
-}
+LogicalResult verify(StreamPushOp op) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamLengthOp
