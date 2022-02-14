@@ -45,7 +45,7 @@ def SDFG_AllocOp : SDFG_Op<"alloc", [
 def SDFG_LoadOp : SDFG_Op<"load", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"result type matches element type of 'memlet'", "arr", "res",
-                    "$_self.cast<ArrayType>().getElementType()">
+                    "$_self.cast<ArrayType>().getDimensions().getElementType()">
 ]> {
     let summary = "Memlet load operation";
     let description = [{
@@ -82,7 +82,7 @@ def SDFG_LoadOp : SDFG_Op<"load", [
 def SDFG_StoreOp : SDFG_Op<"store", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"value type matches element type of 'memlet'", "arr", "val",
-                    "$_self.cast<ArrayType>().getElementType()">
+                    "$_self.cast<ArrayType>().getDimensions().getElementType()">
 ]> {
     let summary = "Memlet store operation";
     let description = [{

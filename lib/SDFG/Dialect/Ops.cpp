@@ -670,7 +670,8 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   Region *body = result.addRegion();
   SmallVector<Type, 4> types;
   types.push_back(parser.getBuilder().getIndexType());
-  types.push_back(streamType.cast<StreamType>().getElementType());
+  types.push_back(
+      streamType.cast<StreamType>().getDimensions().getElementType());
   if (parser.parseRegion(*body, ivs, types))
     return failure();
 
@@ -882,11 +883,11 @@ static void print(OpAsmPrinter &p, AllocOp op) {
 
 LogicalResult verify(AllocOp op) {
   if (ArrayType res = op.res().getType().dyn_cast<ArrayType>()) {
-    if (res.getUndefRank() != op.params().size())
+    if (res.getDimensions().getUndefRank() != op.params().size())
       return op.emitOpError("failed to verify that parameter size "
                             "matches undefined dimensions size");
 
-    if (res.hasZeros())
+    if (res.getDimensions().hasZeros())
       return op.emitOpError("failed to verify that return type "
                             "doesn't contain dimensions of size zero");
   }
@@ -915,7 +916,8 @@ AllocOp AllocOp::create(Location loc, Type res, StringRef name,
   StringAttr nameAttr = builder.getStringAttr(name);
 
   if (!res.isa<ArrayType>()) {
-    res = ArrayType::get(res.getContext(), res, {}, {}, {});
+    SizedType sized = SizedType::get(res.getContext(), res, {}, {}, {});
+    res = ArrayType::get(res.getContext(), sized);
   }
 
   build(builder, state, res, {}, nameAttr, transient);
@@ -934,20 +936,20 @@ SDFGNode AllocOp::getParentSDFG() {
 
 Type AllocOp::getElementType() {
   if (ArrayType t = getType().dyn_cast<ArrayType>())
-    return t.getElementType();
+    return t.getDimensions().getElementType();
 
   if (StreamType t = getType().dyn_cast<StreamType>())
-    return t.getElementType();
+    return t.getDimensions().getElementType();
 
   return Type();
 }
 
 bool AllocOp::isScalar() {
   if (ArrayType t = getType().dyn_cast<ArrayType>())
-    return t.getShape().empty();
+    return t.getDimensions().getShape().empty();
 
   if (StreamType t = getType().dyn_cast<StreamType>())
-    return t.getShape().empty();
+    return t.getDimensions().getShape().empty();
 
   return false;
 }
@@ -1174,10 +1176,10 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
   OperationState state(loc, getOperationName());
 
   if (ArrayType arr = t.dyn_cast<ArrayType>())
-    t = arr.getElementType();
+    t = arr.getDimensions().getElementType();
 
   else if (StreamType arr = t.dyn_cast<StreamType>())
-    t = arr.getElementType();
+    t = arr.getDimensions().getElementType();
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
@@ -1203,10 +1205,10 @@ LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
   OperationState state(loc, getOperationName());
 
   if (ArrayType arr = t.dyn_cast<ArrayType>())
-    t = arr.getElementType();
+    t = arr.getDimensions().getElementType();
 
   else if (StreamType arr = t.dyn_cast<StreamType>())
-    t = arr.getElementType();
+    t = arr.getDimensions().getElementType();
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
@@ -1270,7 +1272,8 @@ static void print(OpAsmPrinter &p, LoadOp op) {
 
 LogicalResult verify(LoadOp op) {
   size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size = op.arr().getType().cast<ArrayType>().getRank();
+  size_t mem_size =
+      op.arr().getType().cast<ArrayType>().getDimensions().getRank();
   if (idx_size != mem_size)
     return op.emitOpError("incorrect number of indices for load");
 
@@ -1426,7 +1429,8 @@ static void print(OpAsmPrinter &p, StoreOp op) {
 
 LogicalResult verify(StoreOp op) {
   size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size = op.arr().getType().cast<ArrayType>().getRank();
+  size_t mem_size =
+      op.arr().getType().cast<ArrayType>().getDimensions().getRank();
   if (idx_size != mem_size)
     return op.emitOpError("incorrect number of indices for store");
 
@@ -1523,8 +1527,10 @@ static void print(OpAsmPrinter &p, MemletCastOp op) {
 }
 
 LogicalResult verify(MemletCastOp op) {
-  size_t src_size = op.src().getType().cast<ArrayType>().getRank();
-  size_t res_size = op.res().getType().cast<ArrayType>().getRank();
+  size_t src_size =
+      op.src().getType().cast<ArrayType>().getDimensions().getRank();
+  size_t res_size =
+      op.res().getType().cast<ArrayType>().getDimensions().getRank();
   if (src_size != res_size)
     return op.emitOpError("incorrect rank for memlet_cast");
 
@@ -1572,8 +1578,10 @@ static void print(OpAsmPrinter &p, ViewCastOp op) {
 }
 
 LogicalResult verify(ViewCastOp op) {
-  size_t src_size = op.src().getType().cast<ArrayType>().getRank();
-  size_t res_size = op.res().getType().cast<ArrayType>().getRank();
+  size_t src_size =
+      op.src().getType().cast<ArrayType>().getDimensions().getRank();
+  size_t res_size =
+      op.res().getType().cast<ArrayType>().getDimensions().getRank();
   if (src_size != res_size)
     return op.emitOpError("incorrect rank for view_cast");
 
@@ -1732,7 +1740,7 @@ static void print(OpAsmPrinter &p, StreamPushOp op) {
 
 LogicalResult verify(StreamPushOp op) {
   if (op.val().getType() !=
-      op.str().getType().cast<StreamType>().getElementType())
+      op.str().getType().cast<StreamType>().getDimensions().getElementType())
     op.emitOpError("failed to verify that value type "
                    "matches element type of 'stream'");
 

@@ -8,7 +8,7 @@
 def SDFG_StreamPopOp : SDFG_Op<"stream_pop", [
     ParentOneOf<["StateNode", "MapNode"]>,
     TypesMatchWith<"result type matches element type of 'stream'", "str", "res",
-                    "$_self.cast<StreamType>().getElementType()">
+                    "$_self.cast<StreamType>().getDimensions().getElementType()">
 ]> {
     let summary = "Stream pop operation";
     let description = [{
@@ -35,7 +35,7 @@ def SDFG_StreamPopOp : SDFG_Op<"stream_pop", [
 def SDFG_StreamPushOp : SDFG_Op<"stream_push", [
     ParentOneOf<["StateNode", "MapNode"]>,
     TypesMatchWith<"value type matches element type of 'stream'", "str", "val",
-                  "$_self.cast<StreamType>().getElementType()">
+                  "$_self.cast<StreamType>().getDimensions().getElementType()">
 ]> {
     let summary = "Stream push operation";
     let description = [{

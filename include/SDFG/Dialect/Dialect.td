@@ -25,38 +25,16 @@ class SDFG_Type<string name, list<Trait> traits = []> :
                                         TypeDef<SDFG_Dialect, name, traits>{}
 
 //===----------------------------------------------------------------------===//
-// ArrayType
+// SizedType
 //===----------------------------------------------------------------------===//
 
-def SDFG_ArrayType : SDFG_Type<"Array">{
-    let mnemonic = "array";
-    let summary = "A array type";
-    let description = [{
-        A type representing a array.
-    }];
-
+def SDFG_SizedType : SDFG_Type<"Sized">{
     let parameters = (ins
         "Type":$elementType,
         ArrayRefParameter<"StringAttr">:$symbols,
         ArrayRefParameter<"int64_t">:$integers, 
         ArrayRefParameter<"bool">:$shape 
     );
-
-    let printer = [{
-        printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
-                        getImpl()->integers, getImpl()->shape);
-    }];
-
-    let parser = [{
-        Type elementType;
-        SmallVector<StringAttr> symbols;
-        SmallVector<int64_t> integers;
-        SmallVector<bool> shape;
-        if(parseDimensionList($_parser, elementType, symbols, integers, shape))
-            return Type();
-        
-        return get($_ctxt, elementType, symbols, integers, shape);
-    }];
 
     let extraClassDeclaration = [{
         size_t getRank(){ return getShape().size(); }
@@ -74,27 +52,16 @@ def SDFG_ArrayType : SDFG_Type<"Array">{
     }];
 }
 
-//===----------------------------------------------------------------------===//
-// StreamType
-//===----------------------------------------------------------------------===//
-
-def SDFG_StreamType : SDFG_Type<"Stream">{
-    let mnemonic = "stream";
-    let summary = "A stream type";
-    let description = [{
-        A type representing a stream.
-    }];
-
-    let parameters = (ins
-        "Type":$elementType,
-        ArrayRefParameter<"StringAttr">:$symbols,
-        ArrayRefParameter<"int64_t">:$integers, 
-        ArrayRefParameter<"bool">:$shape 
-    );
+class SDFG_SizedBaseType<string name> : SDFG_Type<name>{
+    let parameters = (ins SDFG_SizedType:$dimensions);
 
     let printer = [{
-        printDimensionList($_printer,getImpl()->elementType, getImpl()->symbols,
-                        getImpl()->integers, getImpl()->shape);
+        Type elemType = getImpl()->dimensions.getElementType();
+        ArrayRef<StringAttr> symbols = getImpl()->dimensions.getSymbols();
+        ArrayRef<int64_t> integers = getImpl()->dimensions.getIntegers();
+        ArrayRef<bool> shape = getImpl()->dimensions.getShape();
+
+        printDimensionList($_printer, elemType, symbols, integers, shape);
     }];
 
     let parser = [{
@@ -104,8 +71,34 @@ def SDFG_StreamType : SDFG_Type<"Stream">{
         SmallVector<bool> shape;
         if(parseDimensionList($_parser, elementType, symbols, integers, shape))
             return Type();
+
         
-        return get($_ctxt, elementType, symbols, integers, shape);
+        SizedType sized = SizedType::get($_ctxt, elementType, symbols, integers, shape);
+        return get($_ctxt, sized);
+    }];
+}
+
+//===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+def SDFG_ArrayType : SDFG_SizedBaseType<"Array">{
+    let mnemonic = "array";
+    let summary = "A array type";
+    let description = [{
+        A type representing a array.
+    }];
+}
+
+//===----------------------------------------------------------------------===//
+// StreamType
+//===----------------------------------------------------------------------===//
+
+def SDFG_StreamType : SDFG_SizedBaseType<"Stream">{
+    let mnemonic = "stream";
+    let summary = "A stream type";
+    let description = [{
+        A type representing a stream.
     }];
 }
 
