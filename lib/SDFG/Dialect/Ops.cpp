@@ -11,6 +11,63 @@ using namespace mlir;
 using namespace sdfg;
 
 //===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
+                               SmallVector<OpAsmParser::OperandType, 4> &args,
+                               SmallVector<Type, 4> &argTypes,
+                               bool enableShadowing) {
+  Region *body = result.addRegion();
+  if (parser.parseRegion(*body, args, argTypes, enableShadowing))
+    return failure();
+
+  if (body->empty())
+    return parser.emitError(parser.getCurrentLocation(),
+                            "expected non-empty body");
+  return success();
+}
+
+static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
+                               SmallVector<OpAsmParser::OperandType, 4> &args,
+                               SmallVector<Type, 4> &argTypes) {
+  bool isFirst = true;
+
+  while (parser.parseOptionalRParen().failed()) {
+    if (!isFirst)
+      if (parser.parseComma())
+        return failure();
+    isFirst = false;
+
+    OpAsmParser::OperandType operand;
+    OpAsmParser::OperandType arg;
+    Type opType;
+
+    if (parser.parseOperand(operand))
+      return failure();
+
+    if (parser.parseOptionalKeyword("as").succeeded())
+      if (parser.parseRegionArgument(arg))
+        return failure();
+
+    if (parser.parseColonType(opType))
+      return failure();
+
+    if (parser.resolveOperand(operand, opType, result.operands))
+      return failure();
+
+    if (arg.location.isValid())
+      args.push_back(arg);
+    else
+      args.push_back(operand);
+
+    argTypes.push_back(opType);
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // InlineSymbol
 //===----------------------------------------------------------------------===//
 
@@ -120,7 +177,7 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
+/* SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
                           FunctionType ft) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -139,7 +196,7 @@ SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
   SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
   rewriter.createBlock(&sdfg.getRegion(), {}, ft.getInputs());
   return sdfg;
-}
+} */
 
 static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -153,86 +210,83 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
     return failure();
 
-  SmallVector<OpAsmParser::OperandType, 4> entryArgs;
-  SmallVector<NamedAttrList, 4> argAttrs;
-  SmallVector<NamedAttrList, 4> resultAttrs;
+  SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
-  SmallVector<Type, 4> resultTypes;
 
-  Region *body = result.addRegion();
-  OptionalParseResult opr = parser.parseOptionalRegion(*body);
-  if (opr.hasValue() && opr.getValue().succeeded()) {
-    if (body->empty())
-      body->emplaceBlock();
-
-    Type type = parser.getBuilder().getFunctionType(argTypes, resultTypes);
-    if (!type)
+  if (parser.parseOptionalLParen().failed()) {
+    result.addAttribute("num_args", parser.getBuilder().getI32IntegerAttr(0));
+    if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
       return failure();
-    result.addAttribute(SDFGNode::getTypeAttrName(), TypeAttr::get(type));
 
     return success();
   }
 
-  bool isVariadic = false;
-  if (function_like_impl::parseFunctionSignature(
-          parser,
-          /*allowVariadic=*/false, entryArgs, argTypes, argAttrs, isVariadic,
-          resultTypes, resultAttrs))
+  if (parseAsArgs(parser, result, args, argTypes))
     return failure();
 
-  Type type = parser.getBuilder().getFunctionType(argTypes, resultTypes);
-  if (!type)
-    return failure();
-  result.addAttribute(SDFGNode::getTypeAttrName(), TypeAttr::get(type));
+  size_t num_args = result.operands.size();
+  result.addAttribute("num_args",
+                      parser.getBuilder().getI32IntegerAttr(num_args));
 
-  if (parser.parseRegion(*body, entryArgs,
-                         entryArgs.empty() ? ArrayRef<Type>() : argTypes,
-                         /*enableNameShadowing=*/false))
+  if (parser.parseArrow() || parser.parseLParen() ||
+      parseAsArgs(parser, result, args, argTypes))
     return failure();
 
-  if (body->empty())
-    return parser.emitError(parser.getCurrentLocation(),
-                            "expected non-empty function body");
+  if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
+    return failure();
 
   return success();
 }
 
 static void print(OpAsmPrinter &p, SDFGNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"ID", "sym_name", "type"});
+                          /*elidedAttrs=*/{"ID", "sym_name", "num_args"});
   p << ' ';
   p.printSymbolName(op.sym_name());
+  p << '(';
 
-  if (!op.getType().getInputs().empty() || !op.getType().getResults().empty())
-    function_like_impl::printFunctionSignature(p, op, op.getType().getInputs(),
-                                               /*isVariadic=*/false,
-                                               op.getType().getResults());
+  for (unsigned i = 0; i < op.num_args(); ++i) {
+    if (i > 0)
+      p << ", ";
+    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
+      << op.getOperandTypes()[i];
+  }
 
+  p << ") -> (";
+
+  for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
+    if (i > op.num_args())
+      p << ", ";
+    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
+      << op.getOperandTypes()[i];
+  }
+
+  p << ")";
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/false, /*printEmptyBlock=*/true);
+                /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
 LogicalResult verify(SDFGNode op) {
-  if (op.isExternal())
-    return success();
+  /*   if (op.isExternal())
+      return success();
 
-  // Verify that the argument list of the function and the arg list of the
-  // entry block line up. The trait already verified that the number of
-  // arguments is the same between the signature and the block.
-  ArrayRef<Type> fnInputTypes = op.getType().getInputs();
-  Block &entryBlock = op.front();
+    // Verify that the argument list of the function and the arg list of the
+    // entry block line up. The trait already verified that the number of
+    // arguments is the same between the signature and the block.
+    ArrayRef<Type> fnInputTypes = op.getType().getInputs();
+    Block &entryBlock = op.front();
 
-  for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
-    if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-      return op.emitOpError("type of entry block argument #")
-             << i << '(' << entryBlock.getArgument(i).getType()
-             << ") must match the type of the corresponding argument in "
-             << "function signature(" << fnInputTypes[i] << ')';
+    for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
+      if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
+        return op.emitOpError("type of entry block argument #")
+               << i << '(' << entryBlock.getArgument(i).getType()
+               << ") must match the type of the corresponding argument in "
+               << "function signature(" << fnInputTypes[i] << ')';
 
-  // Verify that no other dialect is used in the body
-  for (Operation &oper : op.body().getOps())
-    if (oper.getDialect() != (*op).getDialect())
-      return op.emitOpError("does not support other dialects");
+    // Verify that no other dialect is used in the body
+    for (Operation &oper : op.body().getOps())
+      if (oper.getDialect() != (*op).getDialect())
+        return op.emitOpError("does not support other dialects"); */
   return success();
 }
 
@@ -388,51 +442,16 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
   SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
 
-  if (parser.parseLParen())
+  if (parser.parseLParen() || parseAsArgs(parser, result, args, argTypes))
     return failure();
-
-  while (parser.parseOptionalRParen().failed()) {
-    if (result.operands.size() > 0)
-      if (parser.parseComma())
-        return failure();
-
-    OpAsmParser::OperandType operand;
-    OpAsmParser::OperandType arg;
-    Type opType;
-
-    if (parser.parseOperand(operand))
-      return failure();
-
-    if (parser.parseOptionalKeyword("as").succeeded())
-      if (parser.parseRegionArgument(arg))
-        return failure();
-
-    if (parser.parseColonType(opType))
-      return failure();
-
-    if (parser.resolveOperand(operand, opType, result.operands))
-      return failure();
-
-    if (arg.location.isValid())
-      args.push_back(arg);
-    else
-      args.push_back(operand);
-
-    argTypes.push_back(opType);
-  }
 
   Type retType;
   if (parser.parseArrow() || parser.parseType(retType))
     return failure();
   result.addTypes(retType);
 
-  Region *body = result.addRegion();
-  if (parser.parseRegion(*body, args, argTypes, /*enableNameShadowing=*/true))
+  if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
     return failure();
-
-  if (body->empty())
-    return parser.emitError(parser.getCurrentLocation(),
-                            "expected non-empty tasklet body");
 
   return success();
 }
@@ -447,7 +466,7 @@ static void print(OpAsmPrinter &p, TaskletNode op) {
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     if (i > 0)
       p << ", ";
-    p << op.getOperand(i) << " as " << op.body().getArgument(i) << " : "
+    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
       << op.getOperandTypes()[i];
   }
 
