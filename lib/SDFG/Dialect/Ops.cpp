@@ -942,16 +942,6 @@ AllocOp AllocOp::create(Location loc, Type res, StringRef name,
   return cast<AllocOp>(Operation::create(state));
 }
 
-SDFGNode AllocOp::getParentSDFG() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-
-  if (SDFGNode sdfg = dyn_cast<SDFGNode>(sdfgOrState))
-    return sdfg;
-
-  Operation *sdfg = sdfgOrState->getParentOp();
-  return dyn_cast<SDFGNode>(sdfg);
-}
-
 Type AllocOp::getElementType() {
   return utils::getSizedType(getType()).getElementType();
 }
@@ -961,10 +951,7 @@ bool AllocOp::isScalar() {
 }
 
 bool AllocOp::isInState() {
-  Operation *sdfgOrState = (*this)->getParentOp();
-  if (StateNode state = dyn_cast<StateNode>(sdfgOrState))
-    return true;
-  return false;
+  return utils::getParentState(*this->getOperation(), false) != nullptr;
 }
 
 std::string AllocOp::getName() {
@@ -974,7 +961,7 @@ std::string AllocOp::getName() {
       return name.getValue().str();
   }
 
-  AsmState state(getParentSDFG());
+  AsmState state(utils::getParentSDFG(*this->getOperation()));
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   (*this)->getResult(0).printAsOperand(nameStream, state);

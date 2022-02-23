@@ -7,7 +7,6 @@
 using namespace mlir::sdfg::emitter;
 
 namespace mlir::sdfg::translation {
-
 void registerToSDFGTranslation();
 
 LogicalResult translateToSDFG(ModuleOp &op, JsonEmitter &jemit);
@@ -32,9 +31,7 @@ LogicalResult translateToSDFG(StreamPopOp &op, JsonEmitter &jemit);
 LogicalResult translateToSDFG(StreamPushOp &op, JsonEmitter &jemit);
 LogicalResult translateToSDFG(StreamLengthOp &op, JsonEmitter &jemit);
 
-LogicalResult translateToSDFG(sdfg::CallOp &op, JsonEmitter &jemit);
 LogicalResult translateToSDFG(LibCallOp &op, JsonEmitter &jemit);
-
 LogicalResult translateToSDFG(AllocSymbolOp &op, JsonEmitter &jemit);
 LogicalResult translateToSDFG(SymOp &op, JsonEmitter &jemit);
 
@@ -43,7 +40,6 @@ inline void printDebuginfo(Operation &op, JsonEmitter &jemit);
 
 void prepForTranslation(SDFGNode &op);
 void prepForTranslation(StateNode &op);
-void prepForTranslation(sdfg::CallOp &op);
 
 } // namespace mlir::sdfg::translation
 

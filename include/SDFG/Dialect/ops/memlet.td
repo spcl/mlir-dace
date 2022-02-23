@@ -29,7 +29,6 @@ def SDFG_AllocOp : SDFG_Op<"alloc", [
         static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, bool transient);
         static AllocOp create(PatternRewriter &rewriter, Location loc, Type res, StringRef name, bool transient);
         static AllocOp create(Location loc, Type res, StringRef name, bool transient);
-        SDFGNode getParentSDFG();
         Type getElementType();
         bool isScalar();
         bool isInState();

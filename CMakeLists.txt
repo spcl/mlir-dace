@@ -32,5 +32,4 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(sdfg-opt)
-# NOTE: Temporarily Disabled
-# add_subdirectory(sdfg-translate)
+add_subdirectory(sdfg-translate)
