@@ -17,8 +17,8 @@ using namespace sdfg;
 LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   utils::resetIDGenerator();
 
-  Node tls(Node::SDFG, op.getLoc());
-  tls.emit(jemit);
+  SDFG tls(op.getLoc());
+  // tls.emit(jemit);
 
   return success();
 }
