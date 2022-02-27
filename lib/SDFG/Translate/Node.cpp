@@ -1,5 +1,4 @@
 #include "SDFG/Translate/Node.h"
-#include "SDFG/Utils/Utils.h"
 
 using namespace mlir;
 using namespace sdfg;
@@ -9,21 +8,73 @@ using namespace translation;
 // Edges
 //===----------------------------------------------------------------------===//
 
-Edge::Edge(Node *source, Node *destination)
-    : source(source), destination(destination) {}
+InterstateEdge::InterstateEdge(State *source, State *destination)
+    : Edge(source, destination) {
+  condition = nullptr;
+  assignments.clear();
+}
+
+void InterstateEdge::setCondition(std::string condition) {
+  this->condition = condition;
+}
+
+void InterstateEdge::addAssignment(Assignment assignment) {
+  assignments.push_back(assignment);
+}
 
 //===----------------------------------------------------------------------===//
 // Nodes
 //===----------------------------------------------------------------------===//
 
-Node::Node(Location location) : location(location) { ID = utils::generateID(); }
-
-void Node::emit(emitter::JsonEmitter &jemit) {}
+void Node::setID(unsigned id) { this->id = id; }
+unsigned Node::getID() { return id; }
+void Node::setParent(Node *parent) { this->parent = parent; }
+Node *Node::getParent() { return parent; }
 
 void Node::addAttribute(Attribute attribute) {
   attributes.push_back(attribute);
 }
 
-ContainerNode::ContainerNode(Location location) : Node(location) {}
+void SDFG::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "SDFG");
+  jemit.printKVPair("sdfg_list_id", id, /*stringify=*/false);
+  // jemit.printKVPair("start_state", entryState.ID(), /*stringify=*/false);
 
-SDFG::SDFG(Location location) : ContainerNode(location) {}
+  jemit.startNamedObject("attributes");
+  jemit.endObject(); // attributes
+
+  jemit.startNamedList("nodes");
+  for (State s : nodes)
+    s.emit(jemit);
+  jemit.endList(); // nodes
+
+  jemit.startNamedList("edges");
+  jemit.endList(); // edges
+
+  jemit.endObject();
+}
+
+void SDFG::addNode(State &state) {
+  state.setParent(this);
+  state.setID(nodes.size());
+  nodes.push_back(state);
+}
+
+void State::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "SDFGState");
+  // jemit.printKVPair("label", op.sym_name());
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.endObject(); // attributes
+
+  jemit.startNamedList("nodes");
+  jemit.endList(); // nodes
+
+  jemit.startNamedList("edges");
+  jemit.endList(); // edges
+
+  jemit.endObject();
+}

@@ -8,6 +8,7 @@
 namespace mlir::sdfg::translation {
 class Attribute;
 class Connector;
+class Assignment;
 
 class Edge;
 class InterstateEdge;
@@ -38,41 +39,51 @@ private:
   std::string name;
 };
 
+class Assignment {
+private:
+  std::string key;
+  std::string value;
+};
+
 //===----------------------------------------------------------------------===//
 // Edges
 //===----------------------------------------------------------------------===//
 
 class Edge {
-public:
-  Edge(Node *source, Node *destination);
-  virtual void emit(emitter::JsonEmitter &jemit);
-
-private:
+protected:
   Node *source;
   Node *destination;
+
+  Edge(Node *source, Node *destination)
+      : source(source), destination(destination) {}
+
+public:
+  virtual void emit(emitter::JsonEmitter &jemit) {}
 };
 
 class InterstateEdge : public Edge {
+protected:
+  State *source;
+  State *destination;
+
+  std::string condition;
+  std::vector<Assignment> assignments;
+
 public:
-  InterstateEdge(StateNode *source, StateNode *destination);
-
-private:
-  StateNode *source;
-  StateNode *destination;
-
-  // Condition
-  // assignments
+  InterstateEdge(State *source, State *destination);
+  void setCondition(std::string condition);
+  void addAssignment(Assignment assignment);
 };
 
 class MultiEdge : public Edge {
-public:
-  MultiEdge(Connector source, Connector destination);
 
 private:
   Connector source;
   Connector destination;
-
   mlir::sdfg::SizedType shape;
+
+public:
+  MultiEdge(Connector source, Connector destination);
 };
 
 //===----------------------------------------------------------------------===//
@@ -80,56 +91,57 @@ private:
 //===----------------------------------------------------------------------===//
 
 class Node {
+protected:
+  unsigned id;
+  Location location;
+  std::vector<Attribute> attributes;
+  Node *parent;
+
+  Node(Location location) : id(0), location(location) {}
+
 public:
-  virtual void emit(emitter::JsonEmitter &jemit);
+  void setID(unsigned id);
+  unsigned getID();
+  void setParent(Node *parent);
+  Node *getParent();
+
+  virtual void emit(emitter::JsonEmitter &jemit) {}
 
   // check for existing attribtues
   // Replace or add to list
   void addAttribute(Attribute attribute);
-
-protected:
-  Node(Location location);
-
-private:
-  unsigned ID;
-  Location location;
-  std::vector<Attribute> attributes;
 };
 
-class ContainerNode : public Node {
-public:
-  void addNode(Node node);
-  // Check EdgeNodes are inside this Node
-  virtual void addEdge(Edge edge);
-
-protected:
-  ContainerNode(Location location);
-
+class SDFG : public Node {
 private:
-  std::vector<Node> children;
-  std::vector<Edge> edges;
-};
+  // LUT (id -> node)
+  std::vector<State> nodes;
+  std::vector<InterstateEdge> edges;
 
-class SDFG : public ContainerNode {
 public:
-  SDFG(Location location);
+  SDFG(Location location) : Node(location) {}
+  void emit(emitter::JsonEmitter &jemit) override;
+  void addNode(State &state);
   void addEdge(InterstateEdge edge);
-
-private:
-  // LUT (id -> node)
 };
 
-class State : public ContainerNode {
-public:
-  void addEdge(MultiEdge edge);
+class State : public Node {
 
 private:
   // LUT (id -> node)
+  std::vector<ConnectorNode> nodes;
+  std::vector<MultiEdge> edges;
+
+public:
+  State(Location location) : Node(location) {}
+  void emit(emitter::JsonEmitter &jemit) override;
+  void addNode(ConnectorNode node);
+  void addEdge(MultiEdge edge);
 };
 
 class ConnectorNode : public Node {
 
-private:
+protected:
   std::vector<Connector> connectors;
 };
 

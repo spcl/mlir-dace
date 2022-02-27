@@ -2,10 +2,10 @@
 
 namespace mlir::sdfg::utils {
 namespace {
-int idGeneratorID = 0;
+unsigned idGeneratorID = 0;
 }
 
-int generateID() { return idGeneratorID++; }
+unsigned generateID() { return idGeneratorID++; }
 
 void resetIDGenerator() { idGeneratorID = 0; }
 

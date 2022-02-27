@@ -17,8 +17,23 @@ using namespace sdfg;
 LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   utils::resetIDGenerator();
 
-  SDFG tls(op.getLoc());
-  // tls.emit(jemit);
+  if (++op.getOps<SDFGNode>().begin() != op.getOps<SDFGNode>().end()) {
+    emitError(op.getLoc(), "Must have exactly one top-level SDFGNode");
+    return failure();
+  }
 
+  SDFGNode sdfgNode = *op.getOps<SDFGNode>().begin();
+  SDFG sdfg(sdfgNode.getLoc());
+
+  for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
+    State state(stateNode.getLoc());
+    sdfg.addNode(state);
+  }
+
+  for (EdgeOp edgeOp : sdfgNode.getOps<EdgeOp>()) {
+    // InterstateEdge edge();
+  }
+
+  sdfg.emit(jemit);
   return success();
 }

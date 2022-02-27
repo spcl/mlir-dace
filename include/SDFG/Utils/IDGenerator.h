@@ -3,7 +3,7 @@
 
 namespace mlir::sdfg::utils {
 
-int generateID();
+unsigned generateID();
 void resetIDGenerator();
 
 } // namespace mlir::sdfg::utils
