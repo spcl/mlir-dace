@@ -35,7 +35,6 @@ def SDFG_TaskletNode : SDFG_Op<"tasklet", [
         static TaskletNode create(Location location, StringRef name,
                                   ValueRange operands, TypeRange results);
 
-        void setID(unsigned id);
         std::string getInputName(unsigned idx);
         std::string getOutputName(unsigned idx);
     }];

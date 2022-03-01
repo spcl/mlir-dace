@@ -305,34 +305,8 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-unsigned SDFGNode::getIndexOfState(StateNode &node) {
-  unsigned state_idx = 0;
-
-  for (Operation &op : body().getOps()) {
-    if (StateNode state = dyn_cast<StateNode>(op)) {
-      if (state.sym_name() == node.sym_name())
-        return state_idx;
-
-      ++state_idx;
-    }
-  }
-
-  return -1;
-}
-
-StateNode SDFGNode::getStateByIndex(unsigned idx) {
-  unsigned state_idx = 0;
-
-  for (Operation &op : body().getOps()) {
-    if (StateNode state = dyn_cast<StateNode>(op)) {
-      if (state_idx == idx)
-        return state;
-
-      ++state_idx;
-    }
-  }
-
-  return nullptr;
+StateNode SDFGNode::getFirstState() {
+  return *body().getOps<StateNode>().begin();
 }
 
 StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
@@ -345,12 +319,6 @@ bool SDFGNode::isNested() {
   if (StateNode state = dyn_cast<StateNode>(parent))
     return true;
   return false;
-}
-
-void SDFGNode::setID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  IDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -414,12 +382,6 @@ LogicalResult verify(StateNode op) {
     if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
       return op.emitOpError("does not support other dialects");
   return success();
-}
-
-void StateNode::setID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  IDAttr(intAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -499,12 +461,6 @@ TaskletNode TaskletNode::create(Location location, StringRef name,
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
   builder.createBlock(&task.body(), {}, operands.getTypes());
   return task;
-}
-
-void TaskletNode::setID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  IDAttr(intAttr);
 }
 
 std::string TaskletNode::getInputName(unsigned idx) {

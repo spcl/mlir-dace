@@ -34,11 +34,9 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
     let extraClassDeclaration = [{
         static SDFGNode create(PatternRewriter &rewriter, Location location, FunctionType type);
         static SDFGNode create(PatternRewriter &rewriter, Location location, FunctionType type, StringRef name);
-        unsigned getIndexOfState(StateNode &node);
-        StateNode getStateByIndex(unsigned idx);
         StateNode getStateBySymRef(StringRef symRef);
+        StateNode getFirstState();
         bool isNested();
-        void setID(unsigned id);
     }];
 }
 

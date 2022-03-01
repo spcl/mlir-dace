@@ -15,8 +15,6 @@ using namespace sdfg;
 // A check might indicate that the IR is unsound
 
 LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
-  utils::resetIDGenerator();
-
   if (++op.getOps<SDFGNode>().begin() != op.getOps<SDFGNode>().end()) {
     emitError(op.getLoc(), "Must have exactly one top-level SDFGNode");
     return failure();
@@ -26,12 +24,23 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   SDFG sdfg(sdfgNode.getLoc());
 
   for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
-    State state(stateNode.getLoc());
-    sdfg.addNode(state);
+    // State state(stateNode.getLoc());
+    std::shared_ptr<State> state(new State(stateNode.getLoc()));
+
+    state->setLabel(stateNode.getName());
+    sdfg.addState(stateNode.ID(), state);
   }
 
   for (EdgeOp edgeOp : sdfgNode.getOps<EdgeOp>()) {
-    // InterstateEdge edge();
+    StateNode srcNode = sdfgNode.getStateBySymRef(edgeOp.src());
+    StateNode destNode = sdfgNode.getStateBySymRef(edgeOp.dest());
+
+    std::shared_ptr<State> src = sdfg.lookup(srcNode.ID());
+    std::shared_ptr<State> dest = sdfg.lookup(destNode.ID());
+    InterstateEdge iEdge(src, dest);
+
+    //  TODO: Add Conditions/Assignments
+    sdfg.addEdge(iEdge);
   }
 
   sdfg.emit(jemit);

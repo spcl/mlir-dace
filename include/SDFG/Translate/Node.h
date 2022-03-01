@@ -10,7 +10,7 @@ class Attribute;
 class Connector;
 class Assignment;
 
-class Edge;
+// class Edge;
 class InterstateEdge;
 class MultiEdge;
 
@@ -28,62 +28,66 @@ class Tasklet;
 //===----------------------------------------------------------------------===//
 
 class Attribute {
-private:
+public:
   std::string name;
   // Store attribute or string?
 };
 
 class Connector {
-private:
+public:
   ConnectorNode *parent;
   std::string name;
 };
 
 class Assignment {
-private:
+public:
   std::string key;
   std::string value;
+};
+
+//===----------------------------------------------------------------------===//
+// Interfaces
+//===----------------------------------------------------------------------===//
+
+class Emittable {
+public:
+  virtual void emit(emitter::JsonEmitter &jemit) = 0;
 };
 
 //===----------------------------------------------------------------------===//
 // Edges
 //===----------------------------------------------------------------------===//
 
-class Edge {
+class InterstateEdge {
 protected:
-  Node *source;
-  Node *destination;
-
-  Edge(Node *source, Node *destination)
-      : source(source), destination(destination) {}
-
-public:
-  virtual void emit(emitter::JsonEmitter &jemit) {}
-};
-
-class InterstateEdge : public Edge {
-protected:
-  State *source;
-  State *destination;
+  std::shared_ptr<State> source;
+  std::shared_ptr<State> destination;
 
   std::string condition;
   std::vector<Assignment> assignments;
 
 public:
-  InterstateEdge(State *source, State *destination);
-  void setCondition(std::string condition);
+  InterstateEdge(std::shared_ptr<State> source,
+                 std::shared_ptr<State> destination)
+      : source(source), destination(destination) {}
+
+  void setCondition(StringRef condition);
   void addAssignment(Assignment assignment);
+
+  void emit(emitter::JsonEmitter &jemit);
 };
 
-class MultiEdge : public Edge {
+class MultiEdge {
 
 private:
-  Connector source;
-  Connector destination;
+  Connector *source;
+  Connector *destination;
   mlir::sdfg::SizedType shape;
 
 public:
-  MultiEdge(Connector source, Connector destination);
+  MultiEdge(Connector *source, Connector *destination);
+
+  void emit(emitter::JsonEmitter &jemit);
 };
 
 //===----------------------------------------------------------------------===//
@@ -94,16 +98,23 @@ class Node {
 protected:
   unsigned id;
   Location location;
+  std::string label;
   std::vector<Attribute> attributes;
   Node *parent;
 
   Node(Location location) : id(0), location(location) {}
 
 public:
-  void setID(unsigned id);
-  unsigned getID();
-  void setParent(Node *parent);
-  Node *getParent();
+  void setID(unsigned id) { this->id = id; }
+  unsigned getID() { return id; }
+
+  Location getLocation() { return location; }
+
+  void setLabel(StringRef label) { this->label = label.str(); }
+  StringRef getLabel() { return label; }
+
+  void setParent(Node *parent) { this->parent = parent; }
+  Node *getParent() { return parent; }
 
   virtual void emit(emitter::JsonEmitter &jemit) {}
 
@@ -114,29 +125,34 @@ public:
 
 class SDFG : public Node {
 private:
-  // LUT (id -> node)
+  std::map<unsigned, std::shared_ptr<State>> lut;
   std::vector<State> nodes;
   std::vector<InterstateEdge> edges;
 
 public:
   SDFG(Location location) : Node(location) {}
-  void emit(emitter::JsonEmitter &jemit) override;
-  void addNode(State &state);
+
+  std::shared_ptr<State> lookup(unsigned id);
+  void addState(unsigned id, std::shared_ptr<State> state);
   void addEdge(InterstateEdge edge);
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class State : public Node {
 
 private:
-  // LUT (id -> node)
+  std::map<unsigned, ConnectorNode *> lut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
 
 public:
   State(Location location) : Node(location) {}
-  void emit(emitter::JsonEmitter &jemit) override;
+
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class ConnectorNode : public Node {

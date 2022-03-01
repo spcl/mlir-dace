@@ -8,14 +8,20 @@ using namespace translation;
 // Edges
 //===----------------------------------------------------------------------===//
 
-InterstateEdge::InterstateEdge(State *source, State *destination)
-    : Edge(source, destination) {
-  condition = nullptr;
-  assignments.clear();
+void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "Edge");
+  jemit.printKVPair("src", source->getID());
+  jemit.printKVPair("dst", destination->getID());
+
+  jemit.startNamedObject("attributes");
+  jemit.endObject(); // attributes
+
+  jemit.endObject();
 }
 
-void InterstateEdge::setCondition(std::string condition) {
-  this->condition = condition;
+void InterstateEdge::setCondition(StringRef condition) {
+  this->condition = condition.str();
 }
 
 void InterstateEdge::addAssignment(Assignment assignment) {
@@ -23,17 +29,16 @@ void InterstateEdge::addAssignment(Assignment assignment) {
 }
 
 //===----------------------------------------------------------------------===//
-// Nodes
+// Node
 //===----------------------------------------------------------------------===//
-
-void Node::setID(unsigned id) { this->id = id; }
-unsigned Node::getID() { return id; }
-void Node::setParent(Node *parent) { this->parent = parent; }
-Node *Node::getParent() { return parent; }
 
 void Node::addAttribute(Attribute attribute) {
   attributes.push_back(attribute);
 }
+
+//===----------------------------------------------------------------------===//
+// SDFG
+//===----------------------------------------------------------------------===//
 
 void SDFG::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -50,21 +55,36 @@ void SDFG::emit(emitter::JsonEmitter &jemit) {
   jemit.endList(); // nodes
 
   jemit.startNamedList("edges");
+  for (InterstateEdge e : edges)
+    e.emit(jemit);
   jemit.endList(); // edges
 
   jemit.endObject();
 }
 
-void SDFG::addNode(State &state) {
-  state.setParent(this);
-  state.setID(nodes.size());
-  nodes.push_back(state);
+void SDFG::addState(unsigned id, std::shared_ptr<State> state) {
+  state->setParent(this);
+  state->setID(nodes.size());
+  nodes.push_back(*state);
+
+  if (!lut.insert({id, state}).second)
+    emitError(location, "Duplicate ID in SDFG::addState");
 }
+
+void SDFG::addEdge(InterstateEdge edge) { edges.push_back(edge); }
+
+std::shared_ptr<State> SDFG::lookup(unsigned id) {
+  return lut.find(id)->second;
+}
+
+//===----------------------------------------------------------------------===//
+// State
+//===----------------------------------------------------------------------===//
 
 void State::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
-  // jemit.printKVPair("label", op.sym_name());
+  jemit.printKVPair("label", label);
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");

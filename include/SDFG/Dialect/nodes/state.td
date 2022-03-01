@@ -30,7 +30,6 @@ def SDFG_StateNode : SDFG_Op<"state", [
         static StateNode create(PatternRewriter &rewriter, Location location);
         static StateNode create(PatternRewriter &rewriter, Location location, StringRef name);
         static StateNode create(Location location, StringRef name);
-        void setID(unsigned id);
     }];
 }
 
