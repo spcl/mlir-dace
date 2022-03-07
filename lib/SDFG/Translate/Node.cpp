@@ -51,7 +51,7 @@ void SDFG::emit(emitter::JsonEmitter &jemit) {
 
   jemit.startNamedList("nodes");
   for (State s : nodes)
-    s.emit(jemit);
+    s->emit(jemit);
   jemit.endList(); // nodes
 
   jemit.startNamedList("edges");
@@ -62,10 +62,10 @@ void SDFG::emit(emitter::JsonEmitter &jemit) {
   jemit.endObject();
 }
 
-void SDFG::addState(unsigned id, std::shared_ptr<State> state) {
+void SDFG::addState(unsigned id, State state) {
   state->setParent(this);
   state->setID(nodes.size());
-  nodes.push_back(*state);
+  nodes.push_back(state);
 
   if (!lut.insert({id, state}).second)
     emitError(location, "Duplicate ID in SDFG::addState");
@@ -73,15 +73,13 @@ void SDFG::addState(unsigned id, std::shared_ptr<State> state) {
 
 void SDFG::addEdge(InterstateEdge edge) { edges.push_back(edge); }
 
-std::shared_ptr<State> SDFG::lookup(unsigned id) {
-  return lut.find(id)->second;
-}
+State SDFG::lookup(unsigned id) { return lut.find(id)->second; }
 
 //===----------------------------------------------------------------------===//
 // State
 //===----------------------------------------------------------------------===//
 
-void State::emit(emitter::JsonEmitter &jemit) {
+void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
   jemit.printKVPair("label", label);

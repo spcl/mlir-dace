@@ -24,10 +24,9 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   SDFG sdfg(sdfgNode.getLoc());
 
   for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
-    // State state(stateNode.getLoc());
-    std::shared_ptr<State> state(new State(stateNode.getLoc()));
-
+    State state(stateNode.getLoc());
     state->setLabel(stateNode.getName());
+
     sdfg.addState(stateNode.ID(), state);
   }
 
@@ -35,8 +34,8 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
     StateNode srcNode = sdfgNode.getStateBySymRef(edgeOp.src());
     StateNode destNode = sdfgNode.getStateBySymRef(edgeOp.dest());
 
-    std::shared_ptr<State> src = sdfg.lookup(srcNode.ID());
-    std::shared_ptr<State> dest = sdfg.lookup(destNode.ID());
+    State src = sdfg.lookup(srcNode.ID());
+    State dest = sdfg.lookup(destNode.ID());
     InterstateEdge iEdge(src, dest);
 
     //  TODO: Add Conditions/Assignments

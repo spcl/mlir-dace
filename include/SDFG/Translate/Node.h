@@ -6,22 +6,32 @@
 #include "mlir/IR/Location.h"
 
 namespace mlir::sdfg::translation {
+class Emittable;
+
 class Attribute;
 class Connector;
 class Assignment;
 
-// class Edge;
-class InterstateEdge;
-class MultiEdge;
-
 class Node;
-class ContainerNode;
 class SDFG;
 class State;
+class StateImpl;
+
+class InterstateEdge;
+class MultiEdge;
 
 class ConnectorNode;
 class Access;
 class Tasklet;
+
+//===----------------------------------------------------------------------===//
+// Interfaces
+//===----------------------------------------------------------------------===//
+
+class Emittable {
+public:
+  virtual void emit(emitter::JsonEmitter &jemit) = 0;
+};
 
 //===----------------------------------------------------------------------===//
 // DataClasses
@@ -46,52 +56,7 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// Interfaces
-//===----------------------------------------------------------------------===//
-
-class Emittable {
-public:
-  virtual void emit(emitter::JsonEmitter &jemit) = 0;
-};
-
-//===----------------------------------------------------------------------===//
-// Edges
-//===----------------------------------------------------------------------===//
-
-class InterstateEdge {
-protected:
-  std::shared_ptr<State> source;
-  std::shared_ptr<State> destination;
-
-  std::string condition;
-  std::vector<Assignment> assignments;
-
-public:
-  InterstateEdge(std::shared_ptr<State> source,
-                 std::shared_ptr<State> destination)
-      : source(source), destination(destination) {}
-
-  void setCondition(StringRef condition);
-  void addAssignment(Assignment assignment);
-
-  void emit(emitter::JsonEmitter &jemit);
-};
-
-class MultiEdge {
-
-private:
-  Connector *source;
-  Connector *destination;
-  mlir::sdfg::SizedType shape;
-
-public:
-  MultiEdge(Connector *source, Connector *destination);
-
-  void emit(emitter::JsonEmitter &jemit);
-};
-
-//===----------------------------------------------------------------------===//
-// Nodes
+// Node
 //===----------------------------------------------------------------------===//
 
 class Node {
@@ -116,30 +81,36 @@ public:
   void setParent(Node *parent) { this->parent = parent; }
   Node *getParent() { return parent; }
 
-  virtual void emit(emitter::JsonEmitter &jemit) {}
-
   // check for existing attribtues
   // Replace or add to list
   void addAttribute(Attribute attribute);
 };
 
-class SDFG : public Node {
+//===----------------------------------------------------------------------===//
+// SDFG
+//===----------------------------------------------------------------------===//
+
+class SDFG : public Node, public Emittable {
 private:
-  std::map<unsigned, std::shared_ptr<State>> lut;
+  std::map<unsigned, State> lut;
   std::vector<State> nodes;
   std::vector<InterstateEdge> edges;
 
 public:
   SDFG(Location location) : Node(location) {}
 
-  std::shared_ptr<State> lookup(unsigned id);
-  void addState(unsigned id, std::shared_ptr<State> state);
+  State lookup(unsigned id);
+  void addState(unsigned id, State state);
   void addEdge(InterstateEdge edge);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class State : public Node {
+//===----------------------------------------------------------------------===//
+// State
+//===----------------------------------------------------------------------===//
+
+class StateImpl : public Node, public Emittable {
 
 private:
   std::map<unsigned, ConnectorNode *> lut;
@@ -147,13 +118,67 @@ private:
   std::vector<MultiEdge> edges;
 
 public:
-  State(Location location) : Node(location) {}
+  StateImpl(Location location) : Node(location) {}
 
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
+
+class State : public Emittable {
+private:
+  std::shared_ptr<StateImpl> ptr;
+
+public:
+  State(Location location) : ptr(std::make_shared<StateImpl>(location)){};
+
+  StateImpl *operator->() const { return ptr.get(); }
+  std::shared_ptr<StateImpl> operator*() const { return ptr; }
+
+  void emit(emitter::JsonEmitter &jemit) override { ptr->emit(jemit); }
+};
+
+//===----------------------------------------------------------------------===//
+// Edges
+//===----------------------------------------------------------------------===//
+
+class InterstateEdge : public Emittable {
+protected:
+  State source;
+  State destination;
+
+  std::string condition;
+  std::vector<Assignment> assignments;
+
+public:
+  InterstateEdge(State source, State destination)
+      : source(source), destination(destination) {}
+
+  // Warn on override
+  void setCondition(StringRef condition);
+  // Check for duplicates
+  void addAssignment(Assignment assignment);
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class MultiEdge : public Emittable {
+
+private:
+  Connector *source;
+  Connector *destination;
+  mlir::sdfg::SizedType shape;
+
+public:
+  MultiEdge(Connector *source, Connector *destination);
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+//===----------------------------------------------------------------------===//
+// ConnectorNode
+//===----------------------------------------------------------------------===//
 
 class ConnectorNode : public Node {
 
