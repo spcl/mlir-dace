@@ -38,7 +38,15 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
     State dest = sdfg.lookup(destNode.ID());
     InterstateEdge iEdge(src, dest);
 
-    //  TODO: Add Conditions/Assignments
+    iEdge.setCondition(edgeOp.condition());
+
+    for (mlir::Attribute attr : edgeOp.assign()) {
+      std::pair<StringRef, StringRef> kv =
+          attr.cast<StringAttr>().getValue().split(':');
+
+      iEdge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
+    }
+
     sdfg.addEdge(iEdge);
   }
 

@@ -740,8 +740,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, from.sym_name(), to.sym_name(), nullptr, nullptr,
-        nullptr);
+  build(builder, state, from.sym_name(), to.sym_name(), nullptr, "1", nullptr);
   return cast<EdgeOp>(rewriter.createOperation(state));
 }
 
@@ -795,7 +794,13 @@ static void print(OpAsmPrinter &p, EdgeOp op) {
   p.printAttributeWithoutType(op.destAttr());
 }
 
-LogicalResult verify(EdgeOp op) { return success(); }
+LogicalResult verify(EdgeOp op) {
+  // Check that condition is non-empty
+  if (op.condition().empty())
+    return op.emitOpError() << "condition must be non-empty or omitted";
+
+  return success();
+}
 
 LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the src/dest attributes are specified.
@@ -1691,7 +1696,7 @@ LogicalResult verify(AllocSymbolOp op) {
     return op.emitOpError("failed to verify that input string starts with "
                           "an alphabetical character");
 
-  for (auto c : op.sym())
+  for (char c : op.sym())
     if (!isalnum(c) && c != '_')
       return op.emitOpError("failed to verify that input string only "
                             "contains alphanumeric characters");

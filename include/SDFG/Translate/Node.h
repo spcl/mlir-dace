@@ -45,14 +45,24 @@ public:
 
 class Connector {
 public:
+  // TODO: Change to shared_ptr
   ConnectorNode *parent;
   std::string name;
+};
+
+class Condition {
+public:
+  std::string condition;
+
+  Condition(StringRef condition) : condition(condition) {}
 };
 
 class Assignment {
 public:
   std::string key;
   std::string value;
+
+  Assignment(StringRef key, StringRef value) : key(key), value(value) {}
 };
 
 //===----------------------------------------------------------------------===//
@@ -65,6 +75,7 @@ protected:
   Location location;
   std::string label;
   std::vector<Attribute> attributes;
+  // TODO: Change to shared_ptr
   Node *parent;
 
   Node(Location location) : id(0), location(location) {}
@@ -134,7 +145,6 @@ public:
   State(Location location) : ptr(std::make_shared<StateImpl>(location)){};
 
   StateImpl *operator->() const { return ptr.get(); }
-  std::shared_ptr<StateImpl> operator*() const { return ptr; }
 
   void emit(emitter::JsonEmitter &jemit) override { ptr->emit(jemit); }
 };
@@ -148,15 +158,14 @@ protected:
   State source;
   State destination;
 
-  std::string condition;
+  Condition condition;
   std::vector<Assignment> assignments;
 
 public:
   InterstateEdge(State source, State destination)
-      : source(source), destination(destination) {}
+      : source(source), destination(destination), condition("1") {}
 
-  // Warn on override
-  void setCondition(StringRef condition);
+  void setCondition(Condition condition);
   // Check for duplicates
   void addAssignment(Assignment assignment);
 
@@ -166,7 +175,9 @@ public:
 class MultiEdge : public Emittable {
 
 private:
+  // TODO: Change to shared_ptr
   Connector *source;
+  // TODO: Change to shared_ptr
   Connector *destination;
   mlir::sdfg::SizedType shape;
 

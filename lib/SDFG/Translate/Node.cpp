@@ -14,14 +14,30 @@ void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("src", source->getID());
   jemit.printKVPair("dst", destination->getID());
 
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "InterstateEdge");
+  // label
+
   jemit.startNamedObject("attributes");
+
+  jemit.startNamedObject("assignments");
+  for (Assignment a : assignments)
+    jemit.printKVPair(a.key, a.value);
+  jemit.endObject(); // assignments
+
+  jemit.startNamedObject("condition");
+  jemit.printKVPair("string_data", condition.condition);
+  jemit.printKVPair("language", "Python");
+  jemit.endObject(); // condition
+
   jemit.endObject(); // attributes
+  jemit.endObject(); // data
 
   jemit.endObject();
 }
 
-void InterstateEdge::setCondition(StringRef condition) {
-  this->condition = condition.str();
+void InterstateEdge::setCondition(Condition condition) {
+  this->condition = condition;
 }
 
 void InterstateEdge::addAssignment(Assignment assignment) {

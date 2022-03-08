@@ -22,8 +22,8 @@ def SDFG_EdgeOp : SDFG_Op<"edge", [
 
     let arguments = (ins 
         FlatSymbolRefAttr:$src, FlatSymbolRefAttr:$dest, 
-        OptionalAttr<TypedArrayAttrBase<StrAttr, "assignment array">>:$assign, 
-        OptionalAttr<StrAttr>:$condition,
+        DefaultValuedAttr<StrArrayAttr, "{}">:$assign, 
+        DefaultValuedAttr<StrAttr, "\"1\"">:$condition,
         Optional<AnyType>:$ref
     );
 
