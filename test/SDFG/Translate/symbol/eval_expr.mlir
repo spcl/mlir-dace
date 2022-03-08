@@ -1,4 +1,4 @@
-// RUN: sdfg-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
+// RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 module  {
   sdfg.sdfg {entry = @state_0} @kernel_2mm(%arg1: !sdfg.memlet<index>) {
     sdfg.alloc_symbol("idx")

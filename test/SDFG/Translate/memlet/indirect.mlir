@@ -1,4 +1,4 @@
-// RUN: sdfg-translate --mlir-to-sdfg %s | python %S/../import_translation_test.py
+// RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 module  {
   sdfg.sdfg {entry = @state_1} @kernel_2mm(%arg0: index, %arg1: !sdfg.memlet<sym("s_0")x900xi32>) {
     sdfg.state @state_1 {

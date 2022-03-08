@@ -16,5 +16,5 @@ sdfg.sdfg{entry=@state_0} @sdfg_0 {
     // CHECK: sdfg.edge
     // CHECK-SAME: assign = ["i: 1", "j: 5"]
     // CHECK-SAME: [[STATE0]] -> [[STATE1]]
-    sdfg.edge{assign=["i: 1", "j: 5"], condition=""} @state_0 -> @state_1
+    sdfg.edge{assign=["i: 1", "j: 5"]} @state_0 -> @state_1
 }
