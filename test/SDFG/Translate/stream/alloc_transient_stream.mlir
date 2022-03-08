@@ -2,7 +2,7 @@
 
 sdfg.sdfg{entry=@state_0} @sdfg_0 {
     sdfg.state @state_0 {
-        %A = sdfg.alloc{transient}() : !sdfg.stream_array<i32>
+        %A = sdfg.alloc{transient}() : !sdfg.stream<i32>
     }
 }
 
