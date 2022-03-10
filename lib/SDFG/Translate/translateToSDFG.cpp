@@ -31,6 +31,9 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
     sdfg.addState(stateNode.ID(), state);
   }
 
+  StateNode entryState = sdfgNode.getStateBySymRef(sdfgNode.entry());
+  sdfg.setStartState(sdfg.lookup(entryState.ID()));
+
   for (EdgeOp edgeOp : sdfgNode.getOps<EdgeOp>()) {
     StateNode srcNode = sdfgNode.getStateBySymRef(edgeOp.src());
     StateNode destNode = sdfgNode.getStateBySymRef(edgeOp.dest());

@@ -62,7 +62,8 @@ void SDFG::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFG");
   jemit.printKVPair("sdfg_list_id", id, /*stringify=*/false);
-  jemit.printKVPair("start_state", states[0]->getID(), /*stringify=*/false);
+  jemit.printKVPair("start_state", startState->getID(),
+                    /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
   jemit.printKVPair("name", name);
@@ -101,6 +102,14 @@ void SDFG::addState(unsigned id, State state) {
 
   if (!lut.insert({id, state}).second)
     emitError(location, "Duplicate ID in SDFG::addState");
+}
+
+void SDFG::setStartState(State state) {
+  if (std::find(states.begin(), states.end(), state) == states.end())
+    emitError(location,
+              "Non-existent state assigned as start in SDFG::setStartState");
+  else
+    this->startState = state;
 }
 
 void SDFG::addEdge(InterstateEdge edge) { edges.push_back(edge); }

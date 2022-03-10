@@ -102,27 +102,6 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// SDFG
-//===----------------------------------------------------------------------===//
-
-class SDFG : public Node, public Emittable {
-private:
-  std::map<unsigned, State> lut;
-  std::vector<State> states;
-  std::vector<InterstateEdge> edges;
-
-public:
-  SDFG(Location location) : Node(location) {}
-
-  State lookup(unsigned id);
-  void addState(unsigned id, State state);
-  // void setStartState();
-  void addEdge(InterstateEdge edge);
-
-  void emit(emitter::JsonEmitter &jemit) override;
-};
-
-//===----------------------------------------------------------------------===//
 // State
 //===----------------------------------------------------------------------===//
 
@@ -147,11 +126,35 @@ private:
   std::shared_ptr<StateImpl> ptr;
 
 public:
-  State(Location location) : ptr(std::make_shared<StateImpl>(location)){};
+  State() : ptr(nullptr) {}
+  State(Location location) : ptr(std::make_shared<StateImpl>(location)) {}
 
-  StateImpl *operator->() const { return ptr.get(); }
+  std::shared_ptr<StateImpl> operator->() const { return ptr; }
+  bool operator==(const State other) const { return other.ptr == ptr; }
 
   void emit(emitter::JsonEmitter &jemit) override { ptr->emit(jemit); }
+};
+
+//===----------------------------------------------------------------------===//
+// SDFG
+//===----------------------------------------------------------------------===//
+
+class SDFG : public Node, public Emittable {
+private:
+  std::map<unsigned, State> lut;
+  std::vector<State> states;
+  std::vector<InterstateEdge> edges;
+  State startState;
+
+public:
+  SDFG(Location location) : Node(location) {}
+
+  State lookup(unsigned id);
+  void addState(unsigned id, State state);
+  void setStartState(State state);
+  void addEdge(InterstateEdge edge);
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 //===----------------------------------------------------------------------===//
