@@ -22,6 +22,7 @@ def SDFG_TaskletNode : SDFG_Op<"tasklet", [
 
     let arguments = (ins
         I32Attr:$ID,
+        // TODO: Remove Tasklet name
         SymbolNameAttr:$sym_name, 
         Variadic<AnyType>:$operands
     );

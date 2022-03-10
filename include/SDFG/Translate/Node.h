@@ -129,6 +129,7 @@ public:
   State() : ptr(nullptr) {}
   State(Location location) : ptr(std::make_shared<StateImpl>(location)) {}
 
+  // TODO: Avoid -> overloading
   std::shared_ptr<StateImpl> operator->() const { return ptr; }
   bool operator==(const State other) const { return other.ptr == ptr; }
 
