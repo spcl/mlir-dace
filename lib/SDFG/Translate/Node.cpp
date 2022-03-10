@@ -14,6 +14,7 @@ void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("src", source->getID());
   jemit.printKVPair("dst", destination->getID());
 
+  jemit.startNamedObject("attributes");
   jemit.startNamedObject("data");
   jemit.printKVPair("type", "InterstateEdge");
   // label
@@ -32,6 +33,7 @@ void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
 
   jemit.endObject(); // attributes
   jemit.endObject(); // data
+  jemit.endObject(); // attributes
 
   jemit.endObject();
 }
@@ -60,13 +62,27 @@ void SDFG::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFG");
   jemit.printKVPair("sdfg_list_id", id, /*stringify=*/false);
-  // jemit.printKVPair("start_state", entryState.ID(), /*stringify=*/false);
+  jemit.printKVPair("start_state", states[0]->getID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  jemit.printKVPair("name", name);
+
+  jemit.startNamedList("arg_names");
+  jemit.endList(); // arg_names
+
+  jemit.startNamedObject("constants_prop");
+  jemit.endObject(); // constants_prop
+
+  jemit.startNamedObject("_arrays");
+  jemit.endObject(); // _arrays
+
+  jemit.startNamedObject("symbols");
+  jemit.endObject(); // symbols
+
   jemit.endObject(); // attributes
 
   jemit.startNamedList("nodes");
-  for (State s : nodes)
+  for (State s : states)
     s->emit(jemit);
   jemit.endList(); // nodes
 
@@ -80,8 +96,8 @@ void SDFG::emit(emitter::JsonEmitter &jemit) {
 
 void SDFG::addState(unsigned id, State state) {
   state->setParent(this);
-  state->setID(nodes.size());
-  nodes.push_back(state);
+  state->setID(states.size());
+  states.push_back(state);
 
   if (!lut.insert({id, state}).second)
     emitError(location, "Duplicate ID in SDFG::addState");
@@ -98,7 +114,7 @@ State SDFG::lookup(unsigned id) { return lut.find(id)->second; }
 void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
-  jemit.printKVPair("label", label);
+  jemit.printKVPair("label", name);
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");

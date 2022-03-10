@@ -3,6 +3,7 @@
 
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Translate/JsonEmitter.h"
+#include "SDFG/Utils/Utils.h"
 #include "mlir/IR/Location.h"
 
 namespace mlir::sdfg::translation {
@@ -73,7 +74,7 @@ class Node {
 protected:
   unsigned id;
   Location location;
-  std::string label;
+  std::string name;
   std::vector<Attribute> attributes;
   // TODO: Change to shared_ptr
   Node *parent;
@@ -86,8 +87,11 @@ public:
 
   Location getLocation() { return location; }
 
-  void setLabel(StringRef label) { this->label = label.str(); }
-  StringRef getLabel() { return label; }
+  void setName(StringRef name) {
+    this->name = name.str();
+    utils::sanitizeName(this->name);
+  }
+  StringRef getName() { return name; }
 
   void setParent(Node *parent) { this->parent = parent; }
   Node *getParent() { return parent; }
@@ -104,7 +108,7 @@ public:
 class SDFG : public Node, public Emittable {
 private:
   std::map<unsigned, State> lut;
-  std::vector<State> nodes;
+  std::vector<State> states;
   std::vector<InterstateEdge> edges;
 
 public:
@@ -112,6 +116,7 @@ public:
 
   State lookup(unsigned id);
   void addState(unsigned id, State state);
+  // void setStartState();
   void addEdge(InterstateEdge edge);
 
   void emit(emitter::JsonEmitter &jemit) override;
