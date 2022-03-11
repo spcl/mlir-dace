@@ -281,20 +281,26 @@ LogicalResult verify(SDFGNode op) {
     for (Operation &oper : op.body().getOps())
       if (oper.getDialect() != (*op).getDialect())
         return op.emitOpError("does not support other dialects"); */
+
+  // Verify that body contains at least one state
+  if (op.body().getOps<StateNode>().empty())
+    return op.emitOpError() << "must contain at least one state";
+
   return success();
 }
 
 LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
-  // Check that the entry attribute is specified.
+  // Check that the entry attribute references valid state
   FlatSymbolRefAttr entryAttr =
       (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
-  if (!entryAttr)
-    return emitOpError("requires a 'src' symbol reference attribute");
-  StateNode entry =
-      symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
-  if (!entry)
-    return emitOpError() << "'" << entryAttr.getValue()
-                         << "' does not reference a valid state";
+
+  if (!!entryAttr) {
+    StateNode entry =
+        symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
+    if (!entry)
+      return emitOpError() << "'" << entryAttr.getValue()
+                           << "' does not reference a valid state";
+  }
 
   return success();
 }

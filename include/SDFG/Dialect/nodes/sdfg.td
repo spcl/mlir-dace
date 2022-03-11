@@ -22,7 +22,7 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
 
     let arguments = (ins 
         I32Attr:$ID,
-        FlatSymbolRefAttr:$entry,
+        OptionalAttr<FlatSymbolRefAttr>:$entry,
         I32Attr:$num_args,
         Variadic<AnyType>:$operands
     );

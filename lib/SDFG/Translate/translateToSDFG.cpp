@@ -31,8 +31,13 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
     sdfg.addState(stateNode.ID(), state);
   }
 
-  StateNode entryState = sdfgNode.getStateBySymRef(sdfgNode.entry());
-  sdfg.setStartState(sdfg.lookup(entryState.ID()));
+  if (sdfgNode.entry().hasValue()) {
+    StateNode entryState =
+        sdfgNode.getStateBySymRef(sdfgNode.entry().getValue());
+    sdfg.setStartState(sdfg.lookup(entryState.ID()));
+  } else {
+    sdfg.setStartState(sdfg.lookup(sdfgNode.getFirstState().ID()));
+  }
 
   for (EdgeOp edgeOp : sdfgNode.getOps<EdgeOp>()) {
     StateNode srcNode = sdfgNode.getStateBySymRef(edgeOp.src());

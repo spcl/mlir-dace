@@ -1,12 +1,15 @@
-// RUN: not sdfg-opt %s 2>&1 | FileCheck %s
-// CHECK: requires a 'src' symbol reference attribute
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
+// CHECK: sdfg.sdfg 
 sdfg.sdfg{} {
-    sdfg.state @state_0{
-    }
+  // CHECK: sdfg.state [[State0:@[a-zA-Z0-9_]*]] 
+  sdfg.state @state_0{
+  }
 
-    sdfg.state @state_1{
-    }
+  // CHECK: sdfg.state [[State1:@[a-zA-Z0-9_]*]] 
+  sdfg.state @state_1{
+  }
 
-    sdfg.edge{assign=["i: 1"], condition=""} @state_0 -> @state_1
+  // CHECK: sdfg.edge {assign = ["i: 1"]} [[State0]] -> [[State1]]
+  sdfg.edge{assign=["i: 1"]} @state_0 -> @state_1
 }
