@@ -14,13 +14,13 @@ sdfg.sdfg{entry=@state_0} {
         }
 
         sdfg.consume{num_pes=5, condition=@empty} (%A : !sdfg.stream<i32>) -> (pe: %p, elem: %e) {
-            %res = sdfg.tasklet @add_one(%e: i64) -> i64{
+            %res = sdfg.tasklet(%e: i64) -> i64{
                 %1 = arith.constant 1 : i64
                 %res = arith.addi %e, %1 : i64
                 sdfg.return %res : i64
             }
 
-            %0 = sdfg.tasklet @zero() -> index{
+            %0 = sdfg.tasklet() -> index{
                 %0 = arith.constant 0 : index
                 sdfg.return %0 : index
             }

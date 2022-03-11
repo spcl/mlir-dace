@@ -9,8 +9,8 @@ sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state
     // CHECK-SAME: @state_0
     sdfg.state @state_0 {
-        // CHECK: [[NAMEB:%[a-zA-Z0-9_]*]] = sdfg.tasklet @zero
-        %0 = sdfg.tasklet @zero() -> i32{
+        // CHECK: [[NAMEB:%[a-zA-Z0-9_]*]] = sdfg.tasklet
+        %0 = sdfg.tasklet() -> i32{
             %0 = arith.constant 0 : i32
             sdfg.return %0 : i32
         }

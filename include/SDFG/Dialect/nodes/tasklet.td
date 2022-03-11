@@ -5,8 +5,7 @@ def SDFG_TaskletNode : SDFG_Op<"tasklet", [
     ParentOneOf<["StateNode","MapNode","ConsumeNode"]>,
     AffineScope, 
     AutomaticAllocationScope, 
-    IsolatedFromAbove, 
-    Symbol
+    IsolatedFromAbove
 ]> {
     let summary = "Tasklet";
     let description = [{
@@ -22,8 +21,6 @@ def SDFG_TaskletNode : SDFG_Op<"tasklet", [
 
     let arguments = (ins
         I32Attr:$ID,
-        // TODO: Remove Tasklet name
-        SymbolNameAttr:$sym_name, 
         Variadic<AnyType>:$operands
     );
 
@@ -33,8 +30,8 @@ def SDFG_TaskletNode : SDFG_Op<"tasklet", [
     let extraClassDeclaration = [{
         static TaskletNode create(PatternRewriter &rewriter, Location location, 
                                   ValueRange operands, TypeRange results);
-        static TaskletNode create(Location location, StringRef name,
-                                  ValueRange operands, TypeRange results);
+        static TaskletNode create(Location location, ValueRange operands, 
+                                  TypeRange results);
 
         std::string getInputName(unsigned idx);
         std::string getOutputName(unsigned idx);

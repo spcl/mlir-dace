@@ -4,7 +4,7 @@
 sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0{
 
-        %res = sdfg.tasklet @get_zero() -> i32{
+        %res = sdfg.tasklet() -> i32{
             %c = arith.constant 0 : i64
             sdfg.return %c : i64
         }

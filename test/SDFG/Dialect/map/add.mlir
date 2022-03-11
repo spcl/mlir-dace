@@ -24,10 +24,10 @@ sdfg.sdfg{entry=@state_0} {
             // CHECK-NEXT: [[NAMEb_ij:%[a-zA-Z0-9_]*]] = sdfg.load [[NAMEB]]
             // CHECK-SAME: [[NAMEi]], [[NAMEj]]
             %b_ij = sdfg.load %B[%i, %j] : !sdfg.array<2x6xi32> -> i32
-            // CHECK: [[NAMEres:%[a-zA-Z0-9_]*]] = sdfg.tasklet @add
+            // CHECK: [[NAMEres:%[a-zA-Z0-9_]*]] = sdfg.tasklet
             // CHECK-SAME: [[NAMEa_ij]]
             // CHECK-SAME: [[NAMEb_ij]]
-            %res = sdfg.tasklet @add(%a_ij: i32, %b_ij: i32) -> i32{
+            %res = sdfg.tasklet(%a_ij: i32, %b_ij: i32) -> i32{
                 %z = arith.addi %a_ij, %b_ij : i32
                 sdfg.return %z : i32
             }

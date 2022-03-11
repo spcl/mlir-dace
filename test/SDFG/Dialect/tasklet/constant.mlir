@@ -6,9 +6,8 @@ sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state @state_0
     sdfg.state @state_0{
         // CHECK: sdfg.tasklet 
-        // CHECK-SAME: @get_zero
         // CHECK-SAME: i32
-        %res = sdfg.tasklet @get_zero() -> i32{
+        %res = sdfg.tasklet() -> i32{
             // CHECK-NEXT: [[NAME:%[a-zA-Z0-9_]*]]
             %c = arith.constant 0 : i32
             // CHECK-NEXT: sdfg.return [[NAME]]

@@ -11,8 +11,8 @@ sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0 {
         // CHECK-NEXT: sdfg.alloc_symbol("N")
         sdfg.alloc_symbol("N")
-        // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdfg.tasklet @one
-        %1 = sdfg.tasklet @one() -> i32{
+        // CHECK: [[NAME1:%[a-zA-Z0-9_]*]] = sdfg.tasklet
+        %1 = sdfg.tasklet() -> i32{
             %1 = arith.constant 1 : i32
             sdfg.return %1 : i32
         }

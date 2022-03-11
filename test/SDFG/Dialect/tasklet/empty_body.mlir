@@ -3,7 +3,7 @@
 
 sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0{
-        sdfg.tasklet @get_zero() -> i32{
+        sdfg.tasklet() -> i32{
         }
     }
 }

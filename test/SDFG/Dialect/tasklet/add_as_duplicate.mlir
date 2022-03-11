@@ -6,16 +6,16 @@ sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state @state_0
     sdfg.state @state_0{
         // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]]
-        // CHECK-SAME: sdfg.tasklet @one
-        %c = sdfg.tasklet @one() -> i32{
+        // CHECK-SAME: sdfg.tasklet
+        %c = sdfg.tasklet() -> i32{
             %1 = arith.constant 1 : i32
             sdfg.return %1 : i32
         }
 
-        // CHECK: sdfg.tasklet @add
+        // CHECK: sdfg.tasklet
         // CHECK-SAME: [[NAMEC]] as [[NAMEB1:%[a-zA-Z0-9_]*]]
         // CHECK-SAME: [[NAMEC]] as [[NAMEB2:%[a-zA-Z0-9_]*]]
-        %s = sdfg.tasklet @add(%c as %b1: i32, %c as %b2: i32) -> i32{
+        %s = sdfg.tasklet(%c as %b1: i32, %c as %b2: i32) -> i32{
             // CHECK-NEXT: [[NAMER:%[a-zA-Z0-9_]*]]
             // CHECK-SAME: [[NAMEB1]], [[NAMEB2]]
             %r = arith.addi %b1, %b2 : i32

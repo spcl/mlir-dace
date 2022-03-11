@@ -397,10 +397,6 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
-  StringAttr sym_nameAttr;
-  if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
-    return failure();
-
   SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
 
@@ -421,9 +417,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 static void print(OpAsmPrinter &p, TaskletNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"ID", "sym_name"});
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p << '(';
+  p << " (";
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     if (i > 0)
@@ -443,20 +437,18 @@ TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
                                 ValueRange operands, TypeRange results) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
-  build(builder, state, results, utils::generateID(),
-        utils::generateName("task"), operands);
+  build(builder, state, results, utils::generateID(), operands);
 
   TaskletNode task = cast<TaskletNode>(rewriter.createOperation(state));
   rewriter.createBlock(&task.getRegion(), {}, operands.getTypes());
   return task;
 }
 
-TaskletNode TaskletNode::create(Location location, StringRef name,
-                                ValueRange operands, TypeRange results) {
+TaskletNode TaskletNode::create(Location location, ValueRange operands,
+                                TypeRange results) {
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
-  build(builder, state, results, utils::generateID(),
-        utils::generateName(name.str()), operands);
+  build(builder, state, results, utils::generateID(), operands);
 
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
   builder.createBlock(&task.body(), {}, operands.getTypes());
@@ -468,8 +460,9 @@ std::string TaskletNode::getInputName(unsigned idx) {
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   getOperand(idx).printAsOperand(nameStream, state);
+  // NOTE: Maybe use utils::sanitize
   name.erase(0, 1); // Remove %-sign
-  return getName().str() + "_" + name;
+  return name;
 }
 
 std::string TaskletNode::getOutputName(unsigned idx) {

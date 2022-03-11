@@ -26,15 +26,15 @@ sdfg.sdfg{entry=@state_0} {
         // CHECK-SAME: pe: [[NAMEp:%[a-zA-Z0-9_]*]]
         // CHECK-SAME: elem: [[NAMEe:%[a-zA-Z0-9_]*]]
         sdfg.consume{num_pes=5, condition=@empty} (%A : !sdfg.stream<i32>) -> (pe: %p, elem: %e) {
-            // CHECK: [[NAMEres:%[a-zA-Z0-9_]*]] = sdfg.tasklet @add_one
+            // CHECK: [[NAMEres:%[a-zA-Z0-9_]*]] = sdfg.tasklet
             // CHECK-SAME: [[NAMEe]]
-            %res = sdfg.tasklet @add_one(%e: i32) -> i32{
+            %res = sdfg.tasklet(%e: i32) -> i32{
                 %1 = arith.constant 1 : i32
                 %res = arith.addi %e, %1 : i32
                 sdfg.return %res : i32
             }
-            // CHECK: [[NAMEzero:%[a-zA-Z0-9_]*]] = sdfg.tasklet @zero()
-            %0 = sdfg.tasklet @zero() -> index{
+            // CHECK: [[NAMEzero:%[a-zA-Z0-9_]*]] = sdfg.tasklet
+            %0 = sdfg.tasklet() -> index{
                 %0 = arith.constant 0 : index
                 sdfg.return %0 : index
             }

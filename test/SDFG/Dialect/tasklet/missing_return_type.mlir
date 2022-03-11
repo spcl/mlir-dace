@@ -3,7 +3,7 @@
 
 sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0{
-        sdfg.tasklet @get_zero() -> {
+        sdfg.tasklet() -> {
             %c = arith.constant 0 : i32
             sdfg.return %c : i32
         }

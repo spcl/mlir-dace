@@ -9,13 +9,13 @@ sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state
     // CHECK-SAME: @state_0
     sdfg.state @state_0 {
-        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdfg.tasklet @zero
-        %0 = sdfg.tasklet @zero() -> index{
+        // CHECK: [[NAME0:%[a-zA-Z0-9_]*]] = sdfg.tasklet
+        %0 = sdfg.tasklet() -> index{
             %0 = arith.constant 0 : index
             sdfg.return %0 : index
         }
-        // CHECK: [[NAMEC:%[a-zA-Z0-9_]*]] = sdfg.tasklet @one
-        %1 = sdfg.tasklet @one() -> i32{
+        // CHECK: [[NAMEC:%[a-zA-Z0-9_]*]] = sdfg.tasklet
+        %1 = sdfg.tasklet() -> i32{
             %1 = arith.constant 1 : i32
             sdfg.return %1 : i32
         }
