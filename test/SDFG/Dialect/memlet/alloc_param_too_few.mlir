@@ -3,7 +3,7 @@
 
 sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0{
-        %n = sdfg.tasklet() -> index{
+        %n = sdfg.tasklet() -> (index) {
             %5 = arith.constant 5 : index
             sdfg.return %5 : index
         }

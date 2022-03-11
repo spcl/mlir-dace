@@ -5,12 +5,12 @@ sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0 {
         sdfg.alloc_symbol("N")
 
-        %0 = sdfg.tasklet() -> index{
+        %0 = sdfg.tasklet() -> (index) {
                 %0 = arith.constant 0 : index
                 sdfg.return %0 : index
             }
 
-        %1 = sdfg.tasklet() -> index{
+        %1 = sdfg.tasklet() -> (index) {
                 %1 = arith.constant 1 : index
                 sdfg.return %1 : index
             }

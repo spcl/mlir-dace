@@ -403,7 +403,8 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
   if (parser.parseLParen() || parseAsArgs(parser, result, args, argTypes))
     return failure();
 
-  if (parser.parseArrow() || parser.parseTypeList(result.types))
+  if (parser.parseArrow() || parser.parseLParen() ||
+      parser.parseTypeList(result.types) || parser.parseRParen())
     return failure();
 
   if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
@@ -424,7 +425,7 @@ static void print(OpAsmPrinter &p, TaskletNode op) {
       << op.getOperandTypes()[i];
   }
 
-  p << ") -> " << op.getResultTypes();
+  p << ") -> (" << op.getResultTypes() << ")";
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
@@ -845,7 +846,7 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, AllocOp op) {
   p.printOptionalAttrDict(op->getAttrs());
-  p << "(";
+  p << " (";
   p.printOperands(op.params());
   p << ") : ";
   p << op.getOperation()->getResultTypes();
@@ -1628,7 +1629,7 @@ static void print(OpAsmPrinter &p, LibCallOp op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
   p << ' ';
   p.printAttributeWithoutType(op.calleeAttr());
-  p << "(" << op.operands() << ")";
+  p << " (" << op.operands() << ")";
   p << " : ";
   p.printFunctionalType(op.operands().getTypes(),
                         op.getOperation()->getResultTypes());
@@ -1674,7 +1675,7 @@ static ParseResult parseAllocSymbolOp(OpAsmParser &parser,
 
 static void print(OpAsmPrinter &p, AllocSymbolOp op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym"});
-  p << "(";
+  p << " (";
   p.printAttributeWithoutType(op.symAttr());
   p << ")";
 }
@@ -1734,7 +1735,7 @@ static ParseResult parseSymOp(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, SymOp op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"expr"});
-  p << "(";
+  p << " (";
   p.printAttributeWithoutType(op.exprAttr());
   p << ") : " << op->getResultTypes();
 }

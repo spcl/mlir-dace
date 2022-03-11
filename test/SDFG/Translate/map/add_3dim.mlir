@@ -11,7 +11,7 @@ sdfg.sdfg{entry=@state_0} {
             %a_ijg = sdfg.load %A[%i, %j, %g] : !sdfg.array<2x6x8xi32> -> i32
             %b_ijg = sdfg.load %B[%i, %j, %g] : !sdfg.array<2x6x8xi32> -> i32
 
-            %res = sdfg.tasklet(%a_ijg: i32, %b_ijg: i32) -> i32{
+            %res = sdfg.tasklet(%a_ijg: i32, %b_ijg: i32) -> (i32) {
                 %z = arith.addi %a_ijg, %b_ijg : i32
                 sdfg.return %z : i32
             }

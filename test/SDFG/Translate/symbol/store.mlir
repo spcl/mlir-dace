@@ -6,7 +6,7 @@ sdfg.sdfg{entry=@state_0} {
     sdfg.state @state_0 {
         sdfg.alloc_symbol("N")
 
-        %1 = sdfg.tasklet () -> i32{
+        %1 = sdfg.tasklet () -> (i32) {
                 %1 = arith.constant 1 : i32
                 sdfg.return %1 : i32
             }

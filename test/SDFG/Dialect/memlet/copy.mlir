@@ -3,10 +3,10 @@
 // CHECK: module
 // CHECK: sdfg.sdfg
 sdfg.sdfg{entry=@state_0} {
-    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc
     // CHECK-SAME: !sdfg.array<i32>
     %A = sdfg.alloc() : !sdfg.array<i32>
-    // CHECK-NEXT: [[NAMEB:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+    // CHECK-NEXT: [[NAMEB:%[a-zA-Z0-9_]*]] = sdfg.alloc
     // CHECK-SAME: !sdfg.array<i32>
     %B = sdfg.alloc() : !sdfg.array<i32>
     // CHECK: sdfg.state

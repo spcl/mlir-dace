@@ -6,10 +6,10 @@
 sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state {{@[a-zA-Z0-9_]*}}
     sdfg.state @state_0 {
-        // CHECK: [[ARRAYN:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+        // CHECK: [[ARRAYN:%[a-zA-Z0-9_]*]] = sdfg.alloc
         // CHECK-SAME: !sdfg.array<i32>
         %N = sdfg.alloc() : !sdfg.array<i32>
-        // CHECK: [[ARRAYR:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+        // CHECK: [[ARRAYR:%[a-zA-Z0-9_]*]] = sdfg.alloc
         // CHECK-SAME: !sdfg.array<i32>
         %R = sdfg.alloc() : !sdfg.array<i32>
         // CHECK: sdfg.sdfg

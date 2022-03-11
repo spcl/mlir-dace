@@ -3,10 +3,10 @@
 // CHECK: module
 // CHECK: sdfg.sdfg
 sdfg.sdfg{entry=@state_0} {
-    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+    // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc
     // CHECK-SAME: !sdfg.stream<i32>
     %A = sdfg.alloc() : !sdfg.stream<i32>
-    // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]] = sdfg.alloc()
+    // CHECK-NEXT: [[NAMEC:%[a-zA-Z0-9_]*]] = sdfg.alloc
     // CHECK-SAME: !sdfg.array<6xi32>
     %C = sdfg.alloc() : !sdfg.array<6xi32>
     // CHECK: sdfg.state
@@ -28,13 +28,13 @@ sdfg.sdfg{entry=@state_0} {
         sdfg.consume{num_pes=5, condition=@empty} (%A : !sdfg.stream<i32>) -> (pe: %p, elem: %e) {
             // CHECK: [[NAMEres:%[a-zA-Z0-9_]*]] = sdfg.tasklet
             // CHECK-SAME: [[NAMEe]]
-            %res = sdfg.tasklet(%e: i32) -> i32{
+            %res = sdfg.tasklet(%e: i32) -> (i32) {
                 %1 = arith.constant 1 : i32
                 %res = arith.addi %e, %1 : i32
                 sdfg.return %res : i32
             }
             // CHECK: [[NAMEzero:%[a-zA-Z0-9_]*]] = sdfg.tasklet
-            %0 = sdfg.tasklet() -> index{
+            %0 = sdfg.tasklet() -> (index) {
                 %0 = arith.constant 0 : index
                 sdfg.return %0 : index
             }
