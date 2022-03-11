@@ -414,8 +414,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 }
 
 static void print(OpAsmPrinter &p, TaskletNode op) {
-  p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"ID", "sym_name"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
   p << " (";
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -1544,29 +1543,23 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOperandList(returnOperands))
     return failure();
 
-  if (!returnOperands.empty()) {
-    if (parser.parseColon())
-      return failure();
+  if (parser.parseColon())
+    return failure();
 
-    SmallVector<Type, 1> returnTypes;
-    if (parser.parseTypeList(returnTypes))
-      return failure();
+  SmallVector<Type, 1> returnTypes;
+  if (parser.parseTypeList(returnTypes))
+    return failure();
 
-    if (parser.resolveOperands(returnOperands, returnTypes,
-                               parser.getCurrentLocation(), result.operands))
-      return failure();
-  }
+  if (parser.resolveOperands(returnOperands, returnTypes,
+                             parser.getCurrentLocation(), result.operands))
+    return failure();
 
   return success();
 }
 
 static void print(OpAsmPrinter &p, sdfg::ReturnOp op) {
   p.printOptionalAttrDict(op->getAttrs());
-  if (!op.input().empty()) {
-    p << ' ' << op.input();
-    p << " : ";
-    p << op.input().getTypes();
-  }
+  p << ' ' << op.input() << " : " << op.input().getTypes();
 }
 
 LogicalResult verify(sdfg::ReturnOp op) {
