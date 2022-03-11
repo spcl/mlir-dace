@@ -22,7 +22,7 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 
   SDFGNode sdfgNode = *op.getOps<SDFGNode>().begin();
   SDFG sdfg(sdfgNode.getLoc());
-  sdfg.setName(sdfgNode.getName());
+  sdfg.setName(utils::generateName("sdfg"));
 
   for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
     State state(stateNode.getLoc());

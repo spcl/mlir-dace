@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdfg.sdfg
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state
     sdfg.state @state_0{
         // CHECK-NEXT: sdfg.alloc_symbol("N")

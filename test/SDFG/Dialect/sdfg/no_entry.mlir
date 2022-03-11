@@ -1,7 +1,7 @@
 // RUN: not sdfg-opt %s 2>&1 | FileCheck %s
 // CHECK: requires a 'src' symbol reference attribute
 
-sdfg.sdfg @sdfg_0 {
+sdfg.sdfg{} {
     sdfg.state @state_0{
     }
 

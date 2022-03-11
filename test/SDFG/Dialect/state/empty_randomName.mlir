@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdfg.sdfg
-sdfg.sdfg{entry=@randomName} @sdfg_0 {
+sdfg.sdfg{entry=@randomName} {
     // CHECK: sdfg.state @randomName
     sdfg.state @randomName{
 

@@ -1,7 +1,7 @@
 // RUN: not sdfg-opt %s 2>&1 | FileCheck %s
 // CHECK: incorrect number of indices
 
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     %A = sdfg.alloc() : !sdfg.array<12xi32>
 
     sdfg.state @state_0 {

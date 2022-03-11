@@ -1,7 +1,7 @@
 // RUN: not sdfg-opt %s 2>&1 | FileCheck %s
 // CHECK: different type than prior uses: 'i64' vs 'i32'
 
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     %A = sdfg.alloc() : !sdfg.stream<i32>
     %C = sdfg.alloc() : !sdfg.array<6xi64>
 

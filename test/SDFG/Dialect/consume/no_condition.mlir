@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdfg.sdfg
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     // CHECK-NEXT: [[NAMEA:%[a-zA-Z0-9_]*]] = sdfg.alloc()
     // CHECK-SAME: !sdfg.stream<2x6xi32>
     %A = sdfg.alloc() : !sdfg.stream<2x6xi32>

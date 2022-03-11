@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdfg.sdfg
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     // CHECK: sdfg.state
     // CHECK-DAG: nosync = false
     // CHECK-DAG: instrument = "No_Instrumentation"

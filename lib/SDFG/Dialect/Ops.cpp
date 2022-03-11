@@ -206,10 +206,6 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
-  StringAttr sym_nameAttr;
-  if (parser.parseSymbolName(sym_nameAttr, "sym_name", result.attributes))
-    return failure();
-
   SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
 
@@ -240,10 +236,8 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, SDFGNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
-                          /*elidedAttrs=*/{"ID", "sym_name", "num_args"});
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p << '(';
+                          /*elidedAttrs=*/{"ID", "num_args"});
+  p << " (";
 
   for (unsigned i = 0; i < op.num_args(); ++i) {
     if (i > 0)

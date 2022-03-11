@@ -1,7 +1,7 @@
 // XFAIL: *
 // RUN: sdfg-opt %s 
 
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
   sdfg.state @state_0{
     %a = sdfg.tasklet @zer0() -> i32 {
       %c = arith.constant 0 : i32
