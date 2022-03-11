@@ -403,10 +403,8 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
   if (parser.parseLParen() || parseAsArgs(parser, result, args, argTypes))
     return failure();
 
-  Type retType;
-  if (parser.parseArrow() || parser.parseType(retType))
+  if (parser.parseArrow() || parser.parseTypeList(result.types))
     return failure();
-  result.addTypes(retType);
 
   if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
     return failure();
@@ -426,7 +424,7 @@ static void print(OpAsmPrinter &p, TaskletNode op) {
       << op.getOperandTypes()[i];
   }
 
-  p << ") -> " << op.getType(0);
+  p << ") -> " << op.getResultTypes();
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
