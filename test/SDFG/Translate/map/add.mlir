@@ -1,7 +1,7 @@
 // RUN: sdfg-translate --mlir-to-sdfg %s | not python3 %S/../import_translation_test.py 2>&1 | FileCheck %s
 // CHECK: Isolated node
 
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     %A = sdfg.alloc() : !sdfg.array<2x6xi32>
     %B = sdfg.alloc() : !sdfg.array<2x6xi32>
     %C = sdfg.alloc() : !sdfg.array<2x6xi32>
@@ -11,7 +11,7 @@ sdfg.sdfg{entry=@state_0} @sdfg_0 {
             %a_ij = sdfg.load %A[%i, %j] : !sdfg.array<2x6xi32> -> i32
             %b_ij = sdfg.load %B[%i, %j] : !sdfg.array<2x6xi32> -> i32
 
-            %res = sdfg.tasklet @add(%a_ij: i32, %b_ij: i32) -> i32{
+            %res = sdfg.tasklet(%a_ij: i32, %b_ij: i32) -> i32{
                 %z = arith.addi %a_ij, %b_ij : i32
                 sdfg.return %z : i32
             }

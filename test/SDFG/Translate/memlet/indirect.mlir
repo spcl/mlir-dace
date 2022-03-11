@@ -1,11 +1,11 @@
 // RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 
 module  {
-    sdfg.sdfg {entry = @state_1} @kernel_2mm(%arg0: index, %arg1: !sdfg.array<sym("s_0")x900xi32>) {
+    sdfg.sdfg{entry = @state_1} (%arg0: index, %arg1: !sdfg.array<sym("s_0")x900xi32>) {
         sdfg.state @state_1 {
             %n = sdfg.load %arg1[%arg0, %arg0] : !sdfg.array<sym("s_0")x900xi32> -> i32
 
-            %0 = sdfg.tasklet @task_2(%arg2: i32) -> i32 {
+            %0 = sdfg.tasklet(%arg2: i32) -> i32 {
                   %c0 = arith.addi %arg2, %arg2 : i32
                   sdfg.return %c0 : i32
                 }

@@ -1,7 +1,7 @@
 // RUN: sdfg-translate --mlir-to-sdfg %s | not python3 %S/../import_translation_test.py 2>&1 | FileCheck %s
 // CHECK: Isolated node
 
-sdfg.sdfg{entry=@state_0} @sdfg_0 {
+sdfg.sdfg{entry=@state_0} {
     %A = sdfg.alloc() : !sdfg.stream<i32>
     %C = sdfg.alloc() : !sdfg.array<6xi32>
 
@@ -14,13 +14,13 @@ sdfg.sdfg{entry=@state_0} @sdfg_0 {
         }
 
         sdfg.consume{num_pes=5, condition=@empty} (%A : !sdfg.stream<i32>) -> (pe: %p, elem: %e) {
-            %res = sdfg.tasklet @add_one(%e: i32) -> i32{
+            %res = sdfg.tasklet(%e: i32) -> i32{
                     %1 = arith.constant 1 : i32
                     %res = arith.addi %e, %1 : i32
                     sdfg.return %res : i32
                 }
 
-            %0 = sdfg.tasklet @zero() -> index{
+            %0 = sdfg.tasklet() -> index{
                     %0 = arith.constant 0 : index
                     sdfg.return %0 : index
                 }
