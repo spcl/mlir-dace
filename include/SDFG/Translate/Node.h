@@ -14,7 +14,11 @@ class Connector;
 class Assignment;
 
 class Node;
+class NodeImpl;
+
 class SDFG;
+class SDFGImpl;
+
 class State;
 class StateImpl;
 
@@ -72,16 +76,39 @@ public:
 
 class Node {
 protected:
+  std::shared_ptr<NodeImpl> ptr;
+
+public:
+  Node() : ptr(nullptr) {}
+  Node(std::shared_ptr<NodeImpl> ptr) : ptr(ptr) {}
+
+  bool operator==(const Node other) const { return other.ptr == ptr; }
+
+  void setID(unsigned id);
+  unsigned getID();
+
+  Location getLocation();
+
+  void setName(StringRef name);
+  StringRef getName();
+
+  void setParent(Node parent);
+  Node getParent();
+
+  void addAttribute(Attribute attribute);
+};
+
+class NodeImpl {
+protected:
   unsigned id;
   Location location;
   std::string name;
   std::vector<Attribute> attributes;
-  // TODO: Change to shared_ptr
-  Node *parent;
-
-  Node(Location location) : id(0), location(location) {}
+  Node parent;
 
 public:
+  NodeImpl(Location location) : id(0), location(location) {}
+
   void setID(unsigned id) { this->id = id; }
   unsigned getID() { return id; }
 
@@ -93,8 +120,8 @@ public:
   }
   StringRef getName() { return name; }
 
-  void setParent(Node *parent) { this->parent = parent; }
-  Node *getParent() { return parent; }
+  void setParent(Node parent) { this->parent = parent; }
+  Node getParent() { return parent; }
 
   // check for existing attribtues
   // Replace or add to list
@@ -105,35 +132,34 @@ public:
 // State
 //===----------------------------------------------------------------------===//
 
-class StateImpl : public Node, public Emittable {
+class State : public Node, public Emittable {
+private:
+  std::shared_ptr<StateImpl> ptr;
 
+public:
+  State(Location location)
+      : Node(std::static_pointer_cast<NodeImpl>(
+            std::make_shared<StateImpl>(location))),
+        ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
+
+  void addNode(ConnectorNode node);
+  void addEdge(MultiEdge edge);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class StateImpl : public NodeImpl, public Emittable {
 private:
   std::map<unsigned, ConnectorNode *> lut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
 
 public:
-  StateImpl(Location location) : Node(location) {}
+  StateImpl(Location location) : NodeImpl(location) {}
 
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
 
   void emit(emitter::JsonEmitter &jemit) override;
-};
-
-class State : public Emittable {
-private:
-  std::shared_ptr<StateImpl> ptr;
-
-public:
-  State() : ptr(nullptr) {}
-  State(Location location) : ptr(std::make_shared<StateImpl>(location)) {}
-
-  // TODO: Avoid -> overloading
-  std::shared_ptr<StateImpl> operator->() const { return ptr; }
-  bool operator==(const State other) const { return other.ptr == ptr; }
-
-  void emit(emitter::JsonEmitter &jemit) override { ptr->emit(jemit); }
 };
 
 //===----------------------------------------------------------------------===//
@@ -142,13 +168,30 @@ public:
 
 class SDFG : public Node, public Emittable {
 private:
+  std::shared_ptr<SDFGImpl> ptr;
+
+public:
+  SDFG(Location location)
+      : Node(std::static_pointer_cast<NodeImpl>(
+            std::make_shared<SDFGImpl>(location))),
+        ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {}
+
+  State lookup(unsigned id);
+  void addState(unsigned id, State state);
+  void setStartState(State state);
+  void addEdge(InterstateEdge edge);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class SDFGImpl : public NodeImpl, public Emittable {
+private:
   std::map<unsigned, State> lut;
   std::vector<State> states;
   std::vector<InterstateEdge> edges;
   State startState;
 
 public:
-  SDFG(Location location) : Node(location) {}
+  SDFGImpl(Location location) : NodeImpl(location), startState(location) {}
 
   State lookup(unsigned id);
   void addState(unsigned id, State state);
