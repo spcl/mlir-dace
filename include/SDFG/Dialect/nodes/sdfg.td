@@ -2,6 +2,7 @@
 #define SDFG_SDFGNode
 
 def SDFG_SDFGNode : SDFG_Op<"sdfg", [
+    ParentOneOf<["ModuleOp"]>,
     NoTerminator,
     IsolatedFromAbove,
     SymbolTable,
@@ -34,7 +35,40 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
         static SDFGNode create(PatternRewriter &rewriter, Location location, FunctionType type, StringRef name);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
-        bool isNested();
+    }];
+}
+
+def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
+    ParentOneOf<["StateNode","MapNode","ConsumeNode"]>,
+    NoTerminator,
+    IsolatedFromAbove,
+    SymbolTable,
+    DeclareOpInterfaceMethods<SymbolUserOpInterface>
+]> {
+    let summary = "Nested SDFG region";
+    let description = [{
+        Describes a nested SDFG where the states are placed in the region. 
+        For example:
+
+        ```mlir
+        sdfg.nested_sdfg{entry=@state_0} {
+            sdfg.edge{assign=["i = 1"]} @state_0 -> @state_1
+            ...
+        }
+        ```
+    }];
+
+    let arguments = (ins 
+        I32Attr:$ID,
+        OptionalAttr<FlatSymbolRefAttr>:$entry,
+        I32Attr:$num_args,
+        Variadic<AnyType>:$operands
+    );
+
+    let regions = (region SizedRegion<1>:$body);
+
+    let extraClassDeclaration = [{
+        // Get SDFG
     }];
 }
 

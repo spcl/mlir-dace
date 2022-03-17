@@ -2,7 +2,7 @@
 #define SDFG_StateNode
 
 def SDFG_StateNode : SDFG_Op<"state", [
-    HasParent<"SDFGNode">,
+    ParentOneOf<["SDFGNode","NestedSDFGNode"]>,
     SingleBlock,
     NoTerminator,
     SymbolTable,

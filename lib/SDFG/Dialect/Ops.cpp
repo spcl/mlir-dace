@@ -28,6 +28,31 @@ static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+static ParseResult parseArgsList(OpAsmParser &parser,
+                                 SmallVector<OpAsmParser::OperandType, 4> &args,
+                                 SmallVector<Type, 4> &argTypes) {
+  bool isFirst = true;
+
+  while (parser.parseOptionalRParen().failed()) {
+    if (!isFirst)
+      if (parser.parseComma())
+        return failure();
+
+    isFirst = false;
+
+    OpAsmParser::OperandType arg;
+    Type type;
+
+    if (parser.parseRegionArgument(arg) || parser.parseColonType(type))
+      return failure();
+
+    args.push_back(arg);
+    argTypes.push_back(type);
+  }
+
+  return success();
+}
+
 static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
                                SmallVector<OpAsmParser::OperandType, 4> &args,
                                SmallVector<Type, 4> &argTypes) {
@@ -217,15 +242,14 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
     return success();
   }
 
-  if (parseAsArgs(parser, result, args, argTypes))
+  if (parseArgsList(parser, args, argTypes))
     return failure();
 
-  size_t num_args = result.operands.size();
   result.addAttribute("num_args",
-                      parser.getBuilder().getI32IntegerAttr(num_args));
+                      parser.getBuilder().getI32IntegerAttr(args.size()));
 
   if (parser.parseArrow() || parser.parseLParen() ||
-      parseAsArgs(parser, result, args, argTypes))
+      parseArgsList(parser, args, argTypes))
     return failure();
 
   if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
@@ -241,18 +265,14 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
 
   for (unsigned i = 0; i < op.num_args(); ++i) {
     if (i > 0)
-      p << ", ";
-    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
-      << op.getOperandTypes()[i];
+      p << ", " << op.body().getArgument(i) << ": " << op.getOperandTypes()[i];
   }
 
   p << ") -> (";
 
   for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
     if (i > op.num_args())
-      p << ", ";
-    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
-      << op.getOperandTypes()[i];
+      p << ", " << op.body().getArgument(i) << ": " << op.getOperandTypes()[i];
   }
 
   p << ")";
@@ -261,26 +281,10 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
 }
 
 LogicalResult verify(SDFGNode op) {
-  /*   if (op.isExternal())
-      return success();
-
-    // Verify that the argument list of the function and the arg list of the
-    // entry block line up. The trait already verified that the number of
-    // arguments is the same between the signature and the block.
-    ArrayRef<Type> fnInputTypes = op.getType().getInputs();
-    Block &entryBlock = op.front();
-
-    for (unsigned i = 0; i < entryBlock.getNumArguments(); ++i)
-      if (fnInputTypes[i] != entryBlock.getArgument(i).getType())
-        return op.emitOpError("type of entry block argument #")
-               << i << '(' << entryBlock.getArgument(i).getType()
-               << ") must match the type of the corresponding argument in "
-               << "function signature(" << fnInputTypes[i] << ')';
-
-    // Verify that no other dialect is used in the body
-    for (Operation &oper : op.body().getOps())
-      if (oper.getDialect() != (*op).getDialect())
-        return op.emitOpError("does not support other dialects"); */
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
 
   // Verify that body contains at least one state
   if (op.body().getOps<StateNode>().empty())
@@ -314,11 +318,101 @@ StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
   return dyn_cast<StateNode>(op);
 }
 
-bool SDFGNode::isNested() {
-  Operation *parent = getOperation()->getParentOp();
-  if (StateNode state = dyn_cast<StateNode>(parent))
-    return true;
-  return false;
+//===----------------------------------------------------------------------===//
+// NestedSDFGNode
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseNestedSDFGNode(OpAsmParser &parser,
+                                       OperationState &result) {
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+
+  IntegerAttr intAttr =
+      parser.getBuilder().getI32IntegerAttr(utils::generateID());
+  result.addAttribute("ID", intAttr);
+
+  SmallVector<OpAsmParser::OperandType, 4> args;
+  SmallVector<Type, 4> argTypes;
+
+  if (parser.parseOptionalLParen().failed()) {
+    result.addAttribute("num_args", parser.getBuilder().getI32IntegerAttr(0));
+    if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
+      return failure();
+
+    return success();
+  }
+
+  if (parseAsArgs(parser, result, args, argTypes))
+    return failure();
+
+  size_t num_args = result.operands.size();
+  result.addAttribute("num_args",
+                      parser.getBuilder().getI32IntegerAttr(num_args));
+
+  if (parser.parseArrow() || parser.parseLParen() ||
+      parseAsArgs(parser, result, args, argTypes))
+    return failure();
+
+  if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
+    return failure();
+
+  return success();
+}
+
+static void print(OpAsmPrinter &p, NestedSDFGNode op) {
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{"ID", "num_args"});
+  p << " (";
+
+  for (unsigned i = 0; i < op.num_args(); ++i) {
+    if (i > 0)
+      p << ", ";
+    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
+      << op.getOperandTypes()[i];
+  }
+
+  p << ") -> (";
+
+  for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
+    if (i > op.num_args())
+      p << ", ";
+    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
+      << op.getOperandTypes()[i];
+  }
+
+  p << ")";
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
+}
+
+LogicalResult verify(NestedSDFGNode op) {
+  // Verify that no other dialect is used in the body
+  for (Operation &oper : op.body().getOps())
+    if (oper.getDialect() != (*op).getDialect())
+      return op.emitOpError("does not support other dialects");
+
+  // Verify that body contains at least one state
+  if (op.body().getOps<StateNode>().empty())
+    return op.emitOpError() << "must contain at least one state";
+
+  return success();
+}
+
+LogicalResult
+NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  // Check that the entry attribute references valid state
+  FlatSymbolRefAttr entryAttr =
+      (*this)->getAttrOfType<FlatSymbolRefAttr>("entry");
+
+  if (!!entryAttr) {
+    StateNode entry =
+        symbolTable.lookupNearestSymbolFrom<StateNode>(*this, entryAttr);
+    if (!entry)
+      return emitOpError() << "'" << entryAttr.getValue()
+                           << "' does not reference a valid state";
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
