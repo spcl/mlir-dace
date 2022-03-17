@@ -2,8 +2,8 @@
 // CHECK: does not reference a valid state
 
 sdfg.sdfg{entry=@state_0} {
-    sdfg.state @state_0{
-    }
+  sdfg.state @state_0{
+  }
 
-    sdfg.edge{assign=["i: 1"], condition=""} @state_0 -> @state_1
+  sdfg.edge @state_0 -> @state_1
 }
