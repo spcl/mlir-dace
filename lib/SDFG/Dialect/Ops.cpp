@@ -31,6 +31,9 @@ static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
 static ParseResult parseArgsList(OpAsmParser &parser,
                                  SmallVector<OpAsmParser::OperandType, 4> &args,
                                  SmallVector<Type, 4> &argTypes) {
+  if (parser.parseLParen())
+    return failure();
+
   for (unsigned i = 0; parser.parseOptionalRParen().failed(); ++i) {
     if (i > 0 && parser.parseComma())
       return failure();
@@ -46,6 +49,19 @@ static ParseResult parseArgsList(OpAsmParser &parser,
   }
 
   return success();
+}
+
+static void printArgsList(OpAsmPrinter &p, Region::BlockArgListType args,
+                          unsigned lb, unsigned ub) {
+  p << " (";
+
+  for (unsigned i = lb; i < ub; ++i) {
+    if (i > lb)
+      p << ", ";
+    p << args[i] << ": " << args[i].getType();
+  }
+
+  p << ")";
 }
 
 static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
@@ -242,22 +258,13 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
 
-  if (parser.parseOptionalLParen().failed()) {
-    result.addAttribute("num_args", parser.getBuilder().getI32IntegerAttr(0));
-    if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
-      return failure();
-
-    return success();
-  }
-
   if (parseArgsList(parser, args, argTypes))
     return failure();
 
   result.addAttribute("num_args",
                       parser.getBuilder().getI32IntegerAttr(args.size()));
 
-  if (parser.parseArrow() || parser.parseLParen() ||
-      parseArgsList(parser, args, argTypes))
+  if (parser.parseArrow() || parseArgsList(parser, args, argTypes))
     return failure();
 
   if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
@@ -269,23 +276,12 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
 static void print(OpAsmPrinter &p, SDFGNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
-  p << " (";
 
-  for (unsigned i = 0; i < op.num_args(); ++i) {
-    if (i > 0)
-      p << ", ";
-    p << op.body().getArgument(i) << ": " << op.body().getArgument(i).getType();
-  }
+  printArgsList(p, op.body().getArguments(), 0, op.num_args());
+  p << " ->";
+  printArgsList(p, op.body().getArguments(), op.num_args(),
+                op.body().getNumArguments());
 
-  p << ") -> (";
-
-  for (unsigned i = op.num_args(); i < op.body().getNumArguments(); ++i) {
-    if (i > op.num_args())
-      p << ", ";
-    p << op.body().getArgument(i) << ": " << op.body().getArgument(i).getType();
-  }
-
-  p << ")";
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
@@ -299,6 +295,10 @@ LogicalResult verify(SDFGNode op) {
   // Verify that body contains at least one state
   if (op.body().getOps<StateNode>().empty())
     return op.emitOpError() << "must contain at least one state";
+
+  // Verify that the SDFG at least returns one value
+  if (op.num_args() >= op.body().getNumArguments())
+    return op.emitOpError() << "must return at least one value";
 
   return success();
 }

@@ -2,7 +2,7 @@
 
 // CHECK: module
 // CHECK: sdfg.sdfg
-sdfg.sdfg{entry=@state_0} {
+sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
   // CHECK: sdfg.state [[STATE0:@[a-zA-Z0-9_]*]]
   sdfg.state @state_0{
   }
