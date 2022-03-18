@@ -86,6 +86,20 @@ static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
+                        Region::BlockArgListType args, unsigned lb,
+                        unsigned ub) {
+  p << " (";
+
+  for (unsigned i = lb; i < ub; ++i) {
+    if (i > lb)
+      p << ", ";
+    p << opRange[i] << " as " << args[i] << ": " << opRange[i].getType();
+  }
+
+  p << ")";
+}
+
 //===----------------------------------------------------------------------===//
 // InlineSymbol
 //===----------------------------------------------------------------------===//
@@ -349,25 +363,12 @@ static ParseResult parseNestedSDFGNode(OpAsmParser &parser,
 static void print(OpAsmPrinter &p, NestedSDFGNode op) {
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
-  p << " (";
 
-  for (unsigned i = 0; i < op.num_args(); ++i) {
-    if (i > 0)
-      p << ", ";
-    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
-      << op.getOperandTypes()[i];
-  }
+  printAsArgs(p, op.getOperands(), op.body().getArguments(), 0, op.num_args());
+  p << " -> ";
+  printAsArgs(p, op.getOperands(), op.body().getArguments(), op.num_args(),
+              op.getNumOperands());
 
-  p << ") -> (";
-
-  for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
-    if (i > op.num_args())
-      p << ", ";
-    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
-      << op.getOperandTypes()[i];
-  }
-
-  p << ")";
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
@@ -385,6 +386,10 @@ LogicalResult verify(NestedSDFGNode op) {
   // Verify that the SDFG at least returns one value
   if (op.num_args() >= op.body().getNumArguments())
     return op.emitOpError() << "must return at least one value";
+
+  // Verify that operands and arguments line up
+  if (op.getNumOperands() != op.body().getNumArguments())
+    op.emitOpError() << "must have matching amount of operands and arguments";
 
   return success();
 }
@@ -488,8 +493,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
   if (parseAsArgs(parser, result, args, argTypes))
     return failure();
 
-  if (parser.parseArrow() || parser.parseLParen() ||
-      parser.parseTypeList(result.types) || parser.parseRParen())
+  if (parser.parseOptionalArrowTypeList(result.types))
     return failure();
 
   if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
@@ -500,21 +504,24 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
 
 static void print(OpAsmPrinter &p, TaskletNode op) {
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
-  p << " (";
-
-  for (unsigned i = 0; i < op.getNumOperands(); ++i) {
-    if (i > 0)
-      p << ", ";
-    p << op.getOperand(i) << " as " << op.body().getArgument(i) << ": "
-      << op.getOperandTypes()[i];
-  }
-
-  p << ") -> (" << op.getResultTypes() << ")";
+  printAsArgs(p, op.getOperands(), op.body().getArguments(), 0,
+              op.getNumOperands());
+  p << " -> (" << op.getResultTypes() << ")";
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
-LogicalResult verify(TaskletNode op) { return success(); }
+LogicalResult verify(TaskletNode op) {
+  // Verify that the Tasklet at least returns one value
+  if (op.getNumResults() <= 0)
+    return op.emitOpError() << "must return at least one value";
+
+  // Verify that operands and arguments line up
+  if (op.getNumOperands() != op.body().getNumArguments())
+    op.emitOpError() << "must have matching amount of operands and arguments";
+
+  return success();
+}
 
 TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
                                 ValueRange operands, TypeRange results) {
@@ -1628,11 +1635,8 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOperandList(returnOperands))
     return failure();
 
-  if (parser.parseColon())
-    return failure();
-
   SmallVector<Type, 1> returnTypes;
-  if (parser.parseTypeList(returnTypes))
+  if (parser.parseOptionalColonTypeList(returnTypes))
     return failure();
 
   if (parser.resolveOperands(returnOperands, returnTypes,
@@ -1644,7 +1648,8 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
 
 static void print(OpAsmPrinter &p, sdfg::ReturnOp op) {
   p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.input() << " : " << op.input().getTypes();
+  if (op.getNumOperands() > 0)
+    p << ' ' << op.input() << " : " << op.input().getTypes();
 }
 
 LogicalResult verify(sdfg::ReturnOp op) {
