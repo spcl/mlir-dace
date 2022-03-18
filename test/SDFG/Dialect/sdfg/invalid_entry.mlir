@@ -8,5 +8,5 @@ sdfg.sdfg{entry=@state_5} {
   sdfg.state @state_1{
   }
 
-  sdfg.edge{assign=["i: 1"], condition=""} @state_0 -> @state_1
+  sdfg.edge @state_0 -> @state_1
 }

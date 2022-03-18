@@ -3,7 +3,9 @@
 
 sdfg.sdfg{entry=@state_0} {
   sdfg.state @state_0{
-    sdfg.nested_sdfg{entry=@state_1} {
+    %N = sdfg.alloc() : !sdfg.array<i32>
+
+    sdfg.nested_sdfg{entry=@state_1} () -> (%N: !sdfg.array<i32>){
       sdfg.state @state_2{
       }
 

@@ -31,14 +31,9 @@ static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
 static ParseResult parseArgsList(OpAsmParser &parser,
                                  SmallVector<OpAsmParser::OperandType, 4> &args,
                                  SmallVector<Type, 4> &argTypes) {
-  bool isFirst = true;
-
-  while (parser.parseOptionalRParen().failed()) {
-    if (!isFirst)
-      if (parser.parseComma())
-        return failure();
-
-    isFirst = false;
+  for (unsigned i = 0; parser.parseOptionalRParen().failed(); ++i) {
+    if (i > 0 && parser.parseComma())
+      return failure();
 
     OpAsmParser::OperandType arg;
     Type type;
@@ -56,13 +51,12 @@ static ParseResult parseArgsList(OpAsmParser &parser,
 static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
                                SmallVector<OpAsmParser::OperandType, 4> &args,
                                SmallVector<Type, 4> &argTypes) {
-  bool isFirst = true;
+  if (parser.parseLParen())
+    return failure();
 
-  while (parser.parseOptionalRParen().failed()) {
-    if (!isFirst)
-      if (parser.parseComma())
-        return failure();
-    isFirst = false;
+  for (unsigned i = 0; parser.parseOptionalRParen().failed(); ++i) {
+    if (i > 0 && parser.parseComma())
+      return failure();
 
     OpAsmParser::OperandType operand;
     OpAsmParser::OperandType arg;
@@ -336,14 +330,6 @@ static ParseResult parseNestedSDFGNode(OpAsmParser &parser,
   SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
 
-  if (parser.parseOptionalLParen().failed()) {
-    result.addAttribute("num_args", parser.getBuilder().getI32IntegerAttr(0));
-    if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
-      return failure();
-
-    return success();
-  }
-
   if (parseAsArgs(parser, result, args, argTypes))
     return failure();
 
@@ -351,8 +337,7 @@ static ParseResult parseNestedSDFGNode(OpAsmParser &parser,
   result.addAttribute("num_args",
                       parser.getBuilder().getI32IntegerAttr(num_args));
 
-  if (parser.parseArrow() || parser.parseLParen() ||
-      parseAsArgs(parser, result, args, argTypes))
+  if (parser.parseArrow() || parseAsArgs(parser, result, args, argTypes))
     return failure();
 
   if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
@@ -396,6 +381,10 @@ LogicalResult verify(NestedSDFGNode op) {
   // Verify that body contains at least one state
   if (op.body().getOps<StateNode>().empty())
     return op.emitOpError() << "must contain at least one state";
+
+  // Verify that the SDFG at least returns one value
+  if (op.num_args() >= op.body().getNumArguments())
+    return op.emitOpError() << "must return at least one value";
 
   return success();
 }
@@ -496,7 +485,7 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
   SmallVector<OpAsmParser::OperandType, 4> args;
   SmallVector<Type, 4> argTypes;
 
-  if (parser.parseLParen() || parseAsArgs(parser, result, args, argTypes))
+  if (parseAsArgs(parser, result, args, argTypes))
     return failure();
 
   if (parser.parseArrow() || parser.parseLParen() ||
