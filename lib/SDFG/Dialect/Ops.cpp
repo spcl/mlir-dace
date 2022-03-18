@@ -365,7 +365,7 @@ static void print(OpAsmPrinter &p, NestedSDFGNode op) {
                           /*elidedAttrs=*/{"ID", "num_args"});
 
   printAsArgs(p, op.getOperands(), op.body().getArguments(), 0, op.num_args());
-  p << " -> ";
+  p << " ->";
   printAsArgs(p, op.getOperands(), op.body().getArguments(), op.num_args(),
               op.getNumOperands());
 
