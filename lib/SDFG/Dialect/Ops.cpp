@@ -265,14 +265,16 @@ static void print(OpAsmPrinter &p, SDFGNode op) {
 
   for (unsigned i = 0; i < op.num_args(); ++i) {
     if (i > 0)
-      p << ", " << op.body().getArgument(i) << ": " << op.getOperandTypes()[i];
+      p << ", ";
+    p << op.body().getArgument(i) << ": " << op.body().getArgument(i).getType();
   }
 
   p << ") -> (";
 
-  for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
+  for (unsigned i = op.num_args(); i < op.body().getNumArguments(); ++i) {
     if (i > op.num_args())
-      p << ", " << op.body().getArgument(i) << ": " << op.getOperandTypes()[i];
+      p << ", ";
+    p << op.body().getArgument(i) << ": " << op.body().getArgument(i).getType();
   }
 
   p << ")";
