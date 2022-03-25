@@ -26,8 +26,12 @@ class InterstateEdge;
 class MultiEdge;
 
 class ConnectorNode;
-class Access;
+class ConnectorNodeImpl;
+
 class Tasklet;
+class TaskletImpl;
+
+class Access;
 
 //===----------------------------------------------------------------------===//
 // Interfaces
@@ -46,13 +50,6 @@ class Attribute {
 public:
   std::string name;
   // Store attribute or string?
-};
-
-class Connector {
-public:
-  // TODO: Change to shared_ptr
-  ConnectorNode *parent;
-  std::string name;
 };
 
 class Condition {
@@ -79,7 +76,6 @@ protected:
   std::shared_ptr<NodeImpl> ptr;
 
 public:
-  Node() : ptr(nullptr) {}
   Node(std::shared_ptr<NodeImpl> ptr) : ptr(ptr) {}
 
   bool operator==(const Node other) const { return other.ptr == ptr; }
@@ -107,7 +103,7 @@ protected:
   Node parent;
 
 public:
-  NodeImpl(Location location) : id(0), location(location) {}
+  NodeImpl(Location location) : id(0), location(location), parent(nullptr) {}
 
   void setID(unsigned id) { this->id = id; }
   unsigned getID() { return id; }
@@ -126,6 +122,58 @@ public:
   // check for existing attribtues
   // Replace or add to list
   void addAttribute(Attribute attribute);
+};
+
+//===----------------------------------------------------------------------===//
+// ConnectorNode
+//===----------------------------------------------------------------------===//
+
+class ConnectorNode : public Node, public Emittable {
+protected:
+  std::shared_ptr<ConnectorNodeImpl> ptr;
+
+public:
+  ConnectorNode(std::shared_ptr<ConnectorNodeImpl> ptr)
+      : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class ConnectorNodeImpl : public NodeImpl, public Emittable {
+protected:
+  std::vector<Connector> connectors;
+
+public:
+  ConnectorNodeImpl(Location location) : NodeImpl(location) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class Connector {
+public:
+  ConnectorNode parent;
+  std::string name;
+
+  Connector(ConnectorNode parent, StringRef name)
+      : parent(parent), name(name) {}
+};
+
+//===----------------------------------------------------------------------===//
+// MultiEdge
+//===----------------------------------------------------------------------===//
+
+class MultiEdge : public Emittable {
+
+private:
+  Connector source;
+  Connector destination;
+  mlir::sdfg::SizedType shape;
+
+public:
+  MultiEdge(Connector source, Connector destination)
+      : source(source), destination(destination) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 //===----------------------------------------------------------------------===//
@@ -149,7 +197,7 @@ public:
 
 class StateImpl : public NodeImpl, public Emittable {
 private:
-  std::map<unsigned, ConnectorNode *> lut;
+  std::map<unsigned, ConnectorNode> lut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
 
@@ -158,7 +206,6 @@ public:
 
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
-
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -202,7 +249,7 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// Edges
+// InterstateEdge
 //===----------------------------------------------------------------------===//
 
 class InterstateEdge : public Emittable {
@@ -224,33 +271,31 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class MultiEdge : public Emittable {
+//===----------------------------------------------------------------------===//
+// Tasklet
+//===----------------------------------------------------------------------===//
 
+class Tasklet : public ConnectorNode {
 private:
-  // TODO: Change to shared_ptr
-  Connector *source;
-  // TODO: Change to shared_ptr
-  Connector *destination;
-  mlir::sdfg::SizedType shape;
+  std::shared_ptr<TaskletImpl> ptr;
 
 public:
-  MultiEdge(Connector *source, Connector *destination);
+  Tasklet(Location location)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<TaskletImpl>(location))),
+        ptr(std::static_pointer_cast<TaskletImpl>(ConnectorNode::ptr)) {}
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-//===----------------------------------------------------------------------===//
-// ConnectorNode
-//===----------------------------------------------------------------------===//
+class TaskletImpl : public ConnectorNodeImpl {
+public:
+  TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
 
-class ConnectorNode : public Node {
-
-protected:
-  std::vector<Connector> connectors;
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class Tasklet : public ConnectorNode {};
-class Access : public ConnectorNode {};
+// class Access : public ConnectorNode {};
 
 /* class MapBegin : public ConnectorNode {};
 class MapEnd : public ConnectorNode {};

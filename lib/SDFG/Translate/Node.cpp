@@ -5,7 +5,7 @@ using namespace sdfg;
 using namespace translation;
 
 //===----------------------------------------------------------------------===//
-// Edges
+// InterstateEdge
 //===----------------------------------------------------------------------===//
 
 void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
@@ -47,6 +47,12 @@ void InterstateEdge::addAssignment(Assignment assignment) {
 }
 
 //===----------------------------------------------------------------------===//
+// MultiEdge
+//===----------------------------------------------------------------------===//
+
+void MultiEdge::emit(emitter::JsonEmitter &jemit) {}
+
+//===----------------------------------------------------------------------===//
 // Node
 //===----------------------------------------------------------------------===//
 
@@ -66,6 +72,13 @@ void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
 void NodeImpl::addAttribute(Attribute attribute) {
   attributes.push_back(attribute);
 }
+
+//===----------------------------------------------------------------------===//
+// ConnectorNode
+//===----------------------------------------------------------------------===//
+
+void ConnectorNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {}
 
 //===----------------------------------------------------------------------===//
 // SDFG
@@ -146,6 +159,8 @@ void State::addNode(ConnectorNode node) { ptr->addNode(node); }
 void State::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
+void StateImpl::addNode(ConnectorNode node) { nodes.push_back(node); }
+
 void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
@@ -156,10 +171,44 @@ void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.endObject(); // attributes
 
   jemit.startNamedList("nodes");
+  for (ConnectorNode cn : nodes)
+    cn.emit(jemit);
   jemit.endList(); // nodes
 
   jemit.startNamedList("edges");
   jemit.endList(); // edges
+
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
+// Tasklet
+//===----------------------------------------------------------------------===//
+
+void Tasklet::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "Tasklet");
+  jemit.printKVPair("label", name);
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", name);
+
+  jemit.startNamedObject("code");
+  jemit.printKVPair("string_data", "");
+  jemit.printKVPair("language", "Python");
+  jemit.endObject(); // code
+
+  // Superclass should print these
+  jemit.startNamedObject("in_connectors");
+  jemit.endObject(); // in_connectors
+
+  jemit.startNamedObject("out_connectors");
+  jemit.endObject(); // out_connectors
+
+  jemit.endObject(); // attributes
 
   jemit.endObject();
 }
