@@ -1,6 +1,6 @@
-// RUN: not sdfg-opt %s 2>&1 | FileCheck %s
-// CHECK: must return at least one value
+// RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
+// CHECK: sdfg.sdfg () -> ()
 sdfg.sdfg () -> () {
   sdfg.state @state_0{
   }

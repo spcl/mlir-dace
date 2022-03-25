@@ -296,10 +296,6 @@ LogicalResult verify(SDFGNode op) {
   if (op.body().getOps<StateNode>().empty())
     return op.emitOpError() << "must contain at least one state";
 
-  // Verify that the SDFG at least returns one value
-  if (op.num_args() >= op.body().getNumArguments())
-    return op.emitOpError() << "must return at least one value";
-
   return success();
 }
 
@@ -382,10 +378,6 @@ LogicalResult verify(NestedSDFGNode op) {
   // Verify that body contains at least one state
   if (op.body().getOps<StateNode>().empty())
     return op.emitOpError() << "must contain at least one state";
-
-  // Verify that the SDFG at least returns one value
-  if (op.num_args() >= op.body().getNumArguments())
-    return op.emitOpError() << "must return at least one value";
 
   // Verify that operands and arguments line up
   if (op.getNumOperands() != op.body().getNumArguments())
@@ -512,10 +504,6 @@ static void print(OpAsmPrinter &p, TaskletNode op) {
 }
 
 LogicalResult verify(TaskletNode op) {
-  // Verify that the Tasklet at least returns one value
-  if (op.getNumResults() <= 0)
-    return op.emitOpError() << "must return at least one value";
-
   // Verify that operands and arguments line up
   if (op.getNumOperands() != op.body().getNumArguments())
     op.emitOpError() << "must have matching amount of operands and arguments";
