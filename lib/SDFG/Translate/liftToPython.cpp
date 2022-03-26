@@ -16,12 +16,11 @@ std::string valueToString(Value value, Operation &op) {
 }
 
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
-Optional<std::string> liftOperationToPython(Operation &op) {
+Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
   std::string nameOut =
       op.getNumResults() == 1 ? valueToString(op.getResult(0), op) : "";
 
   if (isa<arith::AddFOp>(op) || isa<arith::AddIOp>(op)) {
-    printf("ADD\n");
     std::string nameArg0 = valueToString(op.getOperand(0), op);
     std::string nameArg1 = valueToString(op.getOperand(1), op);
     return nameOut + " = " + nameArg0 + " + " + nameArg1;
@@ -91,7 +90,12 @@ Optional<std::string> liftOperationToPython(Operation &op) {
 
   // TODO: Handle multiple returns
   if (isa<sdfg::ReturnOp>(op)) {
-    return "__out = " + valueToString(op.getOperand(0), op);
+    std::string code = "";
+    for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+      code.append(task.getOutputName(i) + " = " +
+                  valueToString(op.getOperand(0), op));
+    }
+    return code;
   }
 
   return None;
@@ -102,7 +106,7 @@ Optional<std::string> translation::liftToPython(TaskletNode &op) {
   std::string code = "";
 
   for (Operation &oper : op.body().getOps()) {
-    Optional<std::string> line = liftOperationToPython(oper);
+    Optional<std::string> line = liftOperationToPython(oper, op);
     if (line.hasValue()) {
       code.append(line.getValue() + "\\n");
     } else {
