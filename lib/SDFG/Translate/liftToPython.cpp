@@ -1,102 +1,114 @@
 #include "SDFG/Translate/liftToPython.h"
+#include "SDFG/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/AsmState.h"
 
 using namespace mlir;
 using namespace sdfg;
 
+std::string valueToString(Value value) {
+  AsmState state(utils::getParentState(*value.getDefiningOp()));
+  std::string name;
+  llvm::raw_string_ostream nameStream(name);
+  value.printAsOperand(nameStream, state);
+  utils::sanitizeName(name);
+  return name;
+}
+
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
-// If successful returns Python code as string
-Optional<std::string> translation::liftToPython(TaskletNode &op) {
-  int numOps = 0;
-  Operation *firstOp = nullptr;
+Optional<std::string> liftOperationToPython(Operation &op) {
+  std::string nameOut =
+      op.getNumResults() == 1 ? valueToString(op.getResult(0)) : "";
 
-  for (Operation &oper : op.body().getOps()) {
-    if (numOps == 0)
-      firstOp = &oper;
-    ++numOps;
+  if (isa<arith::AddFOp>(op) || isa<arith::AddIOp>(op)) {
+    std::string nameArg0 = valueToString(op.getOperand(0));
+    std::string nameArg1 = valueToString(op.getOperand(1));
+    return nameOut + " = " + nameArg0 + " + " + nameArg1;
   }
 
-  if (numOps > 2) {
-    emitRemark(op.getLoc(), "No lifting to python possible");
-    return None;
+  if (isa<arith::MulFOp>(op) || isa<arith::MulIOp>(op)) {
+    std::string nameArg0 = valueToString(op.getOperand(0));
+    std::string nameArg1 = valueToString(op.getOperand(1));
+    return nameOut + " = " + nameArg0 + " * " + nameArg1;
   }
 
-  if (isa<arith::AddFOp>(firstOp) || isa<arith::AddIOp>(firstOp)) {
-    std::string nameArg0 = op.getInputName(0);
-    std::string nameArg1 = op.getInputName(op.body().getNumArguments() - 1);
-    return "__out = " + nameArg0 + " + " + nameArg1;
+  if (isa<arith::IndexCastOp>(op)) {
+    return nameOut + " = " + valueToString(op.getOperand(0));
   }
 
-  if (isa<arith::MulFOp>(firstOp) || isa<arith::MulIOp>(firstOp)) {
-    std::string nameArg0 = op.getInputName(0);
-    std::string nameArg1 = op.getInputName(op.body().getNumArguments() - 1);
-    return "__out = " + nameArg0 + " * " + nameArg1;
+  if (SymOp sym = dyn_cast<SymOp>(op)) {
+    return nameOut + " = " + sym.expr().str();
   }
 
   // TODO: Add arith ops
 
-  if (arith::ConstantOp oper = dyn_cast<arith::ConstantOp>(firstOp)) {
+  if (isa<arith::ConstantOp>(op)) {
     std::string val;
 
-    if (arith::ConstantFloatOp flop =
-            dyn_cast<arith::ConstantFloatOp>(firstOp)) {
+    if (arith::ConstantFloatOp flop = dyn_cast<arith::ConstantFloatOp>(op)) {
       SmallVector<char> flopVec;
       flop.value().toString(flopVec);
       for (char c : flopVec)
         val += c;
-    } else if (arith::ConstantIntOp iop =
-                   dyn_cast<arith::ConstantIntOp>(firstOp)) {
+    } else if (arith::ConstantIntOp iop = dyn_cast<arith::ConstantIntOp>(op)) {
       val = std::to_string(iop.value());
     } else if (arith::ConstantIndexOp iop =
-                   dyn_cast<arith::ConstantIndexOp>(firstOp)) {
+                   dyn_cast<arith::ConstantIndexOp>(op)) {
       val = std::to_string(iop.value());
     }
 
-    return "__out = " + val;
+    return nameOut + " = " + val;
   }
 
-  if (arith::IndexCastOp ico = dyn_cast<arith::IndexCastOp>(firstOp)) {
-    std::string nameArg0 = op.getInputName(0);
-    return "__out = " + nameArg0;
-  }
-
-  if (StoreOp store = dyn_cast<StoreOp>(firstOp)) {
+  if (isa<StoreOp>(op)) {
     std::string indices;
 
-    for (unsigned i = 0; i < op.body().getNumArguments() - 1; ++i) {
+    for (unsigned i = 0; i < op.getNumOperands() - 1; ++i) {
       if (i > 0)
         indices.append(", ");
-      indices.append(op.getInputName(i));
+      indices.append(valueToString(op.getOperand(i)));
     }
 
-    std::string valName = op.getInputName(op.body().getNumArguments() - 1);
-    return "__out[" + indices + "]" + " = " + valName;
+    std::string nameVal = valueToString(op.getOperand(op.getNumOperands() - 1));
+    return nameOut + "[" + indices + "]" + " = " + nameVal;
   }
 
-  if (isa<LoadOp>(firstOp)) {
+  if (isa<LoadOp>(op)) {
     std::string indices;
 
-    for (unsigned i = 0; i < op.body().getNumArguments() - 1; ++i) {
+    for (unsigned i = 0; i < op.getNumOperands() - 1; ++i) {
       if (i > 0)
         indices.append(", ");
-      indices.append(op.getInputName(i));
+      indices.append(valueToString(op.getOperand(i)));
     }
 
-    std::string arrName = op.getInputName(op.body().getNumArguments() - 1);
-    return "__out = " + arrName + "[" + indices + "]";
+    std::string nameArr = valueToString(op.getOperand(op.getNumOperands() - 1));
+    return nameOut + " = " + nameArr + "[" + indices + "]";
   }
 
-  if (SymOp sym = dyn_cast<SymOp>(firstOp)) {
-    return "__out = " + sym.expr().str();
+  // TODO: Handle multiple returns
+  if (isa<sdfg::ReturnOp>(op)) {
+    return "__out = " + valueToString(op.getOperand(0));
   }
 
-  if (isa<sdfg::ReturnOp>(firstOp)) {
-    std::string nameArg0 = op.getInputName(0);
-    return "__out = " + nameArg0;
-  }
-
-  emitRemark(op.getLoc(), "No lifting to python possible");
   return None;
+}
+
+// If successful returns Python code as string
+Optional<std::string> translation::liftToPython(TaskletNode &op) {
+  std::string code = "";
+
+  for (Operation &oper : op.body().getOps()) {
+    Optional<std::string> line = liftOperationToPython(oper);
+    if (line.hasValue()) {
+      code.append(line.getValue() + "\n");
+    } else {
+      emitRemark(op.getLoc(), "No lifting to python possible");
+      return None;
+    }
+  }
+
+  return code;
 }
 
 std::string translation::getTaskletName(TaskletNode &op) {
