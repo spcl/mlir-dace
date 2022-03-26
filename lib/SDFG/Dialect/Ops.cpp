@@ -534,18 +534,17 @@ TaskletNode TaskletNode::create(Location location, ValueRange operands,
 }
 
 std::string TaskletNode::getInputName(unsigned idx) {
-  AsmState state(*this);
+  AsmState state(utils::getParentState(*this->getOperation()));
   std::string name;
   llvm::raw_string_ostream nameStream(name);
-  getOperand(idx).printAsOperand(nameStream, state);
-  // NOTE: Maybe use utils::sanitize
-  name.erase(0, 1); // Remove %-sign
+  body().getArgument(idx).printAsOperand(nameStream, state);
+  utils::sanitizeName(name);
   return name;
 }
 
 std::string TaskletNode::getOutputName(unsigned idx) {
   // TODO: Implement multiple return values
-  return "__out";
+  return "__out" + std::to_string(idx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -983,7 +982,7 @@ bool AllocOp::isScalar() {
 }
 
 bool AllocOp::isInState() {
-  return utils::getParentState(*this->getOperation(), false) != nullptr;
+  return utils::getParentState(*this->getOperation()) != nullptr;
 }
 
 std::string AllocOp::getName() {

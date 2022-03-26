@@ -6,7 +6,7 @@
 namespace mlir::sdfg::utils {
 
 SDFGNode getParentSDFG(Operation &op);
-StateNode getParentState(Operation &op, bool ignoreSDFGs = true);
+StateNode getParentState(Operation &op, bool ignoreSDFGs = false);
 
 } // namespace mlir::sdfg::utils
 

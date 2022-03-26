@@ -8,6 +8,14 @@ using namespace translation;
 // InterstateEdge
 //===----------------------------------------------------------------------===//
 
+void InterstateEdge::setCondition(Condition condition) {
+  this->condition = condition;
+}
+
+void InterstateEdge::addAssignment(Assignment assignment) {
+  assignments.push_back(assignment);
+}
+
 void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "Edge");
@@ -38,14 +46,6 @@ void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.endObject();
 }
 
-void InterstateEdge::setCondition(Condition condition) {
-  this->condition = condition;
-}
-
-void InterstateEdge::addAssignment(Assignment assignment) {
-  assignments.push_back(assignment);
-}
-
 //===----------------------------------------------------------------------===//
 // MultiEdge
 //===----------------------------------------------------------------------===//
@@ -69,6 +69,21 @@ Node Node::getParent() { return ptr->getParent(); }
 
 void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
 
+void NodeImpl::setID(unsigned id) { this->id = id; }
+unsigned NodeImpl::getID() { return id; }
+
+Location NodeImpl::getLocation() { return location; }
+
+void NodeImpl::setName(StringRef name) {
+  this->name = name.str();
+  utils::sanitizeName(this->name);
+}
+
+StringRef NodeImpl::getName() { return name; }
+
+void NodeImpl::setParent(Node parent) { this->parent = parent; }
+Node NodeImpl::getParent() { return parent; }
+
 void NodeImpl::addAttribute(Attribute attribute) {
   attributes.push_back(attribute);
 }
@@ -77,8 +92,45 @@ void NodeImpl::addAttribute(Attribute attribute) {
 // ConnectorNode
 //===----------------------------------------------------------------------===//
 
+void ConnectorNode::addInConnector(Connector connector) {
+  ptr->addInConnector(connector);
+}
+void ConnectorNode::addOutConnector(Connector connector) {
+  ptr->addOutConnector(connector);
+}
 void ConnectorNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
-void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {}
+
+void ConnectorNodeImpl::addInConnector(Connector connector) {
+  if (std::find(inConnectors.begin(), inConnectors.end(), connector) !=
+      inConnectors.end()) {
+    emitError(location,
+              "Duplicate connector in ConnectorNodeImpl::addInConnector");
+  }
+
+  inConnectors.push_back(connector);
+}
+
+void ConnectorNodeImpl::addOutConnector(Connector connector) {
+  if (std::find(outConnectors.begin(), outConnectors.end(), connector) !=
+      outConnectors.end()) {
+    emitError(location,
+              "Duplicate connector in ConnectorNodeImpl::addOutConnector");
+  }
+
+  outConnectors.push_back(connector);
+}
+
+void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startNamedObject("in_connectors");
+  for (Connector c : inConnectors)
+    jemit.printKVPair(c.name, "null", /*stringify=*/false);
+  jemit.endObject(); // in_connectors
+
+  jemit.startNamedObject("out_connectors");
+  for (Connector c : outConnectors)
+    jemit.printKVPair(c.name, "null", /*stringify=*/false);
+  jemit.endObject(); // out_connectors
+}
 
 //===----------------------------------------------------------------------===//
 // SDFG
@@ -136,13 +188,14 @@ void SDFGImpl::addState(unsigned id, State state) {
   states.push_back(state);
 
   if (!lut.insert({id, state}).second)
-    emitError(location, "Duplicate ID in SDFG::addState");
+    emitError(location, "Duplicate ID in SDFGImpl::addState");
 }
 
 void SDFGImpl::setStartState(State state) {
   if (std::find(states.begin(), states.end(), state) == states.end())
-    emitError(location,
-              "Non-existent state assigned as start in SDFG::setStartState");
+    emitError(
+        location,
+        "Non-existent state assigned as start in SDFGImpl::setStartState");
   else
     this->startState = state;
 }
@@ -155,11 +208,21 @@ State SDFGImpl::lookup(unsigned id) { return lut.find(id)->second; }
 // State
 //===----------------------------------------------------------------------===//
 
-void State::addNode(ConnectorNode node) { ptr->addNode(node); }
+void State::addNode(unsigned id, ConnectorNode node) {
+  node.setParent(*this);
+  ptr->addNode(id, node);
+}
+
 void State::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
-void StateImpl::addNode(ConnectorNode node) { nodes.push_back(node); }
+void StateImpl::addNode(unsigned id, ConnectorNode node) {
+  node.setID(nodes.size());
+  nodes.push_back(node);
+
+  if (!lut.insert({id, node}).second)
+    emitError(location, "Duplicate ID in StateImpl::addNode");
+}
 
 void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -185,7 +248,14 @@ void StateImpl::emit(emitter::JsonEmitter &jemit) {
 // Tasklet
 //===----------------------------------------------------------------------===//
 
+void Tasklet::setCode(StringRef code) { ptr->setCode(code); }
+void Tasklet::setLanguage(StringRef language) { ptr->setLanguage(language); }
 void Tasklet::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void TaskletImpl::setCode(StringRef code) { this->code = code.str(); }
+void TaskletImpl::setLanguage(StringRef language) {
+  this->language = language.str();
+}
 
 void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -197,17 +267,11 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("label", name);
 
   jemit.startNamedObject("code");
-  jemit.printKVPair("string_data", "");
-  jemit.printKVPair("language", "Python");
+  jemit.printKVPair("string_data", code);
+  jemit.printKVPair("language", language);
   jemit.endObject(); // code
 
-  // Superclass should print these
-  jemit.startNamedObject("in_connectors");
-  jemit.endObject(); // in_connectors
-
-  jemit.startNamedObject("out_connectors");
-  jemit.endObject(); // out_connectors
-
+  ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes
 
   jemit.endObject();

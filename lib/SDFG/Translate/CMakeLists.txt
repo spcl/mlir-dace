@@ -2,6 +2,7 @@ add_mlir_translation_library(
   MLIRTargetSDFG
   registration.cpp
   translateToSDFG.cpp
+  liftToPython.cpp
   JsonEmitter.cpp
   Node.cpp
 

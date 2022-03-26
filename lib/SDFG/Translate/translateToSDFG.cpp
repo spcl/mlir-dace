@@ -1,5 +1,6 @@
 #include "SDFG/Translate/Node.h"
 #include "SDFG/Translate/Translation.h"
+#include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
@@ -25,10 +26,8 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   sdfg.setName(utils::generateName("sdfg"));
 
   for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
-    State state(stateNode.getLoc());
-    state.setName(stateNode.getName());
-
-    sdfg.addState(stateNode.ID(), state);
+    if (collect(stateNode, sdfg).failed())
+      return failure();
   }
 
   if (sdfgNode.entry().hasValue()) {
@@ -40,25 +39,85 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   }
 
   for (EdgeOp edgeOp : sdfgNode.getOps<EdgeOp>()) {
-    StateNode srcNode = sdfgNode.getStateBySymRef(edgeOp.src());
-    StateNode destNode = sdfgNode.getStateBySymRef(edgeOp.dest());
-
-    State src = sdfg.lookup(srcNode.ID());
-    State dest = sdfg.lookup(destNode.ID());
-    InterstateEdge iEdge(src, dest);
-
-    iEdge.setCondition(edgeOp.condition());
-
-    for (mlir::Attribute attr : edgeOp.assign()) {
-      std::pair<StringRef, StringRef> kv =
-          attr.cast<StringAttr>().getValue().split(':');
-
-      iEdge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
-    }
-
-    sdfg.addEdge(iEdge);
+    if (collect(edgeOp, sdfg).failed())
+      return failure();
   }
 
   sdfg.emit(jemit);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// State
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
+  State state(op.getLoc());
+  sdfg.addState(op.ID(), state);
+
+  state.setName(op.getName());
+
+  for (TaskletNode taskletNode : op.getOps<TaskletNode>()) {
+    if (collect(taskletNode, state).failed())
+      return failure();
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// EdgeOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
+  SDFGNode sdfgNode = utils::getParentSDFG(*op);
+  StateNode srcNode = sdfgNode.getStateBySymRef(op.src());
+  StateNode destNode = sdfgNode.getStateBySymRef(op.dest());
+
+  State src = sdfg.lookup(srcNode.ID());
+  State dest = sdfg.lookup(destNode.ID());
+
+  InterstateEdge iEdge(src, dest);
+  sdfg.addEdge(iEdge);
+
+  iEdge.setCondition(op.condition());
+
+  for (mlir::Attribute attr : op.assign()) {
+    std::pair<StringRef, StringRef> kv =
+        attr.cast<StringAttr>().getValue().split(':');
+
+    iEdge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// TaskletNode
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(TaskletNode &op, State &state) {
+  Tasklet tasklet(op.getLoc());
+  state.addNode(op.ID(), tasklet);
+  tasklet.setName(getTaskletName(op));
+
+  for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+    Connector connector(tasklet, op.getInputName(i));
+    tasklet.addInConnector(connector);
+  }
+
+  for (unsigned i = 0; i < op.getNumResults(); ++i) {
+    Connector connector(tasklet, op.getOutputName(i));
+    tasklet.addOutConnector(connector);
+  }
+
+  Optional<std::string> code = liftToPython(op);
+  if (code.hasValue()) {
+    tasklet.setCode(code.getValue());
+    tasklet.setLanguage("Python");
+  } else {
+    // TODO: Write content as code
+  }
+
   return success();
 }

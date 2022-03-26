@@ -105,19 +105,16 @@ protected:
 public:
   NodeImpl(Location location) : id(0), location(location), parent(nullptr) {}
 
-  void setID(unsigned id) { this->id = id; }
-  unsigned getID() { return id; }
+  void setID(unsigned id);
+  unsigned getID();
 
-  Location getLocation() { return location; }
+  Location getLocation();
 
-  void setName(StringRef name) {
-    this->name = name.str();
-    utils::sanitizeName(this->name);
-  }
-  StringRef getName() { return name; }
+  void setName(StringRef name);
+  StringRef getName();
 
-  void setParent(Node parent) { this->parent = parent; }
-  Node getParent() { return parent; }
+  void setParent(Node parent);
+  Node getParent();
 
   // check for existing attribtues
   // Replace or add to list
@@ -136,16 +133,23 @@ public:
   ConnectorNode(std::shared_ptr<ConnectorNodeImpl> ptr)
       : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {}
 
+  void addInConnector(Connector connector);
+  void addOutConnector(Connector connector);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class ConnectorNodeImpl : public NodeImpl, public Emittable {
 protected:
-  std::vector<Connector> connectors;
+  std::vector<Connector> inConnectors;
+  std::vector<Connector> outConnectors;
 
 public:
   ConnectorNodeImpl(Location location) : NodeImpl(location) {}
 
+  void addInConnector(Connector connector);
+  void addOutConnector(Connector connector);
+
+  // Emits connectors
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -156,6 +160,10 @@ public:
 
   Connector(ConnectorNode parent, StringRef name)
       : parent(parent), name(name) {}
+
+  bool operator==(const Connector other) const {
+    return other.parent == parent && other.name == name;
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -190,7 +198,7 @@ public:
             std::make_shared<StateImpl>(location))),
         ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
 
-  void addNode(ConnectorNode node);
+  void addNode(unsigned id, ConnectorNode node);
   void addEdge(MultiEdge edge);
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -204,7 +212,7 @@ private:
 public:
   StateImpl(Location location) : NodeImpl(location) {}
 
-  void addNode(ConnectorNode node);
+  void addNode(unsigned id, ConnectorNode node);
   void addEdge(MultiEdge edge);
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -285,12 +293,22 @@ public:
             std::make_shared<TaskletImpl>(location))),
         ptr(std::static_pointer_cast<TaskletImpl>(ConnectorNode::ptr)) {}
 
+  void setCode(StringRef code);
+  void setLanguage(StringRef language);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class TaskletImpl : public ConnectorNodeImpl {
+private:
+  std::string code;
+  std::string language;
+
 public:
   TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
+
+  void setCode(StringRef code);
+  void setLanguage(StringRef language);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
