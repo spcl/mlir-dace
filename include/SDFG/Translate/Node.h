@@ -305,7 +305,8 @@ private:
   std::string language;
 
 public:
-  TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
+  TaskletImpl(Location location)
+      : ConnectorNodeImpl(location), language("Python") {}
 
   void setCode(StringRef code);
   void setLanguage(StringRef language);
