@@ -1,7 +1,6 @@
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
@@ -534,12 +533,7 @@ TaskletNode TaskletNode::create(Location location, ValueRange operands,
 }
 
 std::string TaskletNode::getInputName(unsigned idx) {
-  AsmState state(utils::getParentState(*this->getOperation()));
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  body().getArgument(idx).printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
-  return name;
+  return utils::valueToString(body().getArgument(idx), *getOperation());
 }
 
 std::string TaskletNode::getOutputName(unsigned idx) {
@@ -992,13 +986,7 @@ std::string AllocOp::getName() {
       return name.getValue().str();
   }
 
-  AsmState state(utils::getParentSDFG(*this->getOperation()));
-  std::string name;
-  llvm::raw_string_ostream nameStream(name);
-  (*this)->getResult(0).printAsOperand(nameStream, state);
-  utils::sanitizeName(name);
-
-  return name;
+  return utils::valueToString(getResult(), *getOperation(), /*useSDFG=*/true);
 }
 
 //===----------------------------------------------------------------------===//

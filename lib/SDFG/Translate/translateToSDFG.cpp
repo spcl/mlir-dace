@@ -3,7 +3,6 @@
 #include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/AsmState.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/DenseMap.h"
 #include <regex>
@@ -77,16 +76,16 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
   State src = sdfg.lookup(srcNode.ID());
   State dest = sdfg.lookup(destNode.ID());
 
-  InterstateEdge iEdge(src, dest);
-  sdfg.addEdge(iEdge);
+  InterstateEdge edge(src, dest);
+  sdfg.addEdge(edge);
 
-  iEdge.setCondition(op.condition());
+  edge.setCondition(op.condition());
 
   for (mlir::Attribute attr : op.assign()) {
     std::pair<StringRef, StringRef> kv =
         attr.cast<StringAttr>().getValue().split(':');
 
-    iEdge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
+    edge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
   }
 
   return success();
@@ -104,11 +103,16 @@ LogicalResult translation::collect(TaskletNode &op, State &state) {
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Connector connector(tasklet, op.getInputName(i));
     tasklet.addInConnector(connector);
+
+    MultiEdge edge(state.lookup(op.getOperand(i)), connector);
+    state.addEdge(edge);
   }
 
   for (unsigned i = 0; i < op.getNumResults(); ++i) {
     Connector connector(tasklet, op.getOutputName(i));
     tasklet.addOutConnector(connector);
+
+    state.mapConnector(op.getResult(i), connector);
   }
 
   Optional<std::string> code = liftToPython(op);

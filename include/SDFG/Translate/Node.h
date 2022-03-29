@@ -200,12 +200,15 @@ public:
 
   void addNode(unsigned id, ConnectorNode node);
   void addEdge(MultiEdge edge);
+  void mapConnector(Value value, Connector connector);
+  Connector lookup(Value value);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class StateImpl : public NodeImpl, public Emittable {
 private:
   std::map<unsigned, ConnectorNode> lut;
+  std::map<std::string, Connector> connectorLut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
 
@@ -214,6 +217,8 @@ public:
 
   void addNode(unsigned id, ConnectorNode node);
   void addEdge(MultiEdge edge);
+  void mapConnector(Value value, Connector connector);
+  Connector lookup(Value value);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 

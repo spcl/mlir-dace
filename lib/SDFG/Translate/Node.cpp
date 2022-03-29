@@ -50,7 +50,29 @@ void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
 // MultiEdge
 //===----------------------------------------------------------------------===//
 
-void MultiEdge::emit(emitter::JsonEmitter &jemit) {}
+void MultiEdge::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MultiConnectorEdge");
+
+  jemit.printKVPair("src", source.parent.getID());
+  jemit.printKVPair("dst", destination.parent.getID());
+
+  jemit.printKVPair("src_connector", source.name);
+  jemit.printKVPair("dst_connector", destination.name);
+
+  jemit.startNamedObject("attributes");
+  jemit.startNamedObject("data");
+  jemit.printKVPair("type", "Memlet");
+  jemit.startNamedObject("attributes");
+
+  // more data
+
+  jemit.endObject(); // attributes
+  jemit.endObject(); // data
+  jemit.endObject(); // attributes
+
+  jemit.endObject();
+}
 
 //===----------------------------------------------------------------------===//
 // Node
@@ -214,6 +236,13 @@ void State::addNode(unsigned id, ConnectorNode node) {
 }
 
 void State::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
+
+void State::mapConnector(Value value, Connector connector) {
+  ptr->mapConnector(value, connector);
+}
+
+Connector State::lookup(Value value) { return ptr->lookup(value); }
+
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void StateImpl::addNode(unsigned id, ConnectorNode node) {
@@ -222,6 +251,17 @@ void StateImpl::addNode(unsigned id, ConnectorNode node) {
 
   if (!lut.insert({id, node}).second)
     emitError(location, "Duplicate ID in StateImpl::addNode");
+}
+
+void StateImpl::addEdge(MultiEdge edge) { edges.push_back(edge); }
+
+void StateImpl::mapConnector(Value value, Connector connector) {
+  if (!connectorLut.insert({utils::valueToString(value), connector}).second)
+    emitError(location, "Duplicate ID in StateImpl::mapConnector");
+}
+
+Connector StateImpl::lookup(Value value) {
+  return connectorLut.find(utils::valueToString(value))->second;
 }
 
 void StateImpl::emit(emitter::JsonEmitter &jemit) {
@@ -239,6 +279,8 @@ void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.endList(); // nodes
 
   jemit.startNamedList("edges");
+  for (MultiEdge me : edges)
+    me.emit(jemit);
   jemit.endList(); // edges
 
   jemit.endObject();
