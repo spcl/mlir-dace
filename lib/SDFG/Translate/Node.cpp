@@ -5,6 +5,27 @@ using namespace sdfg;
 using namespace translation;
 
 //===----------------------------------------------------------------------===//
+// Array
+//===----------------------------------------------------------------------===//
+
+void Array::emit(emitter::JsonEmitter &jemit) {
+  jemit.startNamedObject(name);
+  jemit.printKVPair("type", "Array");
+
+  jemit.startNamedObject("attributes");
+
+  jemit.printKVPair("transient", transient ? "true" : "false",
+                    /*stringify=*/false);
+  jemit.printKVPair("dtype", dtype);
+
+  jemit.startNamedList("shape");
+  jemit.endList(); // shape
+
+  jemit.endObject(); // attributes
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
 // InterstateEdge
 //===----------------------------------------------------------------------===//
 
@@ -158,15 +179,41 @@ void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
 // SDFG
 //===----------------------------------------------------------------------===//
 
-void SDFG::addState(unsigned id, State state) {
+void SDFG::addState(State state, int id) {
   state.setParent(*this);
-  ptr->addState(id, state);
+  ptr->addState(state, id);
 }
 
 State SDFG::lookup(unsigned id) { return ptr->lookup(id); }
 void SDFG::setStartState(State state) { ptr->setStartState(state); }
 void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
+void SDFG::addArray(Array array) { ptr->addArray(array); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
+
+void SDFGImpl::addState(State state, int id) {
+  state.setID(states.size());
+  states.push_back(state);
+
+  if (id < 0)
+    return;
+  if (!lut.insert({id, state}).second)
+    emitError(location, "Duplicate ID in SDFGImpl::addState");
+}
+
+void SDFGImpl::setStartState(State state) {
+  if (std::find(states.begin(), states.end(), state) == states.end())
+    emitError(
+        location,
+        "Non-existent state assigned as start in SDFGImpl::setStartState");
+  else
+    this->startState = state;
+}
+
+void SDFGImpl::addEdge(InterstateEdge edge) { edges.push_back(edge); }
+
+State SDFGImpl::lookup(unsigned id) { return lut.find(id)->second; }
+
+void SDFGImpl::addArray(Array array) { arrays.push_back(array); }
 
 void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -185,6 +232,8 @@ void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.endObject(); // constants_prop
 
   jemit.startNamedObject("_arrays");
+  for (Array a : arrays)
+    a.emit(jemit);
   jemit.endObject(); // _arrays
 
   jemit.startNamedObject("symbols");
@@ -205,34 +254,13 @@ void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.endObject();
 }
 
-void SDFGImpl::addState(unsigned id, State state) {
-  state.setID(states.size());
-  states.push_back(state);
-
-  if (!lut.insert({id, state}).second)
-    emitError(location, "Duplicate ID in SDFGImpl::addState");
-}
-
-void SDFGImpl::setStartState(State state) {
-  if (std::find(states.begin(), states.end(), state) == states.end())
-    emitError(
-        location,
-        "Non-existent state assigned as start in SDFGImpl::setStartState");
-  else
-    this->startState = state;
-}
-
-void SDFGImpl::addEdge(InterstateEdge edge) { edges.push_back(edge); }
-
-State SDFGImpl::lookup(unsigned id) { return lut.find(id)->second; }
-
 //===----------------------------------------------------------------------===//
 // State
 //===----------------------------------------------------------------------===//
 
-void State::addNode(unsigned id, ConnectorNode node) {
+void State::addNode(ConnectorNode node, int id) {
   node.setParent(*this);
-  ptr->addNode(id, node);
+  ptr->addNode(node, id);
 }
 
 void State::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
@@ -245,10 +273,12 @@ Connector State::lookup(Value value) { return ptr->lookup(value); }
 
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
-void StateImpl::addNode(unsigned id, ConnectorNode node) {
+void StateImpl::addNode(ConnectorNode node, int id) {
   node.setID(nodes.size());
   nodes.push_back(node);
 
+  if (id < 0)
+    return;
   if (!lut.insert({id, node}).second)
     emitError(location, "Duplicate ID in StateImpl::addNode");
 }
@@ -315,6 +345,26 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
 
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes
+
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
+// Access
+//===----------------------------------------------------------------------===//
+
+void Access::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void AccessImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "AccessNode");
+  jemit.printKVPair("label", name);
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("data", name);
+  // ConnectorNodeImpl::emit(jemit);
+  jemit.endObject(); // attributes */
 
   jemit.endObject();
 }

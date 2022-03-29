@@ -10,28 +10,31 @@ namespace mlir::sdfg::translation {
 class Emittable;
 
 class Attribute;
-class Connector;
+class Condition;
 class Assignment;
+class Array;
 
 class Node;
 class NodeImpl;
 
-class SDFG;
-class SDFGImpl;
+class ConnectorNode;
+class ConnectorNodeImpl;
+class Connector;
 
 class State;
 class StateImpl;
 
+class SDFG;
+class SDFGImpl;
+
 class InterstateEdge;
 class MultiEdge;
-
-class ConnectorNode;
-class ConnectorNodeImpl;
 
 class Tasklet;
 class TaskletImpl;
 
 class Access;
+class AccessImpl;
 
 //===----------------------------------------------------------------------===//
 // Interfaces
@@ -65,6 +68,19 @@ public:
   std::string value;
 
   Assignment(StringRef key, StringRef value) : key(key), value(value) {}
+};
+
+class Array : public Emittable {
+public:
+  std::string name;
+  bool transient;
+  std::string dtype; // Maybe create type class
+  // shape
+
+  Array(StringRef name, bool transient, StringRef dtype)
+      : name(name), transient(transient), dtype(dtype) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 //===----------------------------------------------------------------------===//
@@ -135,6 +151,7 @@ public:
 
   void addInConnector(Connector connector);
   void addOutConnector(Connector connector);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -198,16 +215,17 @@ public:
             std::make_shared<StateImpl>(location))),
         ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
 
-  void addNode(unsigned id, ConnectorNode node);
+  void addNode(ConnectorNode node, int id = -1);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
   Connector lookup(Value value);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class StateImpl : public NodeImpl, public Emittable {
 private:
-  std::map<unsigned, ConnectorNode> lut;
+  std::map<int, ConnectorNode> lut;
   std::map<std::string, Connector> connectorLut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
@@ -215,10 +233,11 @@ private:
 public:
   StateImpl(Location location) : NodeImpl(location) {}
 
-  void addNode(unsigned id, ConnectorNode node);
+  void addNode(ConnectorNode node, int id);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
   Connector lookup(Value value);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -231,32 +250,38 @@ private:
   std::shared_ptr<SDFGImpl> ptr;
 
 public:
+  SDFG(Node n) : Node(n), ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {}
+
   SDFG(Location location)
       : Node(std::static_pointer_cast<NodeImpl>(
             std::make_shared<SDFGImpl>(location))),
         ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {}
 
   State lookup(unsigned id);
-  void addState(unsigned id, State state);
+  void addState(State state, int id = -1);
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
+  void addArray(Array array);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class SDFGImpl : public NodeImpl, public Emittable {
 private:
-  std::map<unsigned, State> lut;
+  std::map<int, State> lut;
   std::vector<State> states;
   std::vector<InterstateEdge> edges;
+  std::vector<Array> arrays;
   State startState;
 
 public:
   SDFGImpl(Location location) : NodeImpl(location), startState(location) {}
 
   State lookup(unsigned id);
-  void addState(unsigned id, State state);
+  void addState(State state, int id);
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
+  void addArray(Array array);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -319,7 +344,26 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-// class Access : public ConnectorNode {};
+class Access : public ConnectorNode {
+private:
+  std::shared_ptr<AccessImpl> ptr;
+
+public:
+  Access(Location location)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<AccessImpl>(location))),
+        ptr(std::static_pointer_cast<AccessImpl>(ConnectorNode::ptr)) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class AccessImpl : public ConnectorNodeImpl {
+private:
+public:
+  AccessImpl(Location location) : ConnectorNodeImpl(location) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
 
 /* class MapBegin : public ConnectorNode {};
 class MapEnd : public ConnectorNode {};

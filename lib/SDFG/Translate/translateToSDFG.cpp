@@ -52,7 +52,7 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 
 LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
   State state(op.getLoc());
-  sdfg.addState(op.ID(), state);
+  sdfg.addState(state, op.ID());
 
   state.setName(op.getName());
 
@@ -97,7 +97,7 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
 
 LogicalResult translation::collect(TaskletNode &op, State &state) {
   Tasklet tasklet(op.getLoc());
-  state.addNode(op.ID(), tasklet);
+  state.addNode(tasklet, op.ID());
   tasklet.setName(getTaskletName(op));
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -112,7 +112,24 @@ LogicalResult translation::collect(TaskletNode &op, State &state) {
     Connector connector(tasklet, op.getOutputName(i));
     tasklet.addOutConnector(connector);
 
-    state.mapConnector(op.getResult(i), connector);
+    // TODO: Refactor
+    Array array(utils::generateName("tmp"), true, "int32");
+    static_cast<SDFG>(state.getParent()).addArray(array);
+
+    Access access(op.getLoc());
+    access.setName(array.name);
+    state.addNode(access);
+
+    Connector accIn(access, "__in");
+    Connector accOut(access, "__out");
+
+    access.addInConnector(accIn);
+    access.addOutConnector(accOut);
+
+    MultiEdge edge(connector, accIn);
+    state.addEdge(edge);
+
+    state.mapConnector(op.getResult(i), accOut);
   }
 
   Optional<std::string> code = liftToPython(op);
