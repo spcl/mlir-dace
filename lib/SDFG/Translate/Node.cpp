@@ -5,6 +5,27 @@ using namespace sdfg;
 using namespace translation;
 
 //===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+std::string dtypeToString(DType t) {
+  switch (t) {
+  case DType::int32:
+    return "int32";
+  case DType::int64:
+    return "int64";
+  case DType::float32:
+    return "float32";
+  case DType::float64:
+    return "float64";
+
+  // To calm down the compiler
+  default:
+    return "Unsupported Type";
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Array
 //===----------------------------------------------------------------------===//
 
@@ -16,7 +37,7 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 
   jemit.printKVPair("transient", transient ? "true" : "false",
                     /*stringify=*/false);
-  jemit.printKVPair("dtype", dtype);
+  jemit.printKVPair("dtype", dtypeToString(dtype));
 
   jemit.startNamedList("shape");
   jemit.endList(); // shape
@@ -78,8 +99,11 @@ void MultiEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("src", source.parent.getID());
   jemit.printKVPair("dst", destination.parent.getID());
 
-  jemit.printKVPair("src_connector", source.name);
-  jemit.printKVPair("dst_connector", destination.name);
+  jemit.printKVPair("src_connector", source.name,
+                    /*stringify=*/!source.isNull);
+
+  jemit.printKVPair("dst_connector", destination.name,
+                    /*stringify=*/!destination.isNull);
 
   jemit.startNamedObject("attributes");
   jemit.startNamedObject("data");
@@ -165,13 +189,19 @@ void ConnectorNodeImpl::addOutConnector(Connector connector) {
 
 void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("in_connectors");
-  for (Connector c : inConnectors)
+  for (Connector c : inConnectors) {
+    if (c.isNull)
+      continue;
     jemit.printKVPair(c.name, "null", /*stringify=*/false);
+  }
   jemit.endObject(); // in_connectors
 
   jemit.startNamedObject("out_connectors");
-  for (Connector c : outConnectors)
+  for (Connector c : outConnectors) {
+    if (c.isNull)
+      continue;
     jemit.printKVPair(c.name, "null", /*stringify=*/false);
+  }
   jemit.endObject(); // out_connectors
 }
 
@@ -271,6 +301,8 @@ void State::mapConnector(Value value, Connector connector) {
 
 Connector State::lookup(Value value) { return ptr->lookup(value); }
 
+SDFG State::getSDFG() { return static_cast<SDFG>(getParent()); }
+
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void StateImpl::addNode(ConnectorNode node, int id) {
@@ -363,7 +395,7 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 
   jemit.startNamedObject("attributes");
   jemit.printKVPair("data", name);
-  // ConnectorNodeImpl::emit(jemit);
+  ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */
 
   jemit.endObject();

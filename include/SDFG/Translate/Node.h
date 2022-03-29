@@ -49,6 +49,8 @@ public:
 // DataClasses
 //===----------------------------------------------------------------------===//
 
+enum class DType { int32, int64, float32, float64 };
+
 class Attribute {
 public:
   std::string name;
@@ -74,10 +76,10 @@ class Array : public Emittable {
 public:
   std::string name;
   bool transient;
-  std::string dtype; // Maybe create type class
+  DType dtype;
   // shape
 
-  Array(StringRef name, bool transient, StringRef dtype)
+  Array(StringRef name, bool transient, DType dtype)
       : name(name), transient(transient), dtype(dtype) {}
 
   void emit(emitter::JsonEmitter &jemit) override;
@@ -174,9 +176,13 @@ class Connector {
 public:
   ConnectorNode parent;
   std::string name;
+  bool isNull;
+  // DType?
 
+  Connector(ConnectorNode parent)
+      : parent(parent), name("null"), isNull(true) {}
   Connector(ConnectorNode parent, StringRef name)
-      : parent(parent), name(name) {}
+      : parent(parent), name(name), isNull(false) {}
 
   bool operator==(const Connector other) const {
     return other.parent == parent && other.name == name;
@@ -215,6 +221,7 @@ public:
             std::make_shared<StateImpl>(location))),
         ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
 
+  SDFG getSDFG();
   void addNode(ConnectorNode node, int id = -1);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);

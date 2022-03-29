@@ -14,6 +14,64 @@ using namespace sdfg;
 // Checks should be minimal
 // A check might indicate that the IR is unsound
 
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+translation::DType translateTypeToSDFG(Type t, Location loc) {
+  using namespace translation;
+
+  if (t.isInteger(32))
+    return DType::int32;
+
+  if (t.isInteger(64))
+    return DType::int64;
+
+  if (t.isF32())
+    return DType::float32;
+
+  if (t.isF64())
+    return DType::float64;
+
+  if (t.isIndex())
+    return DType::int64;
+
+  std::string type;
+  llvm::raw_string_ostream typeStream(type);
+  t.print(typeStream);
+  emitError(loc, "Unsupported type: " + type);
+
+  return DType::int64;
+}
+
+void insertTransientArray(Location location, translation::Connector connector,
+                          Value value, translation::State &state) {
+  using namespace translation;
+
+  Array array(utils::generateName("tmp"), true,
+              translateTypeToSDFG(value.getType(), location));
+  state.getSDFG().addArray(array);
+
+  Access access(location);
+  access.setName(array.name);
+  state.addNode(access);
+
+  Connector accIn(access);
+  Connector accOut(access);
+
+  access.addInConnector(accIn);
+  access.addOutConnector(accOut);
+
+  MultiEdge edge(connector, accIn);
+  state.addEdge(edge);
+
+  state.mapConnector(value, accOut);
+}
+
+//===----------------------------------------------------------------------===//
+// Module
+//===----------------------------------------------------------------------===//
+
 LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   if (++op.getOps<SDFGNode>().begin() != op.getOps<SDFGNode>().end()) {
     emitError(op.getLoc(), "Must have exactly one top-level SDFGNode");
@@ -112,24 +170,7 @@ LogicalResult translation::collect(TaskletNode &op, State &state) {
     Connector connector(tasklet, op.getOutputName(i));
     tasklet.addOutConnector(connector);
 
-    // TODO: Refactor
-    Array array(utils::generateName("tmp"), true, "int32");
-    static_cast<SDFG>(state.getParent()).addArray(array);
-
-    Access access(op.getLoc());
-    access.setName(array.name);
-    state.addNode(access);
-
-    Connector accIn(access, "__in");
-    Connector accOut(access, "__out");
-
-    access.addInConnector(accIn);
-    access.addOutConnector(accOut);
-
-    MultiEdge edge(connector, accIn);
-    state.addEdge(edge);
-
-    state.mapConnector(op.getResult(i), accOut);
+    insertTransientArray(op.getLoc(), connector, op.getResult(i), state);
   }
 
   Optional<std::string> code = liftToPython(op);
