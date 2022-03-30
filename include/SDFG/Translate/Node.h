@@ -243,7 +243,8 @@ private:
 public:
   StateImpl(Location location) : NodeImpl(location) {}
 
-  void addNode(ConnectorNode node, int id);
+  SDFG getSDFG();
+  void addNode(ConnectorNode node, int id = -1);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
   Connector lookup(Value value);
@@ -272,6 +273,7 @@ public:
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
+  Array getArray(StringRef name);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -288,10 +290,11 @@ public:
   SDFGImpl(Location location) : NodeImpl(location), startState(location) {}
 
   State lookup(unsigned id);
-  void addState(State state, int id);
+  void addState(State state, int id = -1);
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
+  Array getArray(StringRef name);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };

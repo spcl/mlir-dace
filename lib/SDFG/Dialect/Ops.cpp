@@ -989,7 +989,7 @@ std::string AllocOp::getName() {
     }
   }
 
-  return utils::valueToString(getResult(), *getOperation(), /*useSDFG=*/true);
+  return utils::valueToString(getResult(), *getOperation());
 }
 
 //===----------------------------------------------------------------------===//

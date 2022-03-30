@@ -6,8 +6,8 @@
 
 namespace mlir::sdfg::utils {
 
-std::string valueToString(Value value, bool useSDFG = false);
-std::string valueToString(Value value, Operation &op, bool useSDFG = false);
+std::string valueToString(Value value);
+std::string valueToString(Value value, Operation &op);
 
 } // namespace mlir::sdfg::utils
 

@@ -4,13 +4,12 @@
 
 namespace mlir::sdfg::utils {
 
-std::string valueToString(Value value, bool useSDFG) {
-  return valueToString(value, *value.getDefiningOp(), useSDFG);
+std::string valueToString(Value value) {
+  return valueToString(value, *value.getDefiningOp());
 }
 
-std::string valueToString(Value value, Operation &op, bool useSDFG) {
-  AsmState state(useSDFG ? utils::getParentSDFG(op)
-                         : utils::getParentState(op));
+std::string valueToString(Value value, Operation &op) {
+  AsmState state(utils::getParentSDFG(op));
   std::string name;
   llvm::raw_string_ostream nameStream(name);
   value.printAsOperand(nameStream, state);

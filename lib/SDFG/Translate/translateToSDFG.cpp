@@ -92,9 +92,14 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
 
   state.setName(op.getName());
 
-  for (TaskletNode taskletNode : op.getOps<TaskletNode>()) {
-    if (collect(taskletNode, state).failed())
-      return failure();
+  for (Operation &operation : op.getOps()) {
+    if (TaskletNode oper = dyn_cast<TaskletNode>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (CopyOp oper = dyn_cast<CopyOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
   }
 
   return success();
@@ -170,5 +175,15 @@ LogicalResult translation::collect(TaskletNode &op, State &state) {
     // TODO: Write content as code
   }
 
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CopyOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(CopyOp &op, State &state) {
+  MultiEdge edge(state.lookup(op.src()), state.lookup(op.dest()));
+  state.addEdge(edge);
   return success();
 }
