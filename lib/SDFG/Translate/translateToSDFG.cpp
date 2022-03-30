@@ -18,38 +18,11 @@ using namespace sdfg;
 // Helpers
 //===----------------------------------------------------------------------===//
 
-translation::DType translateTypeToSDFG(Type t, Location loc) {
-  using namespace translation;
-
-  if (t.isInteger(32))
-    return DType::int32;
-
-  if (t.isInteger(64))
-    return DType::int64;
-
-  if (t.isF32())
-    return DType::float32;
-
-  if (t.isF64())
-    return DType::float64;
-
-  if (t.isIndex())
-    return DType::int64;
-
-  std::string type;
-  llvm::raw_string_ostream typeStream(type);
-  t.print(typeStream);
-  emitError(loc, "Unsupported type: " + type);
-
-  return DType::int64;
-}
-
 void insertTransientArray(Location location, translation::Connector connector,
                           Value value, translation::State &state) {
   using namespace translation;
 
-  Array array(utils::generateName("tmp"), true,
-              translateTypeToSDFG(value.getType(), location));
+  Array array(utils::generateName("tmp"), true, value.getType());
   state.getSDFG().addArray(array);
 
   Access access(location);
@@ -81,6 +54,11 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   SDFGNode sdfgNode = *op.getOps<SDFGNode>().begin();
   SDFG sdfg(sdfgNode.getLoc());
   sdfg.setName(utils::generateName("sdfg"));
+
+  for (AllocOp allocOp : sdfgNode.getOps<AllocOp>()) {
+    if (collect(allocOp, sdfg).failed())
+      return failure();
+  }
 
   for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
     if (collect(stateNode, sdfg).failed())
@@ -145,6 +123,17 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
 
     edge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
   }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// AllocOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(AllocOp &op, SDFG &sdfg) {
+  Array array(op.getName(), op.transient(), utils::getSizedType(op.getType()));
+  sdfg.addArray(array);
 
   return success();
 }

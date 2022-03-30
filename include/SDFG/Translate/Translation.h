@@ -14,6 +14,8 @@ LogicalResult translateToSDFG(ModuleOp &op, JsonEmitter &jemit);
 
 LogicalResult collect(StateNode &op, SDFG &sdfg);
 LogicalResult collect(EdgeOp &op, SDFG &sdfg);
+LogicalResult collect(AllocOp &op, SDFG &sdfg);
+
 LogicalResult collect(TaskletNode &op, State &state);
 
 } // namespace mlir::sdfg::translation

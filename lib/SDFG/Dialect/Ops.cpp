@@ -982,8 +982,11 @@ bool AllocOp::isInState() {
 std::string AllocOp::getName() {
   if ((*this)->hasAttr("name")) {
     Attribute nameAttr = (*this)->getAttr("name");
-    if (StringAttr name = nameAttr.cast<StringAttr>())
-      return name.getValue().str();
+    if (StringAttr name = nameAttr.cast<StringAttr>()) {
+      std::string str = name.getValue().str();
+      utils::sanitizeName(str);
+      return str;
+    }
   }
 
   return utils::valueToString(getResult(), *getOperation(), /*useSDFG=*/true);

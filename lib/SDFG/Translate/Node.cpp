@@ -8,21 +8,28 @@ using namespace translation;
 // Helpers
 //===----------------------------------------------------------------------===//
 
-std::string dtypeToString(DType t) {
-  switch (t) {
-  case DType::int32:
+std::string typeToString(Type t) {
+  if (t.isInteger(32))
     return "int32";
-  case DType::int64:
+
+  if (t.isInteger(64))
     return "int64";
-  case DType::float32:
+
+  if (t.isF32())
     return "float32";
-  case DType::float64:
+
+  if (t.isF64())
     return "float64";
 
-  // To calm down the compiler
-  default:
-    return "Unsupported Type";
-  }
+  if (t.isIndex())
+    return "int64";
+
+  /*   std::string type;
+    llvm::raw_string_ostream typeStream(type);
+    t.print(typeStream);
+    emitError(loc, "Unsupported type: " + type); */
+
+  return "Unsupported";
 }
 
 //===----------------------------------------------------------------------===//
@@ -37,9 +44,21 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 
   jemit.printKVPair("transient", transient ? "true" : "false",
                     /*stringify=*/false);
-  jemit.printKVPair("dtype", dtypeToString(dtype));
+  jemit.printKVPair("dtype", typeToString(shape.getElementType()));
 
   jemit.startNamedList("shape");
+
+  unsigned intIdx = 0;
+  unsigned symIdx = 0;
+
+  for (unsigned i = 0; i < shape.getShape().size(); ++i) {
+    jemit.startEntry();
+    if (shape.getShape()[i])
+      jemit.printString(std::to_string(shape.getIntegers()[intIdx++]));
+    else
+      jemit.printString(shape.getSymbols()[symIdx++].str());
+  }
+
   jemit.endList(); // shape
 
   jemit.endObject(); // attributes

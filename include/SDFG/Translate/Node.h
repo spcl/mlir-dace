@@ -76,11 +76,14 @@ class Array : public Emittable {
 public:
   std::string name;
   bool transient;
-  DType dtype;
-  // shape
+  SizedType shape;
 
-  Array(StringRef name, bool transient, DType dtype)
-      : name(name), transient(transient), dtype(dtype) {}
+  Array(StringRef name, bool transient, Type t)
+      : name(name), transient(transient),
+        shape(SizedType::get(t.getContext(), t, {}, {}, {})) {}
+
+  Array(StringRef name, bool transient, SizedType shape)
+      : name(name), transient(transient), shape(shape) {}
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
