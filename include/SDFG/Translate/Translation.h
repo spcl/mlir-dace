@@ -20,6 +20,8 @@ LogicalResult collect(AllocOp &op, State &state);
 
 LogicalResult collect(TaskletNode &op, State &state);
 LogicalResult collect(CopyOp &op, State &state);
+LogicalResult collect(StoreOp &op, State &state);
+LogicalResult collect(LoadOp &op, State &state);
 
 } // namespace mlir::sdfg::translation
 

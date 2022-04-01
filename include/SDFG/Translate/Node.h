@@ -273,7 +273,6 @@ public:
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
-  Array getArray(StringRef name);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -294,7 +293,6 @@ public:
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
-  Array getArray(StringRef name);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };

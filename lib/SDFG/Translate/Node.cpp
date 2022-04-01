@@ -237,7 +237,6 @@ State SDFG::lookup(unsigned id) { return ptr->lookup(id); }
 void SDFG::setStartState(State state) { ptr->setStartState(state); }
 void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
 void SDFG::addArray(Array array) { ptr->addArray(array); }
-Array SDFG::getArray(StringRef name) { return ptr->getArray(name); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
 
 void SDFGImpl::addState(State state, int id) {
@@ -264,16 +263,6 @@ void SDFGImpl::addEdge(InterstateEdge edge) { edges.push_back(edge); }
 State SDFGImpl::lookup(unsigned id) { return lut.find(id)->second; }
 
 void SDFGImpl::addArray(Array array) { arrays.push_back(array); }
-
-Array SDFGImpl::getArray(StringRef name) {
-  for (Array a : arrays) {
-    if (a.name == name)
-      return a;
-  }
-
-  emitError(location, "Non-existent array requested in SDFGImpl::getArray");
-  return arrays.front();
-}
 
 void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -353,19 +342,16 @@ void StateImpl::mapConnector(Value value, Connector connector) {
 }
 
 Connector StateImpl::lookup(Value value) {
-  // Search SDFG if value is not mapped
   if (connectorLut.find(utils::valueToString(value)) == connectorLut.end()) {
     if (AllocOp alloc = dyn_cast<AllocOp>(value.getDefiningOp())) {
-      Array array = getSDFG().getArray(alloc.getName());
-
       Access access(location);
-      access.setName(array.name);
+      access.setName(alloc.getName());
       addNode(access);
 
       Connector accOut(access);
       access.addOutConnector(accOut);
 
-      mapConnector(value, accOut);
+      return accOut;
     }
   }
 

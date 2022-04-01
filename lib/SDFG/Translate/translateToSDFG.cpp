@@ -100,6 +100,14 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
     if (CopyOp oper = dyn_cast<CopyOp>(operation))
       if (collect(oper, state).failed())
         return failure();
+
+    if (StoreOp oper = dyn_cast<StoreOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (LoadOp oper = dyn_cast<LoadOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
   }
 
   return success();
@@ -201,5 +209,27 @@ LogicalResult translation::collect(TaskletNode &op, State &state) {
 LogicalResult translation::collect(CopyOp &op, State &state) {
   MultiEdge edge(state.lookup(op.src()), state.lookup(op.dest()));
   state.addEdge(edge);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// StoreOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(StoreOp &op, State &state) {
+  MultiEdge edge(state.lookup(op.val()), state.lookup(op.arr()));
+  state.addEdge(edge);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// LoadOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(LoadOp &op, State &state) {
+  Connector connector = state.lookup(op.arr());
+  state.mapConnector(op.res(), connector);
+
   return success();
 }
