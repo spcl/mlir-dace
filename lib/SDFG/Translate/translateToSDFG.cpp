@@ -55,6 +55,17 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   SDFG sdfg(sdfgNode.getLoc());
   sdfg.setName(utils::generateName("sdfg"));
 
+  for (BlockArgument ba : sdfgNode.body().getArguments()) {
+    if (utils::isSizedType(ba.getType())) {
+      Array array(utils::valueToString(ba), false,
+                  utils::getSizedType(ba.getType()));
+      sdfg.addArg(array);
+    } else {
+      Array array(utils::valueToString(ba), false, ba.getType());
+      sdfg.addArg(array);
+    }
+  }
+
   for (AllocOp allocOp : sdfgNode.getOps<AllocOp>()) {
     if (collect(allocOp, sdfg).failed())
       return failure();

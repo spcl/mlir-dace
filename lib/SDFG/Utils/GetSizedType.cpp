@@ -9,4 +9,11 @@ SizedType getSizedType(Type t) {
   return t.cast<StreamType>().getDimensions();
 }
 
+bool isSizedType(Type t) {
+  if (t.isa<ArrayType>() || t.isa<StreamType>())
+    return true;
+
+  return false;
+}
+
 } // namespace mlir::sdfg::utils

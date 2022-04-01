@@ -273,6 +273,7 @@ public:
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
+  void addArg(Array arg);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -283,6 +284,7 @@ private:
   std::vector<State> states;
   std::vector<InterstateEdge> edges;
   std::vector<Array> arrays;
+  std::vector<Array> args;
   State startState;
 
 public:
@@ -293,6 +295,7 @@ public:
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
+  void addArg(Array arg);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };

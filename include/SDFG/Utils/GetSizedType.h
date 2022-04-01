@@ -6,7 +6,8 @@
 namespace mlir::sdfg::utils {
 
 SizedType getSizedType(Type t);
+bool isSizedType(Type t);
 
-}
+} // namespace mlir::sdfg::utils
 
 #endif // SDFG_Utils_GetSizedType_H

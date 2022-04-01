@@ -237,6 +237,7 @@ State SDFG::lookup(unsigned id) { return ptr->lookup(id); }
 void SDFG::setStartState(State state) { ptr->setStartState(state); }
 void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
 void SDFG::addArray(Array array) { ptr->addArray(array); }
+void SDFG::addArg(Array arg) { ptr->addArg(arg); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
 
 void SDFGImpl::addState(State state, int id) {
@@ -263,6 +264,10 @@ void SDFGImpl::addEdge(InterstateEdge edge) { edges.push_back(edge); }
 State SDFGImpl::lookup(unsigned id) { return lut.find(id)->second; }
 
 void SDFGImpl::addArray(Array array) { arrays.push_back(array); }
+void SDFGImpl::addArg(Array arg) {
+  args.push_back(arg);
+  addArray(arg);
+}
 
 void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -275,6 +280,10 @@ void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("name", name);
 
   jemit.startNamedList("arg_names");
+  for (Array a : args) {
+    jemit.startEntry();
+    jemit.printString(a.name);
+  }
   jemit.endList(); // arg_names
 
   jemit.startNamedObject("constants_prop");
@@ -343,16 +352,14 @@ void StateImpl::mapConnector(Value value, Connector connector) {
 
 Connector StateImpl::lookup(Value value) {
   if (connectorLut.find(utils::valueToString(value)) == connectorLut.end()) {
-    if (AllocOp alloc = dyn_cast<AllocOp>(value.getDefiningOp())) {
-      Access access(location);
-      access.setName(alloc.getName());
-      addNode(access);
+    Access access(location);
+    access.setName(utils::valueToString(value));
+    addNode(access);
 
-      Connector accOut(access);
-      access.addOutConnector(accOut);
+    Connector accOut(access);
+    access.addOutConnector(accOut);
 
-      return accOut;
-    }
+    return accOut;
   }
 
   return connectorLut.find(utils::valueToString(value))->second;
