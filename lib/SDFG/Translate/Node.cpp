@@ -289,6 +289,7 @@ void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("constants_prop");
   jemit.endObject(); // constants_prop
 
+  // Single entry => scalar
   jemit.startNamedObject("_arrays");
   for (Array a : arrays)
     a.emit(jemit);
