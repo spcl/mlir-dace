@@ -186,15 +186,6 @@ LogicalResult translation::collect(AllocOp &op, State &state) {
   Array array(op.getName(), op.transient(), utils::getSizedType(op.getType()));
   state.getSDFG().addArray(array);
 
-  Access access(op.getLoc());
-  access.setName(array.name);
-  state.addNode(access);
-
-  Connector accOut(access);
-  access.addOutConnector(accOut);
-
-  state.mapConnector(op.res(), accOut);
-
   return success();
 }
 
