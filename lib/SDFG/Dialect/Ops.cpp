@@ -402,6 +402,15 @@ NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+StateNode NestedSDFGNode::getFirstState() {
+  return *body().getOps<StateNode>().begin();
+}
+
+StateNode NestedSDFGNode::getStateBySymRef(StringRef symRef) {
+  Operation *op = lookupSymbol(symRef);
+  return dyn_cast<StateNode>(op);
+}
+
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//

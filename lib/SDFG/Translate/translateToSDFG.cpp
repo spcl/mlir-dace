@@ -53,6 +53,19 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 
   SDFGNode sdfgNode = *op.getOps<SDFGNode>().begin();
   SDFG sdfg(sdfgNode.getLoc());
+
+  if (collect(sdfg, sdfgNode).failed())
+    return failure();
+
+  sdfg.emit(jemit);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// SDFG
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(SDFG &sdfg, SDFGNode &sdfgNode) {
   sdfg.setName(utils::generateName("sdfg"));
 
   for (BlockArgument ba : sdfgNode.body().getArguments()) {
@@ -89,7 +102,6 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
       return failure();
   }
 
-  sdfg.emit(jemit);
   return success();
 }
 
@@ -108,6 +120,10 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
       if (collect(oper, state).failed())
         return failure();
 
+    if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
     if (CopyOp oper = dyn_cast<CopyOp>(operation))
       if (collect(oper, state).failed())
         return failure();
@@ -117,6 +133,10 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
         return failure();
 
     if (LoadOp oper = dyn_cast<LoadOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (AllocOp oper = dyn_cast<AllocOp>(operation))
       if (collect(oper, state).failed())
         return failure();
   }
@@ -209,6 +229,54 @@ LogicalResult translation::collect(TaskletNode &op, State &state) {
   } else {
     // TODO: Write content as code
   }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// NestedSDFGNode
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(NestedSDFGNode &op, State &state) {
+  SDFG sdfg(op.getLoc());
+  sdfg.setName(utils::generateName("sdfg"));
+
+  for (BlockArgument ba : op.body().getArguments()) {
+    if (utils::isSizedType(ba.getType())) {
+      Array array(utils::valueToString(ba), false,
+                  utils::getSizedType(ba.getType()));
+      sdfg.addArg(array);
+    } else {
+      Array array(utils::valueToString(ba), false, ba.getType());
+      sdfg.addArg(array);
+    }
+  }
+
+  for (AllocOp allocOp : op.getOps<AllocOp>()) {
+    if (collect(allocOp, sdfg).failed())
+      return failure();
+  }
+
+  for (StateNode stateNode : op.getOps<StateNode>()) {
+    if (collect(stateNode, sdfg).failed())
+      return failure();
+  }
+
+  if (op.entry().hasValue()) {
+    StateNode entryState = op.getStateBySymRef(op.entry().getValue());
+    sdfg.setStartState(sdfg.lookup(entryState.ID()));
+  } else {
+    sdfg.setStartState(sdfg.lookup(op.getFirstState().ID()));
+  }
+
+  for (EdgeOp edgeOp : op.getOps<EdgeOp>()) {
+    if (collect(edgeOp, sdfg).failed())
+      return failure();
+  }
+
+  NestedSDFG nestedSDFG(op.getLoc(), sdfg);
+  nestedSDFG.setName(utils::generateName("nested_sdfg"));
+  state.addNode(nestedSDFG);
 
   return success();
 }

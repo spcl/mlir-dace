@@ -68,7 +68,8 @@ def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
-        // Get SDFG
+        StateNode getStateBySymRef(StringRef symRef);
+        StateNode getFirstState();
     }];
 }
 

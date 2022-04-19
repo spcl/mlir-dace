@@ -38,7 +38,12 @@ std::string typeToString(Type t) {
 
 void Array::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject(name);
-  jemit.printKVPair("type", "Array");
+
+  if (shape.getShape().empty()) {
+    jemit.printKVPair("type", "Scalar");
+  } else {
+    jemit.printKVPair("type", "Array");
+  }
 
   jemit.startNamedObject("attributes");
 
@@ -48,18 +53,40 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 
   jemit.startNamedList("shape");
 
+  if (shape.getShape().empty()) {
+    jemit.startEntry();
+    jemit.printString("1");
+  }
+
   unsigned intIdx = 0;
   unsigned symIdx = 0;
+  SmallVector<std::string> strideList;
 
   for (unsigned i = 0; i < shape.getShape().size(); ++i) {
     jemit.startEntry();
-    if (shape.getShape()[i])
-      jemit.printString(std::to_string(shape.getIntegers()[intIdx++]));
-    else
-      jemit.printString(shape.getSymbols()[symIdx++].str());
+    if (shape.getShape()[i]) {
+      jemit.printString(std::to_string(shape.getIntegers()[intIdx]));
+      strideList.push_back(std::to_string(shape.getIntegers()[intIdx]));
+      ++intIdx;
+    } else {
+      jemit.printString(shape.getSymbols()[symIdx].str());
+      strideList.push_back(shape.getSymbols()[symIdx].str());
+      ++symIdx;
+    }
   }
 
   jemit.endList(); // shape
+
+  if (!shape.getShape().empty()) {
+    jemit.startNamedList("strides");
+
+    for (int i = strideList.size() - 1; i >= 0; --i) {
+      jemit.startEntry();
+      jemit.printString(i == 0 ? "1" : strideList[i]);
+    }
+
+    jemit.endList(); // strides
+  }
 
   jemit.endObject(); // attributes
   jemit.endObject();
@@ -70,14 +97,24 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void InterstateEdge::setCondition(Condition condition) {
-  this->condition = condition;
+  ptr->setCondition(condition);
 }
 
 void InterstateEdge::addAssignment(Assignment assignment) {
+  ptr->addAssignment(assignment);
+}
+
+void InterstateEdge::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void InterstateEdgeImpl::setCondition(Condition condition) {
+  this->condition = condition;
+}
+
+void InterstateEdgeImpl::addAssignment(Assignment assignment) {
   assignments.push_back(assignment);
 }
 
-void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
+void InterstateEdgeImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "Edge");
   jemit.printKVPair("src", source.getID());
@@ -91,6 +128,7 @@ void InterstateEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
 
   jemit.startNamedObject("assignments");
+
   for (Assignment a : assignments)
     jemit.printKVPair(a.key, a.value);
   jemit.endObject(); // assignments
@@ -239,6 +277,7 @@ void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
 void SDFG::addArray(Array array) { ptr->addArray(array); }
 void SDFG::addArg(Array arg) { ptr->addArg(arg); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
+void SDFG::emitNested(emitter::JsonEmitter &jemit) { ptr->emitNested(jemit); };
 
 void SDFGImpl::addState(State state, int id) {
   state.setID(states.size());
@@ -271,6 +310,15 @@ void SDFGImpl::addArg(Array arg) {
 
 void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
+  emitBody(jemit);
+}
+
+void SDFGImpl::emitNested(emitter::JsonEmitter &jemit) {
+  jemit.startNamedObject("sdfg");
+  emitBody(jemit);
+}
+
+void SDFGImpl::emitBody(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("type", "SDFG");
   jemit.printKVPair("sdfg_list_id", id, /*stringify=*/false);
   jemit.printKVPair("start_state", startState.getID(),
@@ -289,7 +337,6 @@ void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("constants_prop");
   jemit.endObject(); // constants_prop
 
-  // Single entry => scalar
   jemit.startNamedObject("_arrays");
   for (Array a : arrays)
     a.emit(jemit);
@@ -310,6 +357,26 @@ void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
     e.emit(jemit);
   jemit.endList(); // edges
 
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
+// NestedSDFG
+//===----------------------------------------------------------------------===//
+
+void NestedSDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void NestedSDFGImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "NestedSDFG");
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", name);
+  ConnectorNodeImpl::emit(jemit);
+  sdfg.emitNested(jemit);
+
+  jemit.endObject(); // attributes
   jemit.endObject();
 }
 

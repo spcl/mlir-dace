@@ -27,7 +27,11 @@ class StateImpl;
 class SDFG;
 class SDFGImpl;
 
+class NestedSDFG;
+class NestedSDFGImpl;
+
 class InterstateEdge;
+class InterstateEdgeImpl;
 class MultiEdge;
 
 class Tasklet;
@@ -276,6 +280,7 @@ public:
   void addArg(Array arg);
 
   void emit(emitter::JsonEmitter &jemit) override;
+  void emitNested(emitter::JsonEmitter &jemit);
 };
 
 class SDFGImpl : public NodeImpl, public Emittable {
@@ -286,6 +291,9 @@ private:
   std::vector<Array> arrays;
   std::vector<Array> args;
   State startState;
+  // static id counter
+
+  void emitBody(emitter::JsonEmitter &jemit);
 
 public:
   SDFGImpl(Location location) : NodeImpl(location), startState(location) {}
@@ -298,6 +306,35 @@ public:
   void addArg(Array arg);
 
   void emit(emitter::JsonEmitter &jemit) override;
+  void emitNested(emitter::JsonEmitter &jemit);
+};
+
+//===----------------------------------------------------------------------===//
+// NestedSDFG
+//===----------------------------------------------------------------------===//
+
+class NestedSDFG : public ConnectorNode {
+private:
+  std::shared_ptr<NestedSDFGImpl> ptr;
+
+public:
+  NestedSDFG(Location location, SDFG sdfg)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<NestedSDFGImpl>(location, sdfg))),
+        ptr(std::static_pointer_cast<NestedSDFGImpl>(ConnectorNode::ptr)) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class NestedSDFGImpl : public ConnectorNodeImpl {
+private:
+  SDFG sdfg;
+
+public:
+  NestedSDFGImpl(Location location, SDFG sdfg)
+      : ConnectorNodeImpl(location), sdfg(sdfg) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 //===----------------------------------------------------------------------===//
@@ -305,7 +342,21 @@ public:
 //===----------------------------------------------------------------------===//
 
 class InterstateEdge : public Emittable {
-protected:
+private:
+  std::shared_ptr<InterstateEdgeImpl> ptr;
+
+public:
+  InterstateEdge(State source, State destination)
+      : ptr(std::make_shared<InterstateEdgeImpl>(source, destination)) {}
+
+  void setCondition(Condition condition);
+  void addAssignment(Assignment assignment);
+
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class InterstateEdgeImpl : public Emittable {
+private:
   State source;
   State destination;
 
@@ -313,7 +364,7 @@ protected:
   std::vector<Assignment> assignments;
 
 public:
-  InterstateEdge(State source, State destination)
+  InterstateEdgeImpl(State source, State destination)
       : source(source), destination(destination), condition("1") {}
 
   void setCondition(Condition condition);
