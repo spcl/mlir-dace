@@ -269,6 +269,26 @@ LogicalResult translation::collect(NestedSDFGNode &op, State &state) {
   nestedSDFG.setName(utils::generateName("nested_sdfg"));
   state.addNode(nestedSDFG);
 
+  for (unsigned i = 0; i < op.num_args(); ++i) {
+    Connector connector(
+        nestedSDFG,
+        utils::valueToString(op.body().getArgument(i), *op.getOperation()));
+    nestedSDFG.addInConnector(connector);
+
+    MultiEdge edge(state.lookup(op.getOperand(i)), connector);
+    state.addEdge(edge);
+  }
+
+  for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
+    Connector connector(
+        nestedSDFG,
+        utils::valueToString(op.body().getArgument(i), *op.getOperation()));
+    nestedSDFG.addOutConnector(connector);
+
+    MultiEdge edge(connector, state.lookup(op.getOperand(i)));
+    state.addEdge(edge);
+  }
+
   return success();
 }
 
