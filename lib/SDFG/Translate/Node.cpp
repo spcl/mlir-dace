@@ -279,6 +279,8 @@ void SDFG::addArg(Array arg) { ptr->addArg(arg); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
 void SDFG::emitNested(emitter::JsonEmitter &jemit) { ptr->emitNested(jemit); };
 
+unsigned SDFGImpl::list_id = 0;
+
 void SDFGImpl::addState(State state, int id) {
   state.setID(states.size());
   states.push_back(state);

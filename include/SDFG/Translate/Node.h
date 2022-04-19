@@ -291,12 +291,14 @@ private:
   std::vector<Array> arrays;
   std::vector<Array> args;
   State startState;
-  // static id counter
+  static unsigned list_id;
 
   void emitBody(emitter::JsonEmitter &jemit);
 
 public:
-  SDFGImpl(Location location) : NodeImpl(location), startState(location) {}
+  SDFGImpl(Location location) : NodeImpl(location), startState(location) {
+    id = SDFGImpl::list_id++;
+  }
 
   State lookup(unsigned id);
   void addState(State state, int id = -1);
