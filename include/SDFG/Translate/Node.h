@@ -40,6 +40,9 @@ class TaskletImpl;
 class Access;
 class AccessImpl;
 
+class MapEntry;
+class MapEntryImpl;
+
 //===----------------------------------------------------------------------===//
 // Interfaces
 //===----------------------------------------------------------------------===//
@@ -96,7 +99,7 @@ public:
 // Node
 //===----------------------------------------------------------------------===//
 
-class Node {
+class Node : public Emittable {
 protected:
   std::shared_ptr<NodeImpl> ptr;
 
@@ -117,9 +120,11 @@ public:
   Node getParent();
 
   void addAttribute(Attribute attribute);
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class NodeImpl {
+class NodeImpl : public Emittable {
 protected:
   unsigned id;
   Location location;
@@ -144,13 +149,15 @@ public:
   // check for existing attribtues
   // Replace or add to list
   void addAttribute(Attribute attribute);
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 //===----------------------------------------------------------------------===//
 // ConnectorNode
 //===----------------------------------------------------------------------===//
 
-class ConnectorNode : public Node, public Emittable {
+class ConnectorNode : public Node {
 protected:
   std::shared_ptr<ConnectorNodeImpl> ptr;
 
@@ -164,7 +171,7 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class ConnectorNodeImpl : public NodeImpl, public Emittable {
+class ConnectorNodeImpl : public NodeImpl {
 protected:
   std::vector<Connector> inConnectors;
   std::vector<Connector> outConnectors;
@@ -218,7 +225,7 @@ public:
 // State
 //===----------------------------------------------------------------------===//
 
-class State : public Node, public Emittable {
+class State : public Node {
 private:
   std::shared_ptr<StateImpl> ptr;
 
@@ -229,7 +236,7 @@ public:
         ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
 
   SDFG getSDFG();
-  void addNode(ConnectorNode node, int id = -1);
+  void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
   Connector lookup(Value value);
@@ -237,10 +244,9 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class StateImpl : public NodeImpl, public Emittable {
+class StateImpl : public NodeImpl {
 private:
-  std::map<int, ConnectorNode> lut;
-  std::map<std::string, Connector> connectorLut;
+  std::map<std::string, Connector> lut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
 
@@ -248,7 +254,7 @@ public:
   StateImpl(Location location) : NodeImpl(location) {}
 
   SDFG getSDFG();
-  void addNode(ConnectorNode node, int id = -1);
+  void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
   Connector lookup(Value value);
@@ -260,7 +266,7 @@ public:
 // SDFG
 //===----------------------------------------------------------------------===//
 
-class SDFG : public Node, public Emittable {
+class SDFG : public Node {
 private:
   std::shared_ptr<SDFGImpl> ptr;
 
@@ -283,7 +289,7 @@ public:
   void emitNested(emitter::JsonEmitter &jemit);
 };
 
-class SDFGImpl : public NodeImpl, public Emittable {
+class SDFGImpl : public NodeImpl {
 private:
   std::map<int, State> lut;
   std::vector<State> states;
@@ -432,10 +438,26 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-/* class MapBegin : public ConnectorNode {};
-class MapEnd : public ConnectorNode {};
+class MapEntry : public ConnectorNode {
+private:
+  std::shared_ptr<MapEntryImpl> ptr;
 
-class ConsumeBegin : public ConnectorNode {};
+public:
+  MapEntry(Location location)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<MapEntryImpl>(location))),
+        ptr(std::static_pointer_cast<MapEntryImpl>(ConnectorNode::ptr)) {}
+};
+
+class MapEntryImpl : public ConnectorNodeImpl {
+private:
+public:
+  MapEntryImpl(Location location) : ConnectorNodeImpl(location) {}
+};
+
+class MapExit : public ConnectorNode {};
+
+/* class ConsumeBegin : public ConnectorNode {};
 class ConsumeEnd : public ConnectorNode {}; */
 
 } // namespace mlir::sdfg::translation

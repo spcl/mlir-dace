@@ -21,6 +21,7 @@ LogicalResult collect(AllocOp &op, SDFG &sdfg);
 LogicalResult collect(AllocOp &op, State &state);
 LogicalResult collect(TaskletNode &op, State &state);
 LogicalResult collect(NestedSDFGNode &op, State &state);
+LogicalResult collect(MapNode &op, State &state);
 
 LogicalResult collect(CopyOp &op, State &state);
 LogicalResult collect(StoreOp &op, State &state);

@@ -24,12 +24,11 @@ std::string typeToString(Type t) {
   if (t.isIndex())
     return "int64";
 
-  /*   std::string type;
-    llvm::raw_string_ostream typeStream(type);
-    t.print(typeStream);
-    emitError(loc, "Unsupported type: " + type); */
+  std::string type;
+  llvm::raw_string_ostream typeStream(type);
+  t.print(typeStream);
 
-  return "Unsupported";
+  return "Unsupported: " + type;
 }
 
 //===----------------------------------------------------------------------===//
@@ -192,6 +191,7 @@ void Node::setParent(Node parent) { ptr->setParent(parent); }
 Node Node::getParent() { return ptr->getParent(); }
 
 void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
+void Node::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void NodeImpl::setID(unsigned id) { this->id = id; }
 unsigned NodeImpl::getID() { return id; }
@@ -211,6 +211,8 @@ Node NodeImpl::getParent() { return parent; }
 void NodeImpl::addAttribute(Attribute attribute) {
   attributes.push_back(attribute);
 }
+
+void NodeImpl::emit(emitter::JsonEmitter &jemit) {}
 
 //===----------------------------------------------------------------------===//
 // ConnectorNode
@@ -386,9 +388,9 @@ void NestedSDFGImpl::emit(emitter::JsonEmitter &jemit) {
 // State
 //===----------------------------------------------------------------------===//
 
-void State::addNode(ConnectorNode node, int id) {
+void State::addNode(ConnectorNode node) {
   node.setParent(*this);
-  ptr->addNode(node, id);
+  ptr->addNode(node);
 }
 
 void State::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
@@ -403,25 +405,20 @@ SDFG State::getSDFG() { return ptr->getSDFG(); }
 
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
-void StateImpl::addNode(ConnectorNode node, int id) {
+void StateImpl::addNode(ConnectorNode node) {
   node.setID(nodes.size());
   nodes.push_back(node);
-
-  if (id < 0)
-    return;
-  if (!lut.insert({id, node}).second)
-    emitError(location, "Duplicate ID in StateImpl::addNode");
 }
 
 void StateImpl::addEdge(MultiEdge edge) { edges.push_back(edge); }
 
 void StateImpl::mapConnector(Value value, Connector connector) {
-  if (!connectorLut.insert({utils::valueToString(value), connector}).second)
+  if (!lut.insert({utils::valueToString(value), connector}).second)
     emitError(location, "Duplicate ID in StateImpl::mapConnector");
 }
 
 Connector StateImpl::lookup(Value value) {
-  if (connectorLut.find(utils::valueToString(value)) == connectorLut.end()) {
+  if (lut.find(utils::valueToString(value)) == lut.end()) {
     Access access(location);
     access.setName(utils::valueToString(value));
     addNode(access);
@@ -432,7 +429,7 @@ Connector StateImpl::lookup(Value value) {
     return accOut;
   }
 
-  return connectorLut.find(utils::valueToString(value))->second;
+  return lut.find(utils::valueToString(value))->second;
 }
 
 SDFG StateImpl::getSDFG() { return static_cast<SDFG>(getParent()); }

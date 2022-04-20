@@ -23,6 +23,11 @@ void insertTransientArray(Location location, translation::Connector connector,
   using namespace translation;
 
   Array array(utils::generateName("tmp"), true, value.getType());
+
+  if (utils::isSizedType(value.getType()))
+    array = Array(utils::generateName("tmp"), true,
+                  utils::getSizedType(value.getType()));
+
   state.getSDFG().addArray(array);
 
   Access access(location);
@@ -124,6 +129,10 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
       if (collect(oper, state).failed())
         return failure();
 
+    if (MapNode oper = dyn_cast<MapNode>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
     if (CopyOp oper = dyn_cast<CopyOp>(operation))
       if (collect(oper, state).failed())
         return failure();
@@ -195,7 +204,7 @@ LogicalResult translation::collect(AllocOp &op, State &state) {
 
 LogicalResult translation::collect(TaskletNode &op, State &state) {
   Tasklet tasklet(op.getLoc());
-  state.addNode(tasklet, op.ID());
+  state.addNode(tasklet);
   tasklet.setName(getTaskletName(op));
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -285,10 +294,21 @@ LogicalResult translation::collect(NestedSDFGNode &op, State &state) {
         utils::valueToString(op.body().getArgument(i), *op.getOperation()));
     nestedSDFG.addOutConnector(connector);
 
-    MultiEdge edge(connector, state.lookup(op.getOperand(i)));
+    Connector destination = state.lookup(op.getOperand(i));
+
+    insertTransientArray(op.getLoc(), connector, op.getOperand(i), state);
+
+    MultiEdge edge(state.lookup(op.getOperand(i)), destination);
     state.addEdge(edge);
   }
 
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MapNode
+//===----------------------------------------------------------------------===//
+LogicalResult translation::collect(MapNode &op, State &state) {
   return success();
 }
 
