@@ -413,8 +413,10 @@ void StateImpl::addNode(ConnectorNode node) {
 void StateImpl::addEdge(MultiEdge edge) { edges.push_back(edge); }
 
 void StateImpl::mapConnector(Value value, Connector connector) {
-  if (!lut.insert({utils::valueToString(value), connector}).second)
-    emitError(location, "Duplicate ID in StateImpl::mapConnector");
+  auto res = lut.insert({utils::valueToString(value), connector});
+
+  if (!res.second)
+    res.first->second = connector;
 }
 
 Connector StateImpl::lookup(Value value) {

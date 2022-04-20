@@ -294,12 +294,17 @@ LogicalResult translation::collect(NestedSDFGNode &op, State &state) {
         utils::valueToString(op.body().getArgument(i), *op.getOperation()));
     nestedSDFG.addOutConnector(connector);
 
-    Connector destination = state.lookup(op.getOperand(i));
+    Access access(op.getLoc());
+    access.setName(utils::valueToString(op.getOperand(i)));
+    state.addNode(access);
 
-    insertTransientArray(op.getLoc(), connector, op.getOperand(i), state);
+    Connector accOut(access);
+    access.addOutConnector(accOut);
 
-    MultiEdge edge(state.lookup(op.getOperand(i)), destination);
+    MultiEdge edge(connector, accOut);
     state.addEdge(edge);
+
+    state.mapConnector(op.getOperand(i), accOut);
   }
 
   return success();
@@ -308,6 +313,7 @@ LogicalResult translation::collect(NestedSDFGNode &op, State &state) {
 //===----------------------------------------------------------------------===//
 // MapNode
 //===----------------------------------------------------------------------===//
+
 LogicalResult translation::collect(MapNode &op, State &state) {
   return success();
 }
@@ -317,8 +323,18 @@ LogicalResult translation::collect(MapNode &op, State &state) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(CopyOp &op, State &state) {
-  MultiEdge edge(state.lookup(op.src()), state.lookup(op.dest()));
+  Access access(op.getLoc());
+  access.setName(utils::valueToString(op.dest()));
+  state.addNode(access);
+
+  Connector accOut(access);
+  access.addOutConnector(accOut);
+
+  MultiEdge edge(state.lookup(op.src()), accOut);
   state.addEdge(edge);
+
+  state.mapConnector(op.dest(), accOut);
+
   return success();
 }
 
@@ -327,8 +343,17 @@ LogicalResult translation::collect(CopyOp &op, State &state) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(StoreOp &op, State &state) {
-  MultiEdge edge(state.lookup(op.val()), state.lookup(op.arr()));
+  Access access(op.getLoc());
+  access.setName(utils::valueToString(op.arr()));
+  state.addNode(access);
+
+  Connector accOut(access);
+  access.addOutConnector(accOut);
+
+  MultiEdge edge(state.lookup(op.val()), accOut);
   state.addEdge(edge);
+
+  state.mapConnector(op.arr(), accOut);
 
   return success();
 }
