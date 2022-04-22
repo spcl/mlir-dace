@@ -315,6 +315,51 @@ LogicalResult translation::collect(NestedSDFGNode &op, State &state) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(MapNode &op, State &state) {
+  MapEntry mapEntry(op.getLoc());
+  mapEntry.setName(utils::generateName("mapEntry"));
+
+  for (BlockArgument bArg : op.body().getArguments()) {
+    mapEntry.addParam(utils::valueToString(bArg));
+  }
+
+  state.addNode(mapEntry);
+
+  for (Operation &operation : op.getOps()) {
+    if (TaskletNode oper = dyn_cast<TaskletNode>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (MapNode oper = dyn_cast<MapNode>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (CopyOp oper = dyn_cast<CopyOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (StoreOp oper = dyn_cast<StoreOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (LoadOp oper = dyn_cast<LoadOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+
+    if (AllocOp oper = dyn_cast<AllocOp>(operation))
+      if (collect(oper, state).failed())
+        return failure();
+  }
+
+  MapExit mapExit(op.getLoc());
+  mapExit.setName(utils::generateName("mapExit"));
+  mapExit.setEntry(mapEntry);
+  state.addNode(mapExit);
+
+  mapEntry.setExit(mapExit);
   return success();
 }
 

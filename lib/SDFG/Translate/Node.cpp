@@ -510,3 +510,60 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 
   jemit.endObject();
 }
+
+//===----------------------------------------------------------------------===//
+// Map
+//===----------------------------------------------------------------------===//
+
+void MapEntry::addParam(StringRef param) { ptr->addParam(param); }
+void MapEntry::setExit(MapExit exit) { ptr->setExit(exit); }
+void MapEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void MapEntryImpl::addParam(StringRef param) { params.push_back(param.str()); }
+void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
+
+void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MapEntry");
+  jemit.printKVPair("label", name);
+  jemit.printKVPair("scope_exit", exit.getID());
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", name);
+
+  jemit.startNamedList("params");
+  for (std::string s : params) {
+    jemit.startEntry();
+    jemit.printString(s);
+  }
+  jemit.endList(); // params
+
+  jemit.startNamedList("ranges");
+  jemit.endList(); // ranges
+
+  ConnectorNodeImpl::emit(jemit);
+  jemit.endObject(); // attributes */
+
+  jemit.endObject();
+}
+
+void MapExit::setEntry(MapEntry entry) { ptr->setEntry(entry); }
+void MapExit::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void MapExitImpl::setEntry(MapEntry entry) { this->entry = entry; }
+
+void MapExitImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "MapExit");
+  jemit.printKVPair("label", name);
+  jemit.printKVPair("scope_entry", entry.getID());
+  jemit.printKVPair("scope_exit", id);
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  ConnectorNodeImpl::emit(jemit);
+  jemit.endObject(); // attributes */
+
+  jemit.endObject();
+}

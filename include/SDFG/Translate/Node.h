@@ -42,6 +42,8 @@ class AccessImpl;
 
 class MapEntry;
 class MapEntryImpl;
+class MapExit;
+class MapExitImpl;
 
 //===----------------------------------------------------------------------===//
 // Interfaces
@@ -447,15 +449,53 @@ public:
       : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
             std::make_shared<MapEntryImpl>(location))),
         ptr(std::static_pointer_cast<MapEntryImpl>(ConnectorNode::ptr)) {}
+
+  MapEntry() : ConnectorNode(nullptr) {}
+
+  void setExit(MapExit exit);
+  void addParam(StringRef param);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class MapExit : public ConnectorNode {
+private:
+  std::shared_ptr<MapExitImpl> ptr;
+
+public:
+  MapExit(Location location)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<MapExitImpl>(location))),
+        ptr(std::static_pointer_cast<MapExitImpl>(ConnectorNode::ptr)) {}
+
+  MapExit() : ConnectorNode(nullptr) {}
+
+  void setEntry(MapEntry entry);
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class MapEntryImpl : public ConnectorNodeImpl {
 private:
+  MapExit exit;
+  std::vector<std::string> params;
+
 public:
   MapEntryImpl(Location location) : ConnectorNodeImpl(location) {}
+
+  void setExit(MapExit exit);
+  void addParam(StringRef param);
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class MapExit : public ConnectorNode {};
+class MapExitImpl : public ConnectorNodeImpl {
+private:
+  MapEntry entry;
+
+public:
+  MapExitImpl(Location location) : ConnectorNodeImpl(location) {}
+
+  void setEntry(MapEntry entry);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
 
 /* class ConsumeBegin : public ConnectorNode {};
 class ConsumeEnd : public ConnectorNode {}; */
