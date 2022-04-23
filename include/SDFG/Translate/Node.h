@@ -97,6 +97,14 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
+class Range {
+public:
+  int start;
+  int end;
+  int step;
+  int tile;
+};
+
 //===----------------------------------------------------------------------===//
 // Node
 //===----------------------------------------------------------------------===//
