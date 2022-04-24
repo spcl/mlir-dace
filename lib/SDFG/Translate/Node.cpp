@@ -92,6 +92,19 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 }
 
 //===----------------------------------------------------------------------===//
+// Range
+//===----------------------------------------------------------------------===//
+
+void Range::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("start", start);
+  jemit.printKVPair("end", end);
+  jemit.printKVPair("step", step);
+  jemit.printKVPair("tile", tile);
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
 // InterstateEdge
 //===----------------------------------------------------------------------===//
 
@@ -265,6 +278,54 @@ void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
 }
 
 //===----------------------------------------------------------------------===//
+// ScopeNode
+//===----------------------------------------------------------------------===//
+
+SDFG ScopeNode::getSDFG() { return ptr->getSDFG(); }
+void ScopeNode::addNode(ConnectorNode node) { ptr->addNode(node); }
+void ScopeNode::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
+
+void ScopeNode::mapConnector(Value value, Connector connector) {
+  ptr->mapConnector(value, connector);
+}
+
+Connector ScopeNode::lookup(Value value) { return ptr->lookup(value); }
+void ScopeNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+SDFG ScopeNodeImpl::getSDFG() { return static_cast<SDFG>(getParent()); }
+
+void ScopeNodeImpl::addNode(ConnectorNode node) {
+  node.setParent(ScopeNode(std::make_shared<ScopeNodeImpl>(*this)));
+  node.setID(nodes.size());
+  nodes.push_back(node);
+}
+
+void ScopeNodeImpl::addEdge(MultiEdge edge) { edges.push_back(edge); }
+
+void ScopeNodeImpl::mapConnector(Value value, Connector connector) {
+  auto res = lut.insert({utils::valueToString(value), connector});
+
+  if (!res.second)
+    res.first->second = connector;
+}
+
+Connector ScopeNodeImpl::lookup(Value value) {
+  return lut.find(utils::valueToString(value))->second;
+}
+
+void ScopeNodeImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startNamedList("nodes");
+  for (ConnectorNode cn : nodes)
+    cn.emit(jemit);
+  jemit.endList(); // nodes
+
+  jemit.startNamedList("edges");
+  for (MultiEdge me : edges)
+    me.emit(jemit);
+  jemit.endList(); // edges
+}
+
+//===----------------------------------------------------------------------===//
 // SDFG
 //===----------------------------------------------------------------------===//
 
@@ -388,36 +449,8 @@ void NestedSDFGImpl::emit(emitter::JsonEmitter &jemit) {
 // State
 //===----------------------------------------------------------------------===//
 
-void State::addNode(ConnectorNode node) {
-  node.setParent(*this);
-  ptr->addNode(node);
-}
-
-void State::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
-
-void State::mapConnector(Value value, Connector connector) {
-  ptr->mapConnector(value, connector);
-}
-
 Connector State::lookup(Value value) { return ptr->lookup(value); }
-
-SDFG State::getSDFG() { return ptr->getSDFG(); }
-
 void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
-
-void StateImpl::addNode(ConnectorNode node) {
-  node.setID(nodes.size());
-  nodes.push_back(node);
-}
-
-void StateImpl::addEdge(MultiEdge edge) { edges.push_back(edge); }
-
-void StateImpl::mapConnector(Value value, Connector connector) {
-  auto res = lut.insert({utils::valueToString(value), connector});
-
-  if (!res.second)
-    res.first->second = connector;
-}
 
 Connector StateImpl::lookup(Value value) {
   if (lut.find(utils::valueToString(value)) == lut.end()) {
@@ -431,10 +464,8 @@ Connector StateImpl::lookup(Value value) {
     return accOut;
   }
 
-  return lut.find(utils::valueToString(value))->second;
+  return ScopeNodeImpl::lookup(value);
 }
-
-SDFG StateImpl::getSDFG() { return static_cast<SDFG>(getParent()); }
 
 void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -445,16 +476,7 @@ void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.endObject(); // attributes
 
-  jemit.startNamedList("nodes");
-  for (ConnectorNode cn : nodes)
-    cn.emit(jemit);
-  jemit.endList(); // nodes
-
-  jemit.startNamedList("edges");
-  for (MultiEdge me : edges)
-    me.emit(jemit);
-  jemit.endList(); // edges
-
+  ScopeNodeImpl::emit(jemit);
   jemit.endObject();
 }
 
@@ -516,10 +538,12 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void MapEntry::addParam(StringRef param) { ptr->addParam(param); }
+void MapEntry::addRange(Range range) { ptr->addRange(range); }
 void MapEntry::setExit(MapExit exit) { ptr->setExit(exit); }
 void MapEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void MapEntryImpl::addParam(StringRef param) { params.push_back(param.str()); }
+void MapEntryImpl::addRange(Range range) { ranges.push_back(range); }
 void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
 
 void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
@@ -539,8 +563,13 @@ void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
   }
   jemit.endList(); // params
 
+  jemit.startNamedObject("range");
+  jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-  jemit.endList(); // ranges
+  for (Range r : ranges)
+    r.emit(jemit);
+  jemit.endList();   // ranges
+  jemit.endObject(); // range
 
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */

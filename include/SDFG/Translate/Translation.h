@@ -13,19 +13,18 @@ void registerToSDFGTranslation();
 LogicalResult translateToSDFG(ModuleOp &op, JsonEmitter &jemit);
 
 LogicalResult collect(SDFG &sdfg, SDFGNode &sdfgNode);
-
 LogicalResult collect(StateNode &op, SDFG &sdfg);
 LogicalResult collect(EdgeOp &op, SDFG &sdfg);
 LogicalResult collect(AllocOp &op, SDFG &sdfg);
 
-LogicalResult collect(AllocOp &op, State &state);
-LogicalResult collect(TaskletNode &op, State &state);
-LogicalResult collect(NestedSDFGNode &op, State &state);
-LogicalResult collect(MapNode &op, State &state);
+LogicalResult collect(AllocOp &op, ScopeNode &scope);
+LogicalResult collect(TaskletNode &op, ScopeNode &scope);
+LogicalResult collect(NestedSDFGNode &op, ScopeNode &scope);
+LogicalResult collect(MapNode &op, ScopeNode &scope);
 
-LogicalResult collect(CopyOp &op, State &state);
-LogicalResult collect(StoreOp &op, State &state);
-LogicalResult collect(LoadOp &op, State &state);
+LogicalResult collect(CopyOp &op, ScopeNode &scope);
+LogicalResult collect(StoreOp &op, ScopeNode &scope);
+LogicalResult collect(LoadOp &op, ScopeNode &scope);
 
 } // namespace mlir::sdfg::translation
 

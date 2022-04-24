@@ -21,6 +21,9 @@ class ConnectorNode;
 class ConnectorNodeImpl;
 class Connector;
 
+class ScopeNode;
+class ScopeNodeImpl;
+
 class State;
 class StateImpl;
 
@@ -97,12 +100,17 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class Range {
+class Range : public Emittable {
 public:
-  int start;
-  int end;
-  int step;
-  int tile;
+  std::string start;
+  std::string end;
+  std::string step;
+  std::string tile;
+
+  Range(StringRef start, StringRef end, StringRef step, StringRef tile)
+      : start(start), end(end), step(step), tile(tile) {}
+
+  void emit(emitter::JsonEmitter &jemit) override;
 };
 
 //===----------------------------------------------------------------------===//
@@ -232,36 +240,34 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// State
+// ScopeNode
 //===----------------------------------------------------------------------===//
 
-class State : public Node {
-private:
-  std::shared_ptr<StateImpl> ptr;
+class ScopeNode : public Node {
+protected:
+  std::shared_ptr<ScopeNodeImpl> ptr;
 
 public:
-  State(Location location)
-      : Node(std::static_pointer_cast<NodeImpl>(
-            std::make_shared<StateImpl>(location))),
-        ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
+  ScopeNode(std::shared_ptr<ScopeNodeImpl> ptr)
+      : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {}
 
   SDFG getSDFG();
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
-  Connector lookup(Value value);
+  virtual Connector lookup(Value value);
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-class StateImpl : public NodeImpl {
-private:
+class ScopeNodeImpl : public NodeImpl {
+protected:
   std::map<std::string, Connector> lut;
   std::vector<ConnectorNode> nodes;
   std::vector<MultiEdge> edges;
 
 public:
-  StateImpl(Location location) : NodeImpl(location) {}
+  ScopeNodeImpl(Location location) : NodeImpl(location) {}
 
   SDFG getSDFG();
   void addNode(ConnectorNode node);
@@ -269,6 +275,33 @@ public:
   void mapConnector(Value value, Connector connector);
   Connector lookup(Value value);
 
+  // Emits nodes & edges
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+//===----------------------------------------------------------------------===//
+// State
+//===----------------------------------------------------------------------===//
+
+class State : public ScopeNode {
+private:
+  std::shared_ptr<StateImpl> ptr;
+
+public:
+  State(Location location)
+      : ScopeNode(std::static_pointer_cast<ScopeNodeImpl>(
+            std::make_shared<StateImpl>(location))),
+        ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
+
+  Connector lookup(Value value) override;
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class StateImpl : public ScopeNodeImpl {
+public:
+  StateImpl(Location location) : ScopeNodeImpl(location) {}
+
+  Connector lookup(Value value);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -462,6 +495,7 @@ public:
 
   void setExit(MapExit exit);
   void addParam(StringRef param);
+  void addRange(Range range);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -485,12 +519,14 @@ class MapEntryImpl : public ConnectorNodeImpl {
 private:
   MapExit exit;
   std::vector<std::string> params;
+  std::vector<Range> ranges;
 
 public:
   MapEntryImpl(Location location) : ConnectorNodeImpl(location) {}
 
   void setExit(MapExit exit);
   void addParam(StringRef param);
+  void addRange(Range range);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
