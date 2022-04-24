@@ -12,7 +12,6 @@ void registerToSDFGTranslation();
 
 LogicalResult translateToSDFG(ModuleOp &op, JsonEmitter &jemit);
 
-LogicalResult collect(SDFG &sdfg, SDFGNode &sdfgNode);
 LogicalResult collect(StateNode &op, SDFG &sdfg);
 LogicalResult collect(EdgeOp &op, SDFG &sdfg);
 LogicalResult collect(AllocOp &op, SDFG &sdfg);

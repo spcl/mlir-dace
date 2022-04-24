@@ -321,8 +321,8 @@ public:
             std::make_shared<SDFGImpl>(location))),
         ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {}
 
-  State lookup(unsigned id);
-  void addState(State state, int id = -1);
+  State lookup(StringRef name);
+  void addState(State state);
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
@@ -334,7 +334,7 @@ public:
 
 class SDFGImpl : public NodeImpl {
 private:
-  std::map<int, State> lut;
+  std::map<std::string, State> lut;
   std::vector<State> states;
   std::vector<InterstateEdge> edges;
   std::vector<Array> arrays;
@@ -349,8 +349,8 @@ public:
     id = SDFGImpl::list_id++;
   }
 
-  State lookup(unsigned id);
-  void addState(State state, int id = -1);
+  State lookup(StringRef name);
+  void addState(State state);
   void setStartState(State state);
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
@@ -489,6 +489,7 @@ public:
   MapEntry(Location location)
       : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
             std::make_shared<MapEntryImpl>(location))),
+
         ptr(std::static_pointer_cast<MapEntryImpl>(ConnectorNode::ptr)) {}
 
   MapEntry() : ConnectorNode(nullptr) {}

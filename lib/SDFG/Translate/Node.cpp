@@ -329,12 +329,12 @@ void ScopeNodeImpl::emit(emitter::JsonEmitter &jemit) {
 // SDFG
 //===----------------------------------------------------------------------===//
 
-void SDFG::addState(State state, int id) {
+void SDFG::addState(State state) {
   state.setParent(*this);
-  ptr->addState(state, id);
+  ptr->addState(state);
 }
 
-State SDFG::lookup(unsigned id) { return ptr->lookup(id); }
+State SDFG::lookup(StringRef name) { return ptr->lookup(name); }
 void SDFG::setStartState(State state) { ptr->setStartState(state); }
 void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
 void SDFG::addArray(Array array) { ptr->addArray(array); }
@@ -344,13 +344,11 @@ void SDFG::emitNested(emitter::JsonEmitter &jemit) { ptr->emitNested(jemit); };
 
 unsigned SDFGImpl::list_id = 0;
 
-void SDFGImpl::addState(State state, int id) {
+void SDFGImpl::addState(State state) {
   state.setID(states.size());
   states.push_back(state);
 
-  if (id < 0)
-    return;
-  if (!lut.insert({id, state}).second)
+  if (!lut.insert({state.getName().str(), state}).second)
     emitError(location, "Duplicate ID in SDFGImpl::addState");
 }
 
@@ -365,7 +363,7 @@ void SDFGImpl::setStartState(State state) {
 
 void SDFGImpl::addEdge(InterstateEdge edge) { edges.push_back(edge); }
 
-State SDFGImpl::lookup(unsigned id) { return lut.find(id)->second; }
+State SDFGImpl::lookup(StringRef name) { return lut.find(name.str())->second; }
 
 void SDFGImpl::addArray(Array array) { arrays.push_back(array); }
 void SDFGImpl::addArg(Array arg) {

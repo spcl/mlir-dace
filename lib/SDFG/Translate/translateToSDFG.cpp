@@ -46,6 +46,86 @@ void insertTransientArray(Location location, translation::Connector connector,
   scope.mapConnector(value, accOut);
 }
 
+LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
+  using namespace translation;
+
+  for (Operation &operation : op.getRegion(0).getOps()) {
+    if (TaskletNode oper = dyn_cast<TaskletNode>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
+    if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
+    if (MapNode oper = dyn_cast<MapNode>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
+    if (CopyOp oper = dyn_cast<CopyOp>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
+    if (StoreOp oper = dyn_cast<StoreOp>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
+    if (LoadOp oper = dyn_cast<LoadOp>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
+    if (AllocOp oper = dyn_cast<AllocOp>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+  }
+
+  return success();
+}
+
+LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
+  using namespace translation;
+
+  sdfg.setName(utils::generateName("sdfg"));
+
+  for (BlockArgument ba : op.getRegion(0).getArguments()) {
+    if (utils::isSizedType(ba.getType())) {
+      Array array(utils::valueToString(ba), false,
+                  utils::getSizedType(ba.getType()));
+      sdfg.addArg(array);
+    } else {
+      Array array(utils::valueToString(ba), false, ba.getType());
+      sdfg.addArg(array);
+    }
+  }
+
+  for (AllocOp allocOp : op.getRegion(0).getOps<AllocOp>()) {
+    if (collect(allocOp, sdfg).failed())
+      return failure();
+  }
+
+  for (StateNode stateNode : op.getRegion(0).getOps<StateNode>()) {
+    if (collect(stateNode, sdfg).failed())
+      return failure();
+  }
+
+  for (EdgeOp edgeOp : op.getRegion(0).getOps<EdgeOp>()) {
+    if (collect(edgeOp, sdfg).failed())
+      return failure();
+  }
+
+  if (op.hasAttr("entry")) {
+    std::string entryName = utils::attributeToString(op.getAttr("entry"), op);
+    entryName.erase(0, 1);
+    sdfg.setStartState(sdfg.lookup(entryName));
+  } else {
+    StateNode stateNode = *op.getRegion(0).getOps<StateNode>().begin();
+    StringRef entryName = stateNode.sym_name();
+    sdfg.setStartState(sdfg.lookup(entryName));
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Module
 //===----------------------------------------------------------------------===//
@@ -59,54 +139,10 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   SDFGNode sdfgNode = *op.getOps<SDFGNode>().begin();
   SDFG sdfg(sdfgNode.getLoc());
 
-  if (collect(sdfg, sdfgNode).failed())
+  if (collectSDFG(*sdfgNode, sdfg).failed())
     return failure();
 
   sdfg.emit(jemit);
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// SDFG
-//===----------------------------------------------------------------------===//
-
-LogicalResult translation::collect(SDFG &sdfg, SDFGNode &sdfgNode) {
-  sdfg.setName(utils::generateName("sdfg"));
-
-  for (BlockArgument ba : sdfgNode.body().getArguments()) {
-    if (utils::isSizedType(ba.getType())) {
-      Array array(utils::valueToString(ba), false,
-                  utils::getSizedType(ba.getType()));
-      sdfg.addArg(array);
-    } else {
-      Array array(utils::valueToString(ba), false, ba.getType());
-      sdfg.addArg(array);
-    }
-  }
-
-  for (AllocOp allocOp : sdfgNode.getOps<AllocOp>()) {
-    if (collect(allocOp, sdfg).failed())
-      return failure();
-  }
-
-  for (StateNode stateNode : sdfgNode.getOps<StateNode>()) {
-    if (collect(stateNode, sdfg).failed())
-      return failure();
-  }
-
-  if (sdfgNode.entry().hasValue()) {
-    StateNode entryState =
-        sdfgNode.getStateBySymRef(sdfgNode.entry().getValue());
-    sdfg.setStartState(sdfg.lookup(entryState.ID()));
-  } else {
-    sdfg.setStartState(sdfg.lookup(sdfgNode.getFirstState().ID()));
-  }
-
-  for (EdgeOp edgeOp : sdfgNode.getOps<EdgeOp>()) {
-    if (collect(edgeOp, sdfg).failed())
-      return failure();
-  }
-
   return success();
 }
 
@@ -116,39 +152,11 @@ LogicalResult translation::collect(SDFG &sdfg, SDFGNode &sdfgNode) {
 
 LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
   State state(op.getLoc());
-  sdfg.addState(state, op.ID());
-
   state.setName(op.getName());
+  sdfg.addState(state);
 
-  for (Operation &operation : op.getOps()) {
-    if (TaskletNode oper = dyn_cast<TaskletNode>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-
-    if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-
-    if (MapNode oper = dyn_cast<MapNode>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-
-    if (CopyOp oper = dyn_cast<CopyOp>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-
-    if (StoreOp oper = dyn_cast<StoreOp>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-
-    if (LoadOp oper = dyn_cast<LoadOp>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-
-    if (AllocOp oper = dyn_cast<AllocOp>(operation))
-      if (collect(oper, state).failed())
-        return failure();
-  }
+  if (collectOperations(*op, state).failed())
+    return failure();
 
   return success();
 }
@@ -162,8 +170,8 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
   StateNode srcNode = sdfgNode.getStateBySymRef(op.src());
   StateNode destNode = sdfgNode.getStateBySymRef(op.dest());
 
-  State src = sdfg.lookup(srcNode.ID());
-  State dest = sdfg.lookup(destNode.ID());
+  State src = sdfg.lookup(srcNode.sym_name());
+  State dest = sdfg.lookup(destNode.sym_name());
 
   InterstateEdge edge(src, dest);
   sdfg.addEdge(edge);
@@ -239,40 +247,9 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
   SDFG sdfg(op.getLoc());
-  sdfg.setName(utils::generateName("sdfg"));
 
-  for (BlockArgument ba : op.body().getArguments()) {
-    if (utils::isSizedType(ba.getType())) {
-      Array array(utils::valueToString(ba), false,
-                  utils::getSizedType(ba.getType()));
-      sdfg.addArg(array);
-    } else {
-      Array array(utils::valueToString(ba), false, ba.getType());
-      sdfg.addArg(array);
-    }
-  }
-
-  for (AllocOp allocOp : op.getOps<AllocOp>()) {
-    if (collect(allocOp, sdfg).failed())
-      return failure();
-  }
-
-  for (StateNode stateNode : op.getOps<StateNode>()) {
-    if (collect(stateNode, sdfg).failed())
-      return failure();
-  }
-
-  if (op.entry().hasValue()) {
-    StateNode entryState = op.getStateBySymRef(op.entry().getValue());
-    sdfg.setStartState(sdfg.lookup(entryState.ID()));
-  } else {
-    sdfg.setStartState(sdfg.lookup(op.getFirstState().ID()));
-  }
-
-  for (EdgeOp edgeOp : op.getOps<EdgeOp>()) {
-    if (collect(edgeOp, sdfg).failed())
-      return failure();
-  }
+  if (collectSDFG(*op, sdfg).failed())
+    return failure();
 
   NestedSDFG nestedSDFG(op.getLoc(), sdfg);
   nestedSDFG.setName(utils::generateName("nested_sdfg"));
@@ -315,60 +292,33 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
-  /*  MapEntry mapEntry(op.getLoc());
-   mapEntry.setName(utils::generateName("mapEntry"));
+  MapEntry mapEntry(op.getLoc());
+  mapEntry.setName(utils::generateName("mapEntry"));
 
-   for (BlockArgument bArg : op.body().getArguments()) {
-     mapEntry.addParam(utils::valueToString(bArg));
-   }
+  for (BlockArgument bArg : op.body().getArguments()) {
+    mapEntry.addParam(utils::valueToString(bArg));
+  }
 
-   for (unsigned i = 0; i < op.lowerBounds().size(); ++i) {
-     std::string lb = utils::attributeToString(op.lowerBounds()[i], *op);
-     std::string ub = utils::attributeToString(op.upperBounds()[i], *op);
-     std::string st = utils::attributeToString(op.steps()[i], *op);
+  for (unsigned i = 0; i < op.lowerBounds().size(); ++i) {
+    std::string lb = utils::attributeToString(op.lowerBounds()[i], *op);
+    std::string ub = utils::attributeToString(op.upperBounds()[i], *op);
+    std::string st = utils::attributeToString(op.steps()[i], *op);
 
-     Range r(lb, ub, st, "1");
-     mapEntry.addRange(r);
-   }
+    Range r(lb, ub, st, "1");
+    mapEntry.addRange(r);
+  }
 
-   scope.addNode(mapEntry);
+  scope.addNode(mapEntry);
 
-   for (Operation &operation : op.getOps()) {
-     if (TaskletNode oper = dyn_cast<TaskletNode>(operation))
-       if (collect(oper, state).failed())
-         return failure();
+  // if (collectOperations(*op, mapEntry).failed())
+  //   return failure();
 
-     if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation))
-       if (collect(oper, state).failed())
-         return failure();
+  MapExit mapExit(op.getLoc());
+  mapExit.setName(utils::generateName("mapExit"));
+  mapExit.setEntry(mapEntry);
+  scope.addNode(mapExit);
 
-     if (MapNode oper = dyn_cast<MapNode>(operation))
-       if (collect(oper, state).failed())
-         return failure();
-
-     if (CopyOp oper = dyn_cast<CopyOp>(operation))
-       if (collect(oper, state).failed())
-         return failure();
-
-     if (StoreOp oper = dyn_cast<StoreOp>(operation))
-       if (collect(oper, state).failed())
-         return failure();
-
-     if (LoadOp oper = dyn_cast<LoadOp>(operation))
-       if (collect(oper, state).failed())
-         return failure();
-
-     if (AllocOp oper = dyn_cast<AllocOp>(operation))
-       if (collect(oper, state).failed())
-         return failure();
-   }
-
-   MapExit mapExit(op.getLoc());
-   mapExit.setName(utils::generateName("mapExit"));
-   mapExit.setEntry(mapEntry);
-   scope.addNode(mapExit);
-
-   mapEntry.setExit(mapExit); */
+  mapEntry.setExit(mapExit);
   return success();
 }
 
