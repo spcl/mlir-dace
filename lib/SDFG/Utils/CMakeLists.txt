@@ -6,5 +6,6 @@ add_library (
   GetSizedType.cpp
   GetParents.cpp
   ValueToString.cpp
+  AttributeToString.cpp
 )
 target_include_directories (SDFG_UTILS PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
