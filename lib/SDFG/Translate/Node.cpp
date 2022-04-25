@@ -326,6 +326,54 @@ void ScopeNodeImpl::emit(emitter::JsonEmitter &jemit) {
 }
 
 //===----------------------------------------------------------------------===//
+// ScopedConnectorNode
+//===----------------------------------------------------------------------===//
+
+void ScopedConnectorNode::setID(unsigned id) {
+  ConnectorNode::setID(id);
+  ScopeNode::setID(id);
+}
+
+unsigned ScopedConnectorNode::getID() { return ConnectorNode::getID(); }
+
+Location ScopedConnectorNode::getLocation() {
+  return ConnectorNode::getLocation();
+}
+
+void ScopedConnectorNode::setName(StringRef name) {
+  ConnectorNode::setName(name);
+  ScopeNode::setName(name);
+}
+
+StringRef ScopedConnectorNode::getName() { return ConnectorNode::getName(); }
+
+void ScopedConnectorNode::setParent(Node parent) {
+  ConnectorNode::setParent(parent);
+  ScopeNode::setParent(parent);
+}
+
+Node ScopedConnectorNode::getParent() { return ConnectorNode::getParent(); }
+
+void ScopedConnectorNode::addAttribute(Attribute attribute) {
+  ConnectorNode::addAttribute(attribute);
+  ScopeNode::addAttribute(attribute);
+}
+
+unsigned ScopedConnectorNodeImpl::getID() { return ConnectorNodeImpl::getID(); }
+
+StringRef ScopedConnectorNodeImpl::getName() {
+  return ConnectorNodeImpl::getName();
+}
+
+Location ScopedConnectorNodeImpl::getLocation() {
+  return ConnectorNodeImpl::getLocation();
+}
+
+Node ScopedConnectorNodeImpl::getParent() {
+  return ConnectorNodeImpl::getParent();
+}
+
+//===----------------------------------------------------------------------===//
 // SDFG
 //===----------------------------------------------------------------------===//
 
@@ -547,12 +595,12 @@ void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
 void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "MapEntry");
-  jemit.printKVPair("label", name);
+  jemit.printKVPair("label", getName());
   jemit.printKVPair("scope_exit", exit.getID());
-  jemit.printKVPair("id", id, /*stringify=*/false);
+  jemit.printKVPair("id", getID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
-  jemit.printKVPair("label", name);
+  jemit.printKVPair("label", getName());
 
   jemit.startNamedList("params");
   for (std::string s : params) {
