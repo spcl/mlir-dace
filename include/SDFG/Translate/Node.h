@@ -65,6 +65,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class DType { int32, int64, float32, float64 };
+enum class NType { SDFG, State, Other };
 
 class Attribute {
 public:
@@ -123,9 +124,10 @@ public:
 class Node : public Emittable {
 protected:
   std::shared_ptr<NodeImpl> ptr;
+  NType type;
 
 public:
-  Node(std::shared_ptr<NodeImpl> ptr) : ptr(ptr) {}
+  Node(std::shared_ptr<NodeImpl> ptr) : ptr(ptr), type(NType::Other) {}
 
   bool operator==(const Node other) const { return other.ptr == ptr; }
 
@@ -140,8 +142,10 @@ public:
   void setParent(Node parent);
   Node getParent();
 
-  void addAttribute(Attribute attribute);
+  virtual SDFG getSDFG();
+  virtual State getState();
 
+  void addAttribute(Attribute attribute);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -254,7 +258,6 @@ public:
   ScopeNode(std::shared_ptr<ScopeNodeImpl> ptr)
       : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {}
 
-  SDFG getSDFG();
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
@@ -272,7 +275,6 @@ protected:
 public:
   ScopeNodeImpl(Location location) : NodeImpl(location) {}
 
-  SDFG getSDFG();
   void addNode(ConnectorNode node);
   void addEdge(MultiEdge edge);
   void mapConnector(Value value, Connector connector);
@@ -305,6 +307,8 @@ public:
 
   void setParent(Node parent);
   Node getParent();
+  SDFG getSDFG() override;
+  State getState() override;
 
   void addAttribute(Attribute attribute);
 };
@@ -314,10 +318,18 @@ public:
   ScopedConnectorNodeImpl(Location location)
       : ConnectorNodeImpl(location), ScopeNodeImpl(location) {}
 
+  void setID(unsigned id);
   unsigned getID();
-  StringRef getName();
+
   Location getLocation();
+
+  void setName(StringRef name);
+  StringRef getName();
+
+  void setParent(Node parent);
   Node getParent();
+
+  void addAttribute(Attribute attribute);
 };
 
 //===----------------------------------------------------------------------===//
@@ -329,10 +341,17 @@ private:
   std::shared_ptr<StateImpl> ptr;
 
 public:
+  State(std::shared_ptr<StateImpl> ptr)
+      : ScopeNode(std::static_pointer_cast<ScopeNodeImpl>(ptr)), ptr(ptr) {
+    type = NType::State;
+  }
+
   State(Location location)
       : ScopeNode(std::static_pointer_cast<ScopeNodeImpl>(
             std::make_shared<StateImpl>(location))),
-        ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {}
+        ptr(std::static_pointer_cast<StateImpl>(Node::ptr)) {
+    type = NType::State;
+  }
 
   Connector lookup(Value value) override;
   void emit(emitter::JsonEmitter &jemit) override;
@@ -355,12 +374,17 @@ private:
   std::shared_ptr<SDFGImpl> ptr;
 
 public:
-  SDFG(Node n) : Node(n), ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {}
+  SDFG(std::shared_ptr<SDFGImpl> ptr)
+      : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {
+    type = NType::SDFG;
+  }
 
   SDFG(Location location)
       : Node(std::static_pointer_cast<NodeImpl>(
             std::make_shared<SDFGImpl>(location))),
-        ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {}
+        ptr(std::static_pointer_cast<SDFGImpl>(Node::ptr)) {
+    type = NType::SDFG;
+  }
 
   State lookup(StringRef name);
   void addState(State state);
@@ -501,6 +525,10 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
+//===----------------------------------------------------------------------===//
+// Access
+//===----------------------------------------------------------------------===//
+
 class Access : public ConnectorNode {
 private:
   std::shared_ptr<AccessImpl> ptr;
@@ -522,6 +550,10 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
+//===----------------------------------------------------------------------===//
+// Map
+//===----------------------------------------------------------------------===//
+
 class MapEntry : public ScopedConnectorNode {
 private:
   std::shared_ptr<MapEntryImpl> ptr;
@@ -534,10 +566,15 @@ public:
 
   MapEntry() : ScopedConnectorNode(nullptr) {}
 
+  MapEntry(std::shared_ptr<MapEntryImpl> ptr)
+      : ScopedConnectorNode(
+            std::static_pointer_cast<ScopedConnectorNodeImpl>(ptr)),
+        ptr(ptr) {}
+
   void addParam(StringRef param);
   void addRange(Range range);
   void setExit(MapExit exit);
-  // Connector lookup(Value value) override;
+  Connector lookup(Value value) override;
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -569,7 +606,7 @@ public:
   void setExit(MapExit exit);
   void addParam(StringRef param);
   void addRange(Range range);
-  // Connector lookup(Value value);
+  Connector lookup(Value value, MapEntry mapEntry);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 

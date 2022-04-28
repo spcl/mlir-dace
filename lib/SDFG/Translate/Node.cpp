@@ -203,6 +203,20 @@ StringRef Node::getName() { return ptr->getName(); }
 void Node::setParent(Node parent) { ptr->setParent(parent); }
 Node Node::getParent() { return ptr->getParent(); }
 
+SDFG Node::getSDFG() {
+  if (type == NType::SDFG) {
+    return SDFG(std::static_pointer_cast<SDFGImpl>(ptr));
+  }
+  return ptr->getParent().getSDFG();
+}
+
+State Node::getState() {
+  if (type == NType::State) {
+    return State(std::static_pointer_cast<StateImpl>(ptr));
+  }
+  return ptr->getParent().getState();
+}
+
 void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
 void Node::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
@@ -243,7 +257,8 @@ void ConnectorNodeImpl::addInConnector(Connector connector) {
   if (std::find(inConnectors.begin(), inConnectors.end(), connector) !=
       inConnectors.end()) {
     emitError(location,
-              "Duplicate connector in ConnectorNodeImpl::addInConnector");
+              "Duplicate connector in ConnectorNodeImpl::addInConnector: " +
+                  connector.name);
   }
 
   inConnectors.push_back(connector);
@@ -253,7 +268,8 @@ void ConnectorNodeImpl::addOutConnector(Connector connector) {
   if (std::find(outConnectors.begin(), outConnectors.end(), connector) !=
       outConnectors.end()) {
     emitError(location,
-              "Duplicate connector in ConnectorNodeImpl::addOutConnector");
+              "Duplicate connector in ConnectorNodeImpl::addOutConnector: " +
+                  connector.name);
   }
 
   outConnectors.push_back(connector);
@@ -281,8 +297,10 @@ void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
 // ScopeNode
 //===----------------------------------------------------------------------===//
 
-SDFG ScopeNode::getSDFG() { return ptr->getSDFG(); }
-void ScopeNode::addNode(ConnectorNode node) { ptr->addNode(node); }
+void ScopeNode::addNode(ConnectorNode node) {
+  node.setParent(*this);
+  ptr->addNode(node);
+}
 void ScopeNode::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
 
 void ScopeNode::mapConnector(Value value, Connector connector) {
@@ -292,10 +310,7 @@ void ScopeNode::mapConnector(Value value, Connector connector) {
 Connector ScopeNode::lookup(Value value) { return ptr->lookup(value); }
 void ScopeNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
-SDFG ScopeNodeImpl::getSDFG() { return static_cast<SDFG>(getParent()); }
-
 void ScopeNodeImpl::addNode(ConnectorNode node) {
-  node.setParent(ScopeNode(std::make_shared<ScopeNodeImpl>(*this)));
   node.setID(nodes.size());
   nodes.push_back(node);
 }
@@ -329,48 +344,53 @@ void ScopeNodeImpl::emit(emitter::JsonEmitter &jemit) {
 // ScopedConnectorNode
 //===----------------------------------------------------------------------===//
 
-void ScopedConnectorNode::setID(unsigned id) {
-  ConnectorNode::setID(id);
-  ScopeNode::setID(id);
-}
-
-unsigned ScopedConnectorNode::getID() { return ConnectorNode::getID(); }
-
-Location ScopedConnectorNode::getLocation() {
-  return ConnectorNode::getLocation();
-}
-
-void ScopedConnectorNode::setName(StringRef name) {
-  ConnectorNode::setName(name);
-  ScopeNode::setName(name);
-}
-
-StringRef ScopedConnectorNode::getName() { return ConnectorNode::getName(); }
-
-void ScopedConnectorNode::setParent(Node parent) {
-  ConnectorNode::setParent(parent);
-  ScopeNode::setParent(parent);
-}
-
-Node ScopedConnectorNode::getParent() { return ConnectorNode::getParent(); }
+void ScopedConnectorNode::setID(unsigned id) { ptr->setID(id); }
+unsigned ScopedConnectorNode::getID() { return ptr->getID(); }
+Location ScopedConnectorNode::getLocation() { return ptr->getLocation(); }
+void ScopedConnectorNode::setName(StringRef name) { ptr->setName(name); }
+StringRef ScopedConnectorNode::getName() { return ptr->getName(); }
+void ScopedConnectorNode::setParent(Node parent) { ptr->setParent(parent); }
+Node ScopedConnectorNode::getParent() { return ptr->getParent(); }
+SDFG ScopedConnectorNode::getSDFG() { return ConnectorNode::getSDFG(); }
+State ScopedConnectorNode::getState() { return ConnectorNode::getState(); }
 
 void ScopedConnectorNode::addAttribute(Attribute attribute) {
-  ConnectorNode::addAttribute(attribute);
-  ScopeNode::addAttribute(attribute);
+  ptr->addAttribute(attribute);
+}
+
+void ScopedConnectorNodeImpl::setID(unsigned id) {
+  ConnectorNodeImpl::setID(id);
+  ScopeNodeImpl::setID(id);
 }
 
 unsigned ScopedConnectorNodeImpl::getID() { return ConnectorNodeImpl::getID(); }
-
-StringRef ScopedConnectorNodeImpl::getName() {
-  return ConnectorNodeImpl::getName();
-}
 
 Location ScopedConnectorNodeImpl::getLocation() {
   return ConnectorNodeImpl::getLocation();
 }
 
+void ScopedConnectorNodeImpl::setName(StringRef name) {
+  ConnectorNodeImpl::setName(name);
+  ScopeNodeImpl::setName(name);
+}
+
+StringRef ScopedConnectorNodeImpl::getName() {
+  return ConnectorNodeImpl::getName();
+}
+
+void ScopedConnectorNodeImpl::setParent(Node parent) {
+  printf("Parent set: %s\n", parent.getName().str().c_str());
+  ConnectorNodeImpl::setParent(parent);
+  ScopeNodeImpl::setParent(parent);
+}
+
 Node ScopedConnectorNodeImpl::getParent() {
   return ConnectorNodeImpl::getParent();
+}
+
+void ScopedConnectorNodeImpl::addAttribute(Attribute attribute) {
+  ConnectorNodeImpl::addAttribute(attribute);
+  ScopeNodeImpl::addAttribute(attribute);
 }
 
 //===----------------------------------------------------------------------===//
@@ -410,7 +430,6 @@ void SDFGImpl::setStartState(State state) {
 }
 
 void SDFGImpl::addEdge(InterstateEdge edge) { edges.push_back(edge); }
-
 State SDFGImpl::lookup(StringRef name) { return lut.find(name.str())->second; }
 
 void SDFGImpl::addArray(Array array) { arrays.push_back(array); }
@@ -583,6 +602,7 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 // Map
 //===----------------------------------------------------------------------===//
 
+Connector MapEntry::lookup(Value value) { return ptr->lookup(value, *this); }
 void MapEntry::addParam(StringRef param) { ptr->addParam(param); }
 void MapEntry::addRange(Range range) { ptr->addRange(range); }
 void MapEntry::setExit(MapExit exit) { ptr->setExit(exit); }
@@ -591,6 +611,25 @@ void MapEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 void MapEntryImpl::addParam(StringRef param) { params.push_back(param.str()); }
 void MapEntryImpl::addRange(Range range) { ranges.push_back(range); }
 void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
+
+Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
+  if (lut.find(utils::valueToString(value)) == lut.end()) {
+    State state = getParent().getState();
+    Connector srcConn = state.lookup(value);
+
+    Connector dstConn(mapEntry, utils::generateName("map_in"));
+    addInConnector(dstConn);
+
+    MultiEdge multiedge(srcConn, dstConn);
+    state.addEdge(multiedge);
+
+    Connector outConn(mapEntry, utils::generateName("map_out"));
+    addOutConnector(outConn);
+    ScopeNodeImpl::mapConnector(value, outConn);
+  }
+
+  return ScopeNodeImpl::lookup(value);
+}
 
 void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();

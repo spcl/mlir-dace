@@ -28,7 +28,8 @@ void insertTransientArray(Location location, translation::Connector connector,
     array = Array(utils::generateName("tmp"), true,
                   utils::getSizedType(value.getType()));
 
-  scope.getSDFG().addArray(array);
+  SDFG sdfg = scope.getSDFG();
+  sdfg.addArray(array);
 
   Access access(location);
   access.setName(array.name);
@@ -212,8 +213,8 @@ LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
   Tasklet tasklet(op.getLoc());
-  scope.addNode(tasklet);
   tasklet.setName(getTaskletName(op));
+  scope.addNode(tasklet);
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     Connector connector(tasklet, op.getInputName(i));
@@ -310,8 +311,8 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
   scope.addNode(mapEntry);
 
-  // if (collectOperations(*op, mapEntry).failed())
-  //   return failure();
+  if (collectOperations(*op, mapEntry).failed())
+    return failure();
 
   MapExit mapExit(op.getLoc());
   mapExit.setName(utils::generateName("mapExit"));
