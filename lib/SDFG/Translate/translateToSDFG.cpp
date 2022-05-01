@@ -63,6 +63,10 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
       if (collect(oper, scope).failed())
         return failure();
 
+    if (ConsumeNode oper = dyn_cast<ConsumeNode>(operation))
+      if (collect(oper, scope).failed())
+        return failure();
+
     if (CopyOp oper = dyn_cast<CopyOp>(operation))
       if (collect(oper, scope).failed())
         return failure();
@@ -316,9 +320,38 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   }
 
   scope.addNode(mapEntry);
-  scope.addNode(mapEntry.getExit());
+  scope.addNode(mapExit);
 
   if (collectOperations(*op, mapEntry).failed())
+    return failure();
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ConsumeNode
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
+  ConsumeEntry consumeEntry(op.getLoc());
+  consumeEntry.setName(utils::generateName("consumeEntry"));
+
+  ConsumeExit consumeExit(op.getLoc());
+  consumeExit.setName(utils::generateName("consumeExit"));
+
+  consumeExit.setEntry(consumeEntry);
+  consumeEntry.setExit(consumeExit);
+
+  // Stream and all
+
+  Connector elem(consumeEntry, "OUT_e");
+  consumeEntry.addOutConnector(elem);
+  consumeEntry.mapConnector(op.body().getArgument(1), elem);
+
+  scope.addNode(consumeEntry);
+  scope.addNode(consumeExit);
+
+  if (collectOperations(*op, consumeEntry).failed())
     return failure();
 
   return success();
@@ -367,6 +400,25 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     Connector out(mapExit,
                   "OUT_" + std::to_string(mapExit.getOutConnectorCount()));
     mapExit.addOutConnector(out);
+    MultiEdge edge(out, accOut);
+    scope.addEdge(edge);
+
+    scope.getState().mapConnector(op.arr(), accOut);
+    return success();
+  }
+
+  if (scope.getType() == NType::ConsumeEntry) {
+    ConsumeExit consumeExit = scope.getConsumeEntry().getExit();
+
+    Connector in(consumeExit,
+                 "IN_" + std::to_string(consumeExit.getInConnectorCount()));
+    consumeExit.addInConnector(in);
+    MultiEdge edgeTmp(scope.lookup(op.val()), in);
+    scope.addEdge(edgeTmp);
+
+    Connector out(consumeExit,
+                  "OUT_" + std::to_string(consumeExit.getOutConnectorCount()));
+    consumeExit.addOutConnector(out);
     MultiEdge edge(out, accOut);
     scope.addEdge(edge);
 

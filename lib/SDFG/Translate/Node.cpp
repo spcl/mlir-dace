@@ -219,6 +219,7 @@ State Node::getState() {
 }
 
 MapEntry Node::getMapEntry() {}
+ConsumeEntry Node::getConsumeEntry() {}
 
 void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
 void Node::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
@@ -380,6 +381,13 @@ MapEntry ScopedConnectorNode::getMapEntry() {
     return MapEntry(std::static_pointer_cast<MapEntryImpl>(ptr));
   }
   return ptr->getParent().getMapEntry();
+}
+
+ConsumeEntry ScopedConnectorNode::getConsumeEntry() {
+  if (ConnectorNode::type == NType::ConsumeEntry) {
+    return ConsumeEntry(std::static_pointer_cast<ConsumeEntryImpl>(ptr));
+  }
+  return ptr->getParent().getConsumeEntry();
 }
 
 void ScopedConnectorNode::addAttribute(Attribute attribute) {
@@ -720,6 +728,95 @@ void MapExitImpl::setEntry(MapEntry entry) { this->entry = entry; }
 void MapExitImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "MapExit");
+  jemit.printKVPair("label", name);
+  jemit.printKVPair("scope_entry", entry.getID());
+  jemit.printKVPair("scope_exit", id);
+  jemit.printKVPair("id", id, /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  ConnectorNodeImpl::emit(jemit);
+  jemit.endObject(); // attributes */
+
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
+// Consume
+//===----------------------------------------------------------------------===//
+
+void ConsumeEntry::addNode(ConnectorNode node) { ptr->addNode(node); }
+void ConsumeEntry::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
+void ConsumeEntry::mapConnector(Value value, Connector connector) {
+  ptr->mapConnector(value, connector);
+}
+Connector ConsumeEntry::lookup(Value value) {
+  return ptr->lookup(value, *this);
+}
+void ConsumeEntry::setExit(ConsumeExit exit) { ptr->setExit(exit); }
+ConsumeExit ConsumeEntry::getExit() { return ptr->getExit(); }
+void ConsumeEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void ConsumeEntryImpl::setExit(ConsumeExit exit) { this->exit = exit; }
+ConsumeExit ConsumeEntryImpl::getExit() { return exit; }
+
+void ConsumeEntryImpl::addNode(ConnectorNode node) {
+  getParent().getState().addNode(node);
+}
+
+void ConsumeEntryImpl::addEdge(MultiEdge edge) {
+  getParent().getState().addEdge(edge);
+}
+
+void ConsumeEntryImpl::mapConnector(Value value, Connector connector) {
+  auto res = lut.insert({utils::valueToString(value), connector});
+
+  if (!res.second)
+    res.first->second = connector;
+}
+
+Connector ConsumeEntryImpl::lookup(Value value, ConsumeEntry entry) {
+  if (lut.find(utils::valueToString(value)) == lut.end()) {
+    State state = getParent().getState();
+    Connector srcConn = state.lookup(value);
+
+    Connector dstConn(entry, "IN_" + std::to_string(inConnectors.size()));
+    addInConnector(dstConn);
+
+    MultiEdge multiedge(srcConn, dstConn);
+    state.addEdge(multiedge);
+
+    Connector outConn(entry, "OUT_" + std::to_string(outConnectors.size()));
+    addOutConnector(outConn);
+    ScopeNodeImpl::mapConnector(value, outConn);
+  }
+
+  return ScopeNodeImpl::lookup(value);
+}
+
+void ConsumeEntryImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "ConsumeEntry");
+  jemit.printKVPair("label", getName());
+  jemit.printKVPair("scope_exit", exit.getID());
+  jemit.printKVPair("id", getID(), /*stringify=*/false);
+
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", getName());
+
+  ConnectorNodeImpl::emit(jemit);
+  jemit.endObject(); // attributes */
+
+  jemit.endObject();
+}
+
+void ConsumeExit::setEntry(ConsumeEntry entry) { ptr->setEntry(entry); }
+void ConsumeExit::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void ConsumeExitImpl::setEntry(ConsumeEntry entry) { this->entry = entry; }
+
+void ConsumeExitImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "ConsumeExit");
   jemit.printKVPair("label", name);
   jemit.printKVPair("scope_entry", entry.getID());
   jemit.printKVPair("scope_exit", id);

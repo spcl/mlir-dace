@@ -51,6 +51,11 @@ class MapEntryImpl;
 class MapExit;
 class MapExitImpl;
 
+class ConsumeEntry;
+class ConsumeEntryImpl;
+class ConsumeExit;
+class ConsumeExitImpl;
+
 //===----------------------------------------------------------------------===//
 // Interfaces
 //===----------------------------------------------------------------------===//
@@ -65,7 +70,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class DType { int32, int64, float32, float64 };
-enum class NType { SDFG, State, Access, MapEntry, Other };
+enum class NType { SDFG, State, Access, MapEntry, ConsumeEntry, Other };
 
 class Attribute {
 public:
@@ -146,6 +151,7 @@ public:
   virtual SDFG getSDFG();
   virtual State getState();
   virtual MapEntry getMapEntry();
+  virtual ConsumeEntry getConsumeEntry();
 
   void addAttribute(Attribute attribute);
   void emit(emitter::JsonEmitter &jemit) override;
@@ -318,6 +324,7 @@ public:
   SDFG getSDFG() override;
   State getState() override;
   MapEntry getMapEntry() override;
+  ConsumeEntry getConsumeEntry() override;
 
   void addAttribute(Attribute attribute);
 };
@@ -642,8 +649,84 @@ public:
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
-/* class ConsumeBegin : public ConnectorNode {};
-class ConsumeEnd : public ConnectorNode {}; */
+//===----------------------------------------------------------------------===//
+// Consume
+//===----------------------------------------------------------------------===//
+
+class ConsumeEntry : public ScopedConnectorNode {
+private:
+  std::shared_ptr<ConsumeEntryImpl> ptr;
+
+public:
+  ConsumeEntry(Location location)
+      : ScopedConnectorNode(std::static_pointer_cast<ScopedConnectorNodeImpl>(
+            std::make_shared<ConsumeEntryImpl>(location))),
+        ptr(std::static_pointer_cast<ConsumeEntryImpl>(
+            ScopedConnectorNode::ptr)) {
+    setType(NType::ConsumeEntry);
+  }
+
+  ConsumeEntry() : ScopedConnectorNode(nullptr) {}
+
+  ConsumeEntry(std::shared_ptr<ConsumeEntryImpl> ptr)
+      : ScopedConnectorNode(
+            std::static_pointer_cast<ScopedConnectorNodeImpl>(ptr)),
+        ptr(ptr) {}
+
+  void setExit(ConsumeExit exit);
+  ConsumeExit getExit();
+  void addNode(ConnectorNode node) override;
+  void addEdge(MultiEdge edge) override;
+  void mapConnector(Value value, Connector connector) override;
+  Connector lookup(Value value) override;
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class ConsumeExit : public ConnectorNode {
+private:
+  std::shared_ptr<ConsumeExitImpl> ptr;
+
+public:
+  ConsumeExit(Location location)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<ConsumeExitImpl>(location))),
+        ptr(std::static_pointer_cast<ConsumeExitImpl>(ConnectorNode::ptr)) {}
+
+  ConsumeExit() : ConnectorNode(nullptr) {}
+
+  void setEntry(ConsumeEntry entry);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class ConsumeEntryImpl : public ScopedConnectorNodeImpl {
+private:
+  ConsumeExit exit;
+  // Condition
+  // pe index
+  // num pes
+
+public:
+  ConsumeEntryImpl(Location location) : ScopedConnectorNodeImpl(location) {}
+
+  void setExit(ConsumeExit exit);
+  ConsumeExit getExit();
+  void addNode(ConnectorNode node) override;
+  void addEdge(MultiEdge edge) override;
+  void mapConnector(Value value, Connector connector) override;
+  Connector lookup(Value value, ConsumeEntry entry);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class ConsumeExitImpl : public ConnectorNodeImpl {
+private:
+  ConsumeEntry entry;
+
+public:
+  ConsumeExitImpl(Location location) : ConnectorNodeImpl(location) {}
+
+  void setEntry(ConsumeEntry entry);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
 
 } // namespace mlir::sdfg::translation
 
