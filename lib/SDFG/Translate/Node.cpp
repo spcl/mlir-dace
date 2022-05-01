@@ -196,6 +196,7 @@ void Node::setID(unsigned id) { ptr->setID(id); }
 unsigned Node::getID() { return ptr->getID(); }
 
 Location Node::getLocation() { return ptr->getLocation(); }
+NType Node::getType() { return type; }
 
 void Node::setName(StringRef name) { ptr->setName(name); }
 StringRef Node::getName() { return ptr->getName(); }
@@ -216,6 +217,8 @@ State Node::getState() {
   }
   return ptr->getParent().getState();
 }
+
+MapEntry Node::getMapEntry() {}
 
 void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
 void Node::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
@@ -251,6 +254,12 @@ void ConnectorNode::addInConnector(Connector connector) {
 void ConnectorNode::addOutConnector(Connector connector) {
   ptr->addOutConnector(connector);
 }
+unsigned ConnectorNode::getInConnectorCount() {
+  return ptr->getInConnectorCount();
+}
+unsigned ConnectorNode::getOutConnectorCount() {
+  return ptr->getOutConnectorCount();
+}
 void ConnectorNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void ConnectorNodeImpl::addInConnector(Connector connector) {
@@ -273,6 +282,14 @@ void ConnectorNodeImpl::addOutConnector(Connector connector) {
   }
 
   outConnectors.push_back(connector);
+}
+
+unsigned ConnectorNodeImpl::getInConnectorCount() {
+  return inConnectors.size();
+}
+
+unsigned ConnectorNodeImpl::getOutConnectorCount() {
+  return outConnectors.size();
 }
 
 void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
@@ -347,12 +364,23 @@ void ScopeNodeImpl::emit(emitter::JsonEmitter &jemit) {
 void ScopedConnectorNode::setID(unsigned id) { ptr->setID(id); }
 unsigned ScopedConnectorNode::getID() { return ptr->getID(); }
 Location ScopedConnectorNode::getLocation() { return ptr->getLocation(); }
+void ScopedConnectorNode::setType(NType t) {
+  ConnectorNode::type = t;
+  ScopeNode::type = t;
+}
+NType ScopedConnectorNode::getType() { return ConnectorNode::getType(); }
 void ScopedConnectorNode::setName(StringRef name) { ptr->setName(name); }
 StringRef ScopedConnectorNode::getName() { return ptr->getName(); }
 void ScopedConnectorNode::setParent(Node parent) { ptr->setParent(parent); }
 Node ScopedConnectorNode::getParent() { return ptr->getParent(); }
 SDFG ScopedConnectorNode::getSDFG() { return ConnectorNode::getSDFG(); }
 State ScopedConnectorNode::getState() { return ConnectorNode::getState(); }
+MapEntry ScopedConnectorNode::getMapEntry() {
+  if (ConnectorNode::type == NType::MapEntry) {
+    return MapEntry(std::static_pointer_cast<MapEntryImpl>(ptr));
+  }
+  return ptr->getParent().getMapEntry();
+}
 
 void ScopedConnectorNode::addAttribute(Attribute attribute) {
   ptr->addAttribute(attribute);
@@ -602,28 +630,50 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 // Map
 //===----------------------------------------------------------------------===//
 
+void MapEntry::addNode(ConnectorNode node) { ptr->addNode(node); }
+void MapEntry::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
+void MapEntry::mapConnector(Value value, Connector connector) {
+  ptr->mapConnector(value, connector);
+}
 Connector MapEntry::lookup(Value value) { return ptr->lookup(value, *this); }
 void MapEntry::addParam(StringRef param) { ptr->addParam(param); }
 void MapEntry::addRange(Range range) { ptr->addRange(range); }
 void MapEntry::setExit(MapExit exit) { ptr->setExit(exit); }
+MapExit MapEntry::getExit() { return ptr->getExit(); }
 void MapEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void MapEntryImpl::addParam(StringRef param) { params.push_back(param.str()); }
 void MapEntryImpl::addRange(Range range) { ranges.push_back(range); }
 void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
+MapExit MapEntryImpl::getExit() { return exit; }
+
+void MapEntryImpl::addNode(ConnectorNode node) {
+  getParent().getState().addNode(node);
+}
+
+void MapEntryImpl::addEdge(MultiEdge edge) {
+  getParent().getState().addEdge(edge);
+}
+
+void MapEntryImpl::mapConnector(Value value, Connector connector) {
+  auto res = lut.insert({utils::valueToString(value), connector});
+
+  if (!res.second)
+    res.first->second = connector;
+}
 
 Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
   if (lut.find(utils::valueToString(value)) == lut.end()) {
     State state = getParent().getState();
     Connector srcConn = state.lookup(value);
 
-    Connector dstConn(mapEntry, utils::generateName("map_in"));
+    Connector dstConn(mapEntry, "IN_" + std::to_string(inConnectors.size()));
     addInConnector(dstConn);
 
     MultiEdge multiedge(srcConn, dstConn);
     state.addEdge(multiedge);
 
-    Connector outConn(mapEntry, utils::generateName("map_out"));
+    Connector outConn(mapEntry, "OUT_" + std::to_string(outConnectors.size()));
     addOutConnector(outConn);
     ScopeNodeImpl::mapConnector(value, outConn);
   }

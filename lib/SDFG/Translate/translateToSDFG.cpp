@@ -296,6 +296,12 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   MapEntry mapEntry(op.getLoc());
   mapEntry.setName(utils::generateName("mapEntry"));
 
+  MapExit mapExit(op.getLoc());
+  mapExit.setName(utils::generateName("mapExit"));
+
+  mapExit.setEntry(mapEntry);
+  mapEntry.setExit(mapExit);
+
   for (BlockArgument bArg : op.body().getArguments()) {
     mapEntry.addParam(utils::valueToString(bArg));
   }
@@ -310,16 +316,11 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   }
 
   scope.addNode(mapEntry);
+  scope.addNode(mapEntry.getExit());
 
   if (collectOperations(*op, mapEntry).failed())
     return failure();
 
-  MapExit mapExit(op.getLoc());
-  mapExit.setName(utils::generateName("mapExit"));
-  mapExit.setEntry(mapEntry);
-  scope.addNode(mapExit);
-
-  mapEntry.setExit(mapExit);
   return success();
 }
 
@@ -354,11 +355,29 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   Connector accOut(access);
   access.addOutConnector(accOut);
 
+  if (scope.getType() == NType::MapEntry) {
+    MapExit mapExit = scope.getMapEntry().getExit();
+
+    Connector in(mapExit,
+                 "IN_" + std::to_string(mapExit.getInConnectorCount()));
+    mapExit.addInConnector(in);
+    MultiEdge edgeTmp(scope.lookup(op.val()), in);
+    scope.addEdge(edgeTmp);
+
+    Connector out(mapExit,
+                  "OUT_" + std::to_string(mapExit.getOutConnectorCount()));
+    mapExit.addOutConnector(out);
+    MultiEdge edge(out, accOut);
+    scope.addEdge(edge);
+
+    scope.getState().mapConnector(op.arr(), accOut);
+    return success();
+  }
+
   MultiEdge edge(scope.lookup(op.val()), accOut);
   scope.addEdge(edge);
 
   scope.mapConnector(op.arr(), accOut);
-
   return success();
 }
 

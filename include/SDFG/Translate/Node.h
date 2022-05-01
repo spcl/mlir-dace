@@ -65,7 +65,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 enum class DType { int32, int64, float32, float64 };
-enum class NType { SDFG, State, Other };
+enum class NType { SDFG, State, Access, MapEntry, Other };
 
 class Attribute {
 public:
@@ -135,6 +135,7 @@ public:
   unsigned getID();
 
   Location getLocation();
+  NType getType();
 
   void setName(StringRef name);
   StringRef getName();
@@ -144,6 +145,7 @@ public:
 
   virtual SDFG getSDFG();
   virtual State getState();
+  virtual MapEntry getMapEntry();
 
   void addAttribute(Attribute attribute);
   void emit(emitter::JsonEmitter &jemit) override;
@@ -192,6 +194,8 @@ public:
 
   void addInConnector(Connector connector);
   void addOutConnector(Connector connector);
+  unsigned getInConnectorCount();
+  unsigned getOutConnectorCount();
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -206,6 +210,8 @@ public:
 
   void addInConnector(Connector connector);
   void addOutConnector(Connector connector);
+  unsigned getInConnectorCount();
+  unsigned getOutConnectorCount();
 
   // Emits connectors
   void emit(emitter::JsonEmitter &jemit) override;
@@ -258,9 +264,9 @@ public:
   ScopeNode(std::shared_ptr<ScopeNodeImpl> ptr)
       : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {}
 
-  void addNode(ConnectorNode node);
-  void addEdge(MultiEdge edge);
-  void mapConnector(Value value, Connector connector);
+  virtual void addNode(ConnectorNode node);
+  virtual void addEdge(MultiEdge edge);
+  virtual void mapConnector(Value value, Connector connector);
   virtual Connector lookup(Value value);
 
   void emit(emitter::JsonEmitter &jemit) override;
@@ -275,9 +281,9 @@ protected:
 public:
   ScopeNodeImpl(Location location) : NodeImpl(location) {}
 
-  void addNode(ConnectorNode node);
-  void addEdge(MultiEdge edge);
-  void mapConnector(Value value, Connector connector);
+  virtual void addNode(ConnectorNode node);
+  virtual void addEdge(MultiEdge edge);
+  virtual void mapConnector(Value value, Connector connector);
   virtual Connector lookup(Value value);
 
   // Emits nodes & edges
@@ -291,6 +297,7 @@ public:
 class ScopedConnectorNode : public ConnectorNode, public ScopeNode {
 protected:
   std::shared_ptr<ScopedConnectorNodeImpl> ptr;
+  void setType(NType t);
 
 public:
   ScopedConnectorNode(std::shared_ptr<ScopedConnectorNodeImpl> ptr)
@@ -301,6 +308,7 @@ public:
   unsigned getID();
 
   Location getLocation();
+  NType getType();
 
   void setName(StringRef name);
   StringRef getName();
@@ -309,6 +317,7 @@ public:
   Node getParent();
   SDFG getSDFG() override;
   State getState() override;
+  MapEntry getMapEntry() override;
 
   void addAttribute(Attribute attribute);
 };
@@ -537,7 +546,9 @@ public:
   Access(Location location)
       : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
             std::make_shared<AccessImpl>(location))),
-        ptr(std::static_pointer_cast<AccessImpl>(ConnectorNode::ptr)) {}
+        ptr(std::static_pointer_cast<AccessImpl>(ConnectorNode::ptr)) {
+    type = NType::Access;
+  }
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -562,7 +573,9 @@ public:
   MapEntry(Location location)
       : ScopedConnectorNode(std::static_pointer_cast<ScopedConnectorNodeImpl>(
             std::make_shared<MapEntryImpl>(location))),
-        ptr(std::static_pointer_cast<MapEntryImpl>(ScopedConnectorNode::ptr)) {}
+        ptr(std::static_pointer_cast<MapEntryImpl>(ScopedConnectorNode::ptr)) {
+    setType(NType::MapEntry);
+  }
 
   MapEntry() : ScopedConnectorNode(nullptr) {}
 
@@ -574,6 +587,10 @@ public:
   void addParam(StringRef param);
   void addRange(Range range);
   void setExit(MapExit exit);
+  MapExit getExit();
+  void addNode(ConnectorNode node) override;
+  void addEdge(MultiEdge edge) override;
+  void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value) override;
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -604,8 +621,12 @@ public:
   MapEntryImpl(Location location) : ScopedConnectorNodeImpl(location) {}
 
   void setExit(MapExit exit);
+  MapExit getExit();
   void addParam(StringRef param);
   void addRange(Range range);
+  void addNode(ConnectorNode node) override;
+  void addEdge(MultiEdge edge) override;
+  void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value, MapEntry mapEntry);
   void emit(emitter::JsonEmitter &jemit) override;
 };
