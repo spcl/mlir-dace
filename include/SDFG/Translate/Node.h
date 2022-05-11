@@ -147,6 +147,7 @@ public:
 
   void setParent(Node parent);
   Node getParent();
+  bool hasParent();
 
   virtual SDFG getSDFG();
   virtual State getState();
@@ -270,7 +271,11 @@ public:
   ScopeNode(std::shared_ptr<ScopeNodeImpl> ptr)
       : Node(std::static_pointer_cast<NodeImpl>(ptr)), ptr(ptr) {}
 
+  ScopeNode(Node n)
+      : Node(n), ptr(std::static_pointer_cast<ScopeNodeImpl>(Node::ptr)) {}
+
   virtual void addNode(ConnectorNode node);
+  virtual void routeWrite(Connector from, Connector to);
   virtual void addEdge(MultiEdge edge);
   virtual void mapConnector(Value value, Connector connector);
   virtual Connector lookup(Value value);
@@ -288,6 +293,7 @@ public:
   ScopeNodeImpl(Location location) : NodeImpl(location) {}
 
   virtual void addNode(ConnectorNode node);
+  virtual void routeWrite(Connector from, Connector to);
   virtual void addEdge(MultiEdge edge);
   virtual void mapConnector(Value value, Connector connector);
   virtual Connector lookup(Value value);
@@ -596,6 +602,7 @@ public:
   void setExit(MapExit exit);
   MapExit getExit();
   void addNode(ConnectorNode node) override;
+  void routeWrite(Connector from, Connector to) override;
   void addEdge(MultiEdge edge) override;
   void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value) override;
@@ -632,6 +639,7 @@ public:
   void addParam(StringRef param);
   void addRange(Range range);
   void addNode(ConnectorNode node) override;
+  void routeWrite(Connector from, Connector to) override;
   void addEdge(MultiEdge edge) override;
   void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value, MapEntry mapEntry);

@@ -203,6 +203,7 @@ StringRef Node::getName() { return ptr->getName(); }
 
 void Node::setParent(Node parent) { ptr->setParent(parent); }
 Node Node::getParent() { return ptr->getParent(); }
+bool Node::hasParent() { return getParent().ptr != nullptr; }
 
 SDFG Node::getSDFG() {
   if (type == NType::SDFG) {
@@ -316,9 +317,15 @@ void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void ScopeNode::addNode(ConnectorNode node) {
-  node.setParent(*this);
+  if (!node.hasParent())
+    node.setParent(*this);
   ptr->addNode(node);
 }
+
+void ScopeNode::routeWrite(Connector from, Connector to) {
+  ptr->routeWrite(from, to);
+}
+
 void ScopeNode::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
 
 void ScopeNode::mapConnector(Value value, Connector connector) {
@@ -331,6 +338,11 @@ void ScopeNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 void ScopeNodeImpl::addNode(ConnectorNode node) {
   node.setID(nodes.size());
   nodes.push_back(node);
+}
+
+void ScopeNodeImpl::routeWrite(Connector from, Connector to) {
+  MultiEdge edge(from, to);
+  addEdge(edge);
 }
 
 void ScopeNodeImpl::addEdge(MultiEdge edge) { edges.push_back(edge); }
@@ -638,11 +650,21 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 // Map
 //===----------------------------------------------------------------------===//
 
-void MapEntry::addNode(ConnectorNode node) { ptr->addNode(node); }
+void MapEntry::addNode(ConnectorNode node) {
+  // Set the parent to this map
+  // Node parent(std::static_pointer_cast<ScopeNodeImpl>(ptr));
+  // node.setParent(parent);
+  ptr->addNode(node);
+}
+void MapEntry::routeWrite(Connector from, Connector to) {
+  ptr->routeWrite(from, to);
+}
+
 void MapEntry::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
 void MapEntry::mapConnector(Value value, Connector connector) {
   ptr->mapConnector(value, connector);
 }
+
 Connector MapEntry::lookup(Value value) { return ptr->lookup(value, *this); }
 void MapEntry::addParam(StringRef param) { ptr->addParam(param); }
 void MapEntry::addRange(Range range) { ptr->addRange(range); }
@@ -656,11 +678,29 @@ void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
 MapExit MapEntryImpl::getExit() { return exit; }
 
 void MapEntryImpl::addNode(ConnectorNode node) {
-  getParent().getState().addNode(node);
+  ScopeNode scope(getParent());
+  scope.addNode(node);
+}
+
+void MapEntryImpl::routeWrite(Connector from, Connector to) {
+  MapExit mapExit = getExit();
+  Connector in(mapExit, "IN_" + std::to_string(mapExit.getInConnectorCount()));
+  mapExit.addInConnector(in);
+
+  MultiEdge edge(from, in);
+  addEdge(edge);
+
+  Connector out(mapExit,
+                "OUT_" + std::to_string(mapExit.getOutConnectorCount()));
+  mapExit.addOutConnector(out);
+
+  ScopeNode scope(getParent());
+  scope.routeWrite(out, to);
 }
 
 void MapEntryImpl::addEdge(MultiEdge edge) {
-  getParent().getState().addEdge(edge);
+  ScopeNode scope(getParent());
+  scope.addEdge(edge);
 }
 
 void MapEntryImpl::mapConnector(Value value, Connector connector) {
@@ -672,14 +712,15 @@ void MapEntryImpl::mapConnector(Value value, Connector connector) {
 
 Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
   if (lut.find(utils::valueToString(value)) == lut.end()) {
-    State state = getParent().getState();
-    Connector srcConn = state.lookup(value);
+    printf("LOOKING UP\n");
+    ScopeNode scope(getParent());
+    Connector srcConn = scope.lookup(value);
 
     Connector dstConn(mapEntry, "IN_" + std::to_string(inConnectors.size()));
     addInConnector(dstConn);
 
     MultiEdge multiedge(srcConn, dstConn);
-    state.addEdge(multiedge);
+    scope.addEdge(multiedge);
 
     Connector outConn(mapEntry, "OUT_" + std::to_string(outConnectors.size()));
     addOutConnector(outConn);

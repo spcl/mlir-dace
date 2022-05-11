@@ -388,22 +388,11 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   Connector accOut(access);
   access.addOutConnector(accOut);
 
+  Connector source = scope.lookup(op.val());
+
   if (scope.getType() == NType::MapEntry) {
-    MapExit mapExit = scope.getMapEntry().getExit();
-
-    Connector in(mapExit,
-                 "IN_" + std::to_string(mapExit.getInConnectorCount()));
-    mapExit.addInConnector(in);
-    MultiEdge edgeTmp(scope.lookup(op.val()), in);
-    scope.addEdge(edgeTmp);
-
-    Connector out(mapExit,
-                  "OUT_" + std::to_string(mapExit.getOutConnectorCount()));
-    mapExit.addOutConnector(out);
-    MultiEdge edge(out, accOut);
-    scope.addEdge(edge);
-
-    scope.getState().mapConnector(op.arr(), accOut);
+    scope.routeWrite(source, accOut);
+    scope.mapConnector(op.arr(), accOut);
     return success();
   }
 

@@ -2,7 +2,7 @@
 #define SDFG_MapNode
 
 def SDFG_MapNode : SDFG_Op<"map", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode"]>,
     SingleBlock,
     NoTerminator,
     DeclareOpInterfaceMethods<LoopLikeOpInterface>
