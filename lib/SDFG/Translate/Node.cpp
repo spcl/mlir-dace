@@ -317,8 +317,11 @@ void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void ScopeNode::addNode(ConnectorNode node) {
-  if (!node.hasParent())
+  // printf("TRY: %s\n", node.getName().str().c_str());
+  if (!node.hasParent()) {
+    // printf("SET\n");
     node.setParent(*this);
+  }
   ptr->addNode(node);
 }
 
@@ -368,77 +371,6 @@ void ScopeNodeImpl::emit(emitter::JsonEmitter &jemit) {
   for (MultiEdge me : edges)
     me.emit(jemit);
   jemit.endList(); // edges
-}
-
-//===----------------------------------------------------------------------===//
-// ScopedConnectorNode
-//===----------------------------------------------------------------------===//
-
-void ScopedConnectorNode::setID(unsigned id) { ptr->setID(id); }
-unsigned ScopedConnectorNode::getID() { return ptr->getID(); }
-Location ScopedConnectorNode::getLocation() { return ptr->getLocation(); }
-void ScopedConnectorNode::setType(NType t) {
-  ConnectorNode::type = t;
-  ScopeNode::type = t;
-}
-NType ScopedConnectorNode::getType() { return ConnectorNode::getType(); }
-void ScopedConnectorNode::setName(StringRef name) { ptr->setName(name); }
-StringRef ScopedConnectorNode::getName() { return ptr->getName(); }
-void ScopedConnectorNode::setParent(Node parent) { ptr->setParent(parent); }
-Node ScopedConnectorNode::getParent() { return ptr->getParent(); }
-SDFG ScopedConnectorNode::getSDFG() { return ConnectorNode::getSDFG(); }
-State ScopedConnectorNode::getState() { return ConnectorNode::getState(); }
-MapEntry ScopedConnectorNode::getMapEntry() {
-  if (ConnectorNode::type == NType::MapEntry) {
-    return MapEntry(std::static_pointer_cast<MapEntryImpl>(ptr));
-  }
-  return ptr->getParent().getMapEntry();
-}
-
-ConsumeEntry ScopedConnectorNode::getConsumeEntry() {
-  if (ConnectorNode::type == NType::ConsumeEntry) {
-    return ConsumeEntry(std::static_pointer_cast<ConsumeEntryImpl>(ptr));
-  }
-  return ptr->getParent().getConsumeEntry();
-}
-
-void ScopedConnectorNode::addAttribute(Attribute attribute) {
-  ptr->addAttribute(attribute);
-}
-
-void ScopedConnectorNodeImpl::setID(unsigned id) {
-  ConnectorNodeImpl::setID(id);
-  ScopeNodeImpl::setID(id);
-}
-
-unsigned ScopedConnectorNodeImpl::getID() { return ConnectorNodeImpl::getID(); }
-
-Location ScopedConnectorNodeImpl::getLocation() {
-  return ConnectorNodeImpl::getLocation();
-}
-
-void ScopedConnectorNodeImpl::setName(StringRef name) {
-  ConnectorNodeImpl::setName(name);
-  ScopeNodeImpl::setName(name);
-}
-
-StringRef ScopedConnectorNodeImpl::getName() {
-  return ConnectorNodeImpl::getName();
-}
-
-void ScopedConnectorNodeImpl::setParent(Node parent) {
-  printf("Parent set: %s\n", parent.getName().str().c_str());
-  ConnectorNodeImpl::setParent(parent);
-  ScopeNodeImpl::setParent(parent);
-}
-
-Node ScopedConnectorNodeImpl::getParent() {
-  return ConnectorNodeImpl::getParent();
-}
-
-void ScopedConnectorNodeImpl::addAttribute(Attribute attribute) {
-  ConnectorNodeImpl::addAttribute(attribute);
-  ScopeNodeImpl::addAttribute(attribute);
 }
 
 //===----------------------------------------------------------------------===//
@@ -651,9 +583,8 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void MapEntry::addNode(ConnectorNode node) {
-  // Set the parent to this map
-  // Node parent(std::static_pointer_cast<ScopeNodeImpl>(ptr));
-  // node.setParent(parent);
+  // printf("MAP TRY: %s\n", node.getName().str().c_str());
+  node.setParent(*this);
   ptr->addNode(node);
 }
 void MapEntry::routeWrite(Connector from, Connector to) {
@@ -678,7 +609,7 @@ void MapEntryImpl::setExit(MapExit exit) { this->exit = exit; }
 MapExit MapEntryImpl::getExit() { return exit; }
 
 void MapEntryImpl::addNode(ConnectorNode node) {
-  ScopeNode scope(getParent());
+  ScopeNode scope(parent);
   scope.addNode(node);
 }
 
@@ -694,12 +625,12 @@ void MapEntryImpl::routeWrite(Connector from, Connector to) {
                 "OUT_" + std::to_string(mapExit.getOutConnectorCount()));
   mapExit.addOutConnector(out);
 
-  ScopeNode scope(getParent());
+  ScopeNode scope(parent);
   scope.routeWrite(out, to);
 }
 
 void MapEntryImpl::addEdge(MultiEdge edge) {
-  ScopeNode scope(getParent());
+  ScopeNode scope(parent);
   scope.addEdge(edge);
 }
 
@@ -712,8 +643,7 @@ void MapEntryImpl::mapConnector(Value value, Connector connector) {
 
 Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
   if (lut.find(utils::valueToString(value)) == lut.end()) {
-    printf("LOOKING UP\n");
-    ScopeNode scope(getParent());
+    ScopeNode scope(parent);
     Connector srcConn = scope.lookup(value);
 
     Connector dstConn(mapEntry, "IN_" + std::to_string(inConnectors.size()));
