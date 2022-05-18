@@ -148,8 +148,6 @@ public:
 
   virtual SDFG getSDFG();
   virtual State getState();
-  virtual MapEntry getMapEntry();
-  virtual ConsumeEntry getConsumeEntry();
 
   void addAttribute(Attribute attribute);
   void emit(emitter::JsonEmitter &jemit) override;
@@ -540,6 +538,9 @@ public:
     type = NType::MapEntry;
   }
 
+  MapEntry(Node n)
+      : ScopeNode(n), ptr(std::static_pointer_cast<MapEntryImpl>(Node::ptr)) {}
+
   MapEntry() : ScopeNode(nullptr) {}
 
   void addParam(StringRef param);
@@ -618,14 +619,16 @@ public:
     type = NType::ConsumeEntry;
   }
 
-  ConsumeEntry() : ScopeNode(nullptr) {}
+  ConsumeEntry(Node n)
+      : ScopeNode(n),
+        ptr(std::static_pointer_cast<ConsumeEntryImpl>(Node::ptr)) {}
 
-  ConsumeEntry(std::shared_ptr<ConsumeEntryImpl> ptr)
-      : ScopeNode(std::static_pointer_cast<ScopeNodeImpl>(ptr)), ptr(ptr) {}
+  ConsumeEntry() : ScopeNode(nullptr) {}
 
   void setExit(ConsumeExit exit);
   ConsumeExit getExit();
   void addNode(ConnectorNode node) override;
+  void routeWrite(Connector from, Connector to) override;
   void addEdge(MultiEdge edge) override;
   void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value) override;
@@ -661,6 +664,7 @@ public:
   void setExit(ConsumeExit exit);
   ConsumeExit getExit();
   void addNode(ConnectorNode node) override;
+  void routeWrite(Connector from, Connector to) override;
   void addEdge(MultiEdge edge) override;
   void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value, ConsumeEntry entry);

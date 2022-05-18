@@ -389,36 +389,9 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   access.addOutConnector(accOut);
 
   Connector source = scope.lookup(op.val());
-
-  if (scope.getType() == NType::MapEntry) {
-    scope.routeWrite(source, accOut);
-    scope.mapConnector(op.arr(), accOut);
-    return success();
-  }
-
-  if (scope.getType() == NType::ConsumeEntry) {
-    ConsumeExit consumeExit = scope.getConsumeEntry().getExit();
-
-    Connector in(consumeExit,
-                 "IN_" + std::to_string(consumeExit.getInConnectorCount()));
-    consumeExit.addInConnector(in);
-    MultiEdge edgeTmp(scope.lookup(op.val()), in);
-    scope.addEdge(edgeTmp);
-
-    Connector out(consumeExit,
-                  "OUT_" + std::to_string(consumeExit.getOutConnectorCount()));
-    consumeExit.addOutConnector(out);
-    MultiEdge edge(out, accOut);
-    scope.addEdge(edge);
-
-    scope.getState().mapConnector(op.arr(), accOut);
-    return success();
-  }
-
-  MultiEdge edge(scope.lookup(op.val()), accOut);
-  scope.addEdge(edge);
-
+  scope.routeWrite(source, accOut);
   scope.mapConnector(op.arr(), accOut);
+
   return success();
 }
 

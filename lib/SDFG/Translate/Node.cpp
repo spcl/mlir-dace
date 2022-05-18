@@ -219,9 +219,6 @@ State Node::getState() {
   return ptr->getParent().getState();
 }
 
-MapEntry Node::getMapEntry() {}
-ConsumeEntry Node::getConsumeEntry() {}
-
 void Node::addAttribute(Attribute attribute) { ptr->addAttribute(attribute); }
 void Node::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
@@ -317,9 +314,7 @@ void ConnectorNodeImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void ScopeNode::addNode(ConnectorNode node) {
-  // printf("TRY: %s\n", node.getName().str().c_str());
   if (!node.hasParent()) {
-    // printf("SET\n");
     node.setParent(*this);
   }
   ptr->addNode(node);
@@ -335,7 +330,17 @@ void ScopeNode::mapConnector(Value value, Connector connector) {
   ptr->mapConnector(value, connector);
 }
 
-Connector ScopeNode::lookup(Value value) { return ptr->lookup(value); }
+Connector ScopeNode::lookup(Value value) {
+  if (type == NType::MapEntry) {
+    return MapEntry(*this).lookup(value);
+  }
+
+  if (type == NType::ConsumeEntry) {
+    return ConsumeEntry(*this).lookup(value);
+  }
+
+  return ptr->lookup(value);
+}
 void ScopeNode::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void ScopeNodeImpl::addNode(ConnectorNode node) {
@@ -358,6 +363,10 @@ void ScopeNodeImpl::mapConnector(Value value, Connector connector) {
 }
 
 Connector ScopeNodeImpl::lookup(Value value) {
+  if (lut.find(utils::valueToString(value)) == lut.end()) {
+    emitError(location,
+              "Tried to lookup nonexistent value in ScopeNodeImpl::lookup");
+  }
   return lut.find(utils::valueToString(value))->second;
 }
 
@@ -583,10 +592,10 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void MapEntry::addNode(ConnectorNode node) {
-  // printf("MAP TRY: %s\n", node.getName().str().c_str());
   node.setParent(*this);
   ptr->addNode(node);
 }
+
 void MapEntry::routeWrite(Connector from, Connector to) {
   ptr->routeWrite(from, to);
 }
@@ -715,14 +724,24 @@ void MapExitImpl::emit(emitter::JsonEmitter &jemit) {
 // Consume
 //===----------------------------------------------------------------------===//
 
-void ConsumeEntry::addNode(ConnectorNode node) { ptr->addNode(node); }
+void ConsumeEntry::addNode(ConnectorNode node) {
+  node.setParent(*this);
+  ptr->addNode(node);
+}
+
+void ConsumeEntry::routeWrite(Connector from, Connector to) {
+  ptr->routeWrite(from, to);
+}
+
 void ConsumeEntry::addEdge(MultiEdge edge) { ptr->addEdge(edge); }
 void ConsumeEntry::mapConnector(Value value, Connector connector) {
   ptr->mapConnector(value, connector);
 }
+
 Connector ConsumeEntry::lookup(Value value) {
   return ptr->lookup(value, *this);
 }
+
 void ConsumeEntry::setExit(ConsumeExit exit) { ptr->setExit(exit); }
 ConsumeExit ConsumeEntry::getExit() { return ptr->getExit(); }
 void ConsumeEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
@@ -732,6 +751,23 @@ ConsumeExit ConsumeEntryImpl::getExit() { return exit; }
 
 void ConsumeEntryImpl::addNode(ConnectorNode node) {
   getParent().getState().addNode(node);
+}
+
+void ConsumeEntryImpl::routeWrite(Connector from, Connector to) {
+  ConsumeExit consumeExit = getExit();
+  Connector in(consumeExit,
+               "IN_" + std::to_string(consumeExit.getInConnectorCount()));
+  consumeExit.addInConnector(in);
+
+  MultiEdge edge(from, in);
+  addEdge(edge);
+
+  Connector out(consumeExit,
+                "OUT_" + std::to_string(consumeExit.getOutConnectorCount()));
+  consumeExit.addOutConnector(out);
+
+  ScopeNode scope(parent);
+  scope.routeWrite(out, to);
 }
 
 void ConsumeEntryImpl::addEdge(MultiEdge edge) {
