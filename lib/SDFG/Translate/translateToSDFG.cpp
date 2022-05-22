@@ -22,11 +22,12 @@ void insertTransientArray(Location location, translation::Connector connector,
                           Value value, translation::ScopeNode &scope) {
   using namespace translation;
 
-  Array array(utils::generateName("tmp"), true, value.getType());
+  Array array(utils::generateName("tmp"), /*transient=*/true, /*stream=*/false,
+              value.getType());
 
   if (utils::isSizedType(value.getType()))
-    array = Array(utils::generateName("tmp"), true,
-                  utils::getSizedType(value.getType()));
+    array = Array(utils::generateName("tmp"), /*transient=*/true,
+                  /*stream=*/false, utils::getSizedType(value.getType()));
 
   SDFG sdfg = scope.getSDFG();
   sdfg.addArray(array);
@@ -51,37 +52,56 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
   using namespace translation;
 
   for (Operation &operation : op.getRegion(0).getOps()) {
-    if (TaskletNode oper = dyn_cast<TaskletNode>(operation))
+    if (TaskletNode oper = dyn_cast<TaskletNode>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation))
+    if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (MapNode oper = dyn_cast<MapNode>(operation))
+    if (MapNode oper = dyn_cast<MapNode>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (ConsumeNode oper = dyn_cast<ConsumeNode>(operation))
+    if (ConsumeNode oper = dyn_cast<ConsumeNode>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (CopyOp oper = dyn_cast<CopyOp>(operation))
+    if (CopyOp oper = dyn_cast<CopyOp>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (StoreOp oper = dyn_cast<StoreOp>(operation))
+    if (StoreOp oper = dyn_cast<StoreOp>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (LoadOp oper = dyn_cast<LoadOp>(operation))
+    if (LoadOp oper = dyn_cast<LoadOp>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
 
-    if (AllocOp oper = dyn_cast<AllocOp>(operation))
+    if (AllocOp oper = dyn_cast<AllocOp>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
+      continue;
+    }
+
+    // emitError(operation.getLoc(), "Unsupported Operation");
+    // return failure();
   }
 
   return success();
@@ -94,11 +114,12 @@ LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
 
   for (BlockArgument ba : op.getRegion(0).getArguments()) {
     if (utils::isSizedType(ba.getType())) {
-      Array array(utils::valueToString(ba), false,
-                  utils::getSizedType(ba.getType()));
+      Array array(utils::valueToString(ba), /*transient=*/true,
+                  /*stream=*/false, utils::getSizedType(ba.getType()));
       sdfg.addArg(array);
     } else {
-      Array array(utils::valueToString(ba), false, ba.getType());
+      Array array(utils::valueToString(ba), /*transient=*/true,
+                  /*stream=*/false, ba.getType());
       sdfg.addArg(array);
     }
   }
@@ -198,14 +219,16 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(AllocOp &op, SDFG &sdfg) {
-  Array array(op.getName(), op.transient(), utils::getSizedType(op.getType()));
+  Array array(op.getName(), op.transient(), op.isStream(),
+              utils::getSizedType(op.getType()));
   sdfg.addArray(array);
 
   return success();
 }
 
 LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
-  Array array(op.getName(), op.transient(), utils::getSizedType(op.getType()));
+  Array array(op.getName(), op.transient(), op.isStream(),
+              utils::getSizedType(op.getType()));
   scope.getSDFG().addArray(array);
 
   return success();
@@ -235,10 +258,10 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
     insertTransientArray(op.getLoc(), connector, op.getResult(i), scope);
   }
 
-  Optional<std::string> code = liftToPython(op);
-  if (code.hasValue()) {
-    tasklet.setCode(code.getValue());
-    tasklet.setLanguage("Python");
+  Optional<std::string> code_data = liftToPython(op);
+  if (code_data.hasValue()) {
+    Code code(code_data.getValue(), "Python");
+    tasklet.setCode(code);
   } else {
     // TODO: Write content as code
   }
@@ -342,11 +365,26 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   consumeExit.setEntry(consumeEntry);
   consumeEntry.setExit(consumeExit);
 
-  // Stream and all
+  if (op.num_pes().hasValue()) {
+    llvm::SmallString<4U> num_pes;
+    op.num_pes().getValue().toStringUnsigned(num_pes);
+    consumeEntry.setNumPes(num_pes.str().str());
+  }
 
-  Connector elem(consumeEntry, "OUT_e");
+  consumeEntry.setPeIndex(utils::valueToString(op.pe()));
+
+  // TODO: Add condition
+
+  Connector stream(consumeEntry, "IN_stream");
+  consumeEntry.addInConnector(stream);
+
+  MultiEdge edge(scope.lookup(op.stream()), stream);
+  scope.addEdge(edge);
+
+  Connector elem(consumeEntry, "OUT_stream");
+
   consumeEntry.addOutConnector(elem);
-  consumeEntry.mapConnector(op.body().getArgument(1), elem);
+  consumeEntry.mapConnector(op.elem(), elem);
 
   scope.addNode(consumeEntry);
   scope.addNode(consumeExit);

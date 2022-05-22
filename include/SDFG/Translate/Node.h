@@ -90,18 +90,28 @@ public:
   Assignment(StringRef key, StringRef value) : key(key), value(value) {}
 };
 
+class Code {
+public:
+  std::string data;
+  std::string language;
+
+  Code() : data(""), language("Python") {}
+  Code(StringRef data, StringRef language) : data(data), language(language) {}
+};
+
 class Array : public Emittable {
 public:
   std::string name;
   bool transient;
+  bool stream;
   SizedType shape;
 
-  Array(StringRef name, bool transient, Type t)
-      : name(name), transient(transient),
+  Array(StringRef name, bool transient, bool stream, Type t)
+      : name(name), transient(transient), stream(stream),
         shape(SizedType::get(t.getContext(), t, {}, {}, {})) {}
 
-  Array(StringRef name, bool transient, SizedType shape)
-      : name(name), transient(transient), shape(shape) {}
+  Array(StringRef name, bool transient, bool stream, SizedType shape)
+      : name(name), transient(transient), stream(stream), shape(shape) {}
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -474,24 +484,18 @@ public:
             std::make_shared<TaskletImpl>(location))),
         ptr(std::static_pointer_cast<TaskletImpl>(ConnectorNode::ptr)) {}
 
-  void setCode(StringRef code);
-  void setLanguage(StringRef language);
-
+  void setCode(Code code);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class TaskletImpl : public ConnectorNodeImpl {
 private:
-  std::string code;
-  std::string language;
+  Code code;
 
 public:
-  TaskletImpl(Location location)
-      : ConnectorNodeImpl(location), language("Python") {}
+  TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
 
-  void setCode(StringRef code);
-  void setLanguage(StringRef language);
-
+  void setCode(Code code);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -629,9 +633,15 @@ public:
   ConsumeExit getExit();
   void addNode(ConnectorNode node) override;
   void routeWrite(Connector from, Connector to) override;
+
   void addEdge(MultiEdge edge) override;
   void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value) override;
+
+  void setNumPes(StringRef pes);
+  void setPeIndex(StringRef pe);
+  void setCondition(Code condition);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -654,9 +664,9 @@ public:
 class ConsumeEntryImpl : public ScopeNodeImpl {
 private:
   ConsumeExit exit;
-  // Condition
-  // pe index
-  // num pes
+  std::string num_pes;
+  std::string pe_index;
+  Code condition;
 
 public:
   ConsumeEntryImpl(Location location) : ScopeNodeImpl(location) {}
@@ -665,9 +675,15 @@ public:
   ConsumeExit getExit();
   void addNode(ConnectorNode node) override;
   void routeWrite(Connector from, Connector to) override;
+
   void addEdge(MultiEdge edge) override;
   void mapConnector(Value value, Connector connector) override;
   Connector lookup(Value value, ConsumeEntry entry);
+
+  void setNumPes(StringRef pes);
+  void setPeIndex(StringRef pe);
+  void setCondition(Code condition);
+
   void emit(emitter::JsonEmitter &jemit) override;
 };
 

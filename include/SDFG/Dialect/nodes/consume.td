@@ -36,6 +36,8 @@ def SDFG_ConsumeNode : SDFG_Op<"consume", [
     let extraClassDeclaration = [{
         void setEntryID(unsigned id);
         void setExitID(unsigned id);
+        BlockArgument pe();
+        BlockArgument elem();
     }];
 }
 

@@ -796,6 +796,9 @@ void ConsumeNode::setExitID(unsigned id) {
   exitIDAttr(intAttr);
 }
 
+BlockArgument ConsumeNode::pe() { return body().getArgument(0); }
+BlockArgument ConsumeNode::elem() { return body().getArgument(1); }
+
 //===----------------------------------------------------------------------===//
 // EdgeOp
 //===----------------------------------------------------------------------===//
@@ -983,6 +986,8 @@ Type AllocOp::getElementType() {
 bool AllocOp::isScalar() {
   return utils::getSizedType(getType()).getShape().empty();
 }
+
+bool AllocOp::isStream() { return getType().isa<StreamType>(); }
 
 bool AllocOp::isInState() {
   return utils::getParentState(*this->getOperation()) != nullptr;

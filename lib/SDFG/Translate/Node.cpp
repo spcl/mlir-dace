@@ -38,7 +38,9 @@ std::string typeToString(Type t) {
 void Array::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject(name);
 
-  if (shape.getShape().empty()) {
+  if (stream) {
+    jemit.printKVPair("type", "Stream");
+  } else if (shape.getShape().empty()) {
     jemit.printKVPair("type", "Scalar");
   } else {
     jemit.printKVPair("type", "Array");
@@ -538,14 +540,10 @@ void StateImpl::emit(emitter::JsonEmitter &jemit) {
 // Tasklet
 //===----------------------------------------------------------------------===//
 
-void Tasklet::setCode(StringRef code) { ptr->setCode(code); }
-void Tasklet::setLanguage(StringRef language) { ptr->setLanguage(language); }
+void Tasklet::setCode(Code code) { ptr->setCode(code); }
 void Tasklet::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
-void TaskletImpl::setCode(StringRef code) { this->code = code.str(); }
-void TaskletImpl::setLanguage(StringRef language) {
-  this->language = language.str();
-}
+void TaskletImpl::setCode(Code code) { this->code = code; }
 
 void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -557,8 +555,8 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("label", name);
 
   jemit.startNamedObject("code");
-  jemit.printKVPair("string_data", code);
-  jemit.printKVPair("language", language);
+  jemit.printKVPair("string_data", code.data);
+  jemit.printKVPair("language", code.language);
   jemit.endObject(); // code
 
   ConnectorNodeImpl::emit(jemit);
@@ -742,6 +740,9 @@ Connector ConsumeEntry::lookup(Value value) {
   return ptr->lookup(value, *this);
 }
 
+void ConsumeEntry::setNumPes(StringRef pes) { ptr->setNumPes(pes); }
+void ConsumeEntry::setPeIndex(StringRef pe) { ptr->setPeIndex(pe); }
+
 void ConsumeEntry::setExit(ConsumeExit exit) { ptr->setExit(exit); }
 ConsumeExit ConsumeEntry::getExit() { return ptr->getExit(); }
 void ConsumeEntry::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
@@ -751,6 +752,12 @@ ConsumeExit ConsumeEntryImpl::getExit() { return exit; }
 
 void ConsumeEntryImpl::addNode(ConnectorNode node) {
   getParent().getState().addNode(node);
+}
+
+void ConsumeEntryImpl::setNumPes(StringRef pes) { num_pes = pes.str(); }
+void ConsumeEntryImpl::setPeIndex(StringRef pe) {
+  pe_index = pe.str();
+  utils::sanitizeName(pe_index);
 }
 
 void ConsumeEntryImpl::routeWrite(Connector from, Connector to) {
@@ -806,6 +813,19 @@ void ConsumeEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("label", getName());
   jemit.printKVPair("scope_exit", exit.getID());
   jemit.printKVPair("id", getID(), /*stringify=*/false);
+
+  if (num_pes.empty()) {
+    jemit.printKVPair("num_pes", "null", /*stringify=*/false);
+  } else {
+    jemit.printKVPair("num_pes", num_pes);
+  }
+
+  jemit.printKVPair("pe_index", pe_index);
+
+  jemit.startNamedObject("condition");
+  jemit.printKVPair("string_data", condition.data);
+  jemit.printKVPair("language", condition.language);
+  jemit.endObject(); // condition
 
   jemit.startNamedObject("attributes");
   jemit.printKVPair("label", getName());

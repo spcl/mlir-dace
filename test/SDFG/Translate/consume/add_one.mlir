@@ -1,5 +1,4 @@
-// RUN: sdfg-translate --mlir-to-sdfg %s | not python3 %S/../import_translation_test.py 2>&1 | FileCheck %s
-// CHECK: Isolated node
+// RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 
 sdfg.sdfg () -> () {
   %A = sdfg.alloc() : !sdfg.stream<i32>

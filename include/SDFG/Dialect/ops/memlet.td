@@ -31,6 +31,7 @@ def SDFG_AllocOp : SDFG_Op<"alloc", [
         static AllocOp create(Location loc, Type res, StringRef name, bool transient);
         Type getElementType();
         bool isScalar();
+        bool isStream();
         bool isInState();
         std::string getName();
     }];
