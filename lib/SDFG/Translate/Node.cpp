@@ -814,6 +814,9 @@ void ConsumeEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("scope_exit", exit.getID());
   jemit.printKVPair("id", getID(), /*stringify=*/false);
 
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("label", getName());
+
   if (num_pes.empty()) {
     jemit.printKVPair("num_pes", "null", /*stringify=*/false);
   } else {
@@ -826,9 +829,6 @@ void ConsumeEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("string_data", condition.data);
   jemit.printKVPair("language", condition.language);
   jemit.endObject(); // condition
-
-  jemit.startNamedObject("attributes");
-  jemit.printKVPair("label", getName());
 
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */

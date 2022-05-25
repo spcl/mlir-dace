@@ -2,7 +2,7 @@
 #define SDFG_ConsumeNode
 
 def SDFG_ConsumeNode : SDFG_Op<"consume", [
-    HasParent<"StateNode">,
+    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     SingleBlock,
     NoTerminator,
     DeclareOpInterfaceMethods<LoopLikeOpInterface>,
