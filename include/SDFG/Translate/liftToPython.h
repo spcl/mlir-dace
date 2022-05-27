@@ -5,8 +5,8 @@
 
 namespace mlir::sdfg::translation {
 
-Optional<std::string> liftToPython(TaskletNode &op);
-std::string getTaskletName(TaskletNode &op);
+Optional<std::string> liftToPython(Operation &op);
+std::string getTaskletName(Operation &op);
 
 } // namespace mlir::sdfg::translation
 

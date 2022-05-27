@@ -6,9 +6,10 @@ using namespace mlir;
 using namespace sdfg;
 
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
-Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
-  std::string nameOut =
-      op.getNumResults() == 1 ? utils::valueToString(op.getResult(0), op) : "";
+Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
+  std::string nameOut = op.getNumResults() == 1
+                            ? utils::valueToString(op.getResult(0), op)
+                            : "Not Supported";
 
   if (isa<arith::AddFOp>(op) || isa<arith::AddIOp>(op)) {
     std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
@@ -22,15 +23,53 @@ Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
     return nameOut + " = " + nameArg0 + " * " + nameArg1;
   }
 
-  if (isa<arith::IndexCastOp>(op)) {
-    return nameOut + " = " + utils::valueToString(op.getOperand(0), op);
-  }
-
-  if (SymOp sym = dyn_cast<SymOp>(op)) {
-    return nameOut + " = " + sym.expr().str();
+  if (arith::IndexCastOp indexCast = dyn_cast<arith::IndexCastOp>(op)) {
+    return nameOut + " = " + utils::valueToString(indexCast.getIn(), op);
   }
 
   // TODO: Add arith ops
+
+  if (arith::CmpIOp cmp = dyn_cast<arith::CmpIOp>(op)) {
+    std::string lhs = utils::valueToString(cmp.getLhs(), op);
+    std::string rhs = utils::valueToString(cmp.getRhs(), op);
+
+    std::string predicate = "";
+
+    switch (cmp.getPredicate()) {
+    case arith::CmpIPredicate::eq:
+      predicate = "==";
+      break;
+
+    case arith::CmpIPredicate::ne:
+      predicate = "!=";
+      break;
+
+    case arith::CmpIPredicate::sge:
+    case arith::CmpIPredicate::uge:
+      predicate = ">=";
+      break;
+
+    case arith::CmpIPredicate::sgt:
+    case arith::CmpIPredicate::ugt:
+      predicate = ">";
+      break;
+
+    case arith::CmpIPredicate::sle:
+    case arith::CmpIPredicate::ule:
+      predicate = "<=";
+      break;
+
+    case arith::CmpIPredicate::slt:
+    case arith::CmpIPredicate::ult:
+      predicate = "<";
+      break;
+
+    default:
+      break;
+    }
+
+    return nameOut + " = " + lhs + " " + predicate + " " + rhs;
+  }
 
   if (isa<arith::ConstantOp>(op)) {
     std::string val;
@@ -50,7 +89,11 @@ Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
     return nameOut + " = " + val;
   }
 
-  if (isa<StoreOp>(op)) {
+  if (SymOp sym = dyn_cast<SymOp>(op)) {
+    return nameOut + " = " + sym.expr().str();
+  }
+
+  if (StoreOp store = dyn_cast<StoreOp>(op)) {
     std::string indices;
 
     for (unsigned i = 0; i < op.getNumOperands() - 1; ++i) {
@@ -59,12 +102,11 @@ Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
       indices.append(utils::valueToString(op.getOperand(i), op));
     }
 
-    std::string nameVal =
-        utils::valueToString(op.getOperand(op.getNumOperands() - 1), op);
+    std::string nameVal = utils::valueToString(store.arr(), op);
     return nameOut + "[" + indices + "]" + " = " + nameVal;
   }
 
-  if (isa<LoadOp>(op)) {
+  if (LoadOp load = dyn_cast<LoadOp>(op)) {
     std::string indices;
 
     for (unsigned i = 0; i < op.getNumOperands() - 1; ++i) {
@@ -73,17 +115,36 @@ Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
       indices.append(utils::valueToString(op.getOperand(i), op));
     }
 
-    std::string nameArr =
-        utils::valueToString(op.getOperand(op.getNumOperands() - 1), op);
+    std::string nameArr = utils::valueToString(load.arr(), op);
     return nameOut + " = " + nameArr + "[" + indices + "]";
   }
 
-  // TODO: Handle multiple returns
+  if (StreamLengthOp streamLen = dyn_cast<StreamLengthOp>(op)) {
+    // NOTE: What's the proper stream name?
+    std::string streamName = utils::valueToString(streamLen.str(), op);
+    return nameOut + " = len(" + streamName + ")";
+  }
+
   if (isa<sdfg::ReturnOp>(op)) {
     std::string code = "";
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
-      code.append(task.getOutputName(i) + " = " +
-                  utils::valueToString(op.getOperand(0), op));
+      if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
+        code.append(task.getOutputName(i) + " = " +
+                    utils::valueToString(op.getOperand(0), op));
+        continue;
+      }
+
+      // Tasklets are the only ones using sdfg.return
+      return None;
+    }
+    return code;
+  }
+
+  if (isa<mlir::ReturnOp>(op)) {
+    std::string code = "";
+    for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+      // NOTE: What's the proper return name?
+      code.append("_out = " + utils::valueToString(op.getOperand(0), op));
     }
     return code;
   }
@@ -92,15 +153,16 @@ Optional<std::string> liftOperationToPython(Operation &op, TaskletNode &task) {
 }
 
 // If successful returns Python code as string
-Optional<std::string> translation::liftToPython(TaskletNode &op) {
+Optional<std::string> translation::liftToPython(Operation &op) {
   std::string code = "";
 
-  for (Operation &oper : op.body().getOps()) {
+  for (Operation &oper : op.getRegion(0).getOps()) {
     Optional<std::string> line = liftOperationToPython(oper, op);
     if (line.hasValue()) {
       code.append(line.getValue() + "\\n");
     } else {
       emitRemark(op.getLoc(), "No lifting to python possible");
+      emitRemark(oper.getLoc(), "Failed to lift");
       return None;
     }
   }
@@ -108,8 +170,8 @@ Optional<std::string> translation::liftToPython(TaskletNode &op) {
   return code;
 }
 
-std::string translation::getTaskletName(TaskletNode &op) {
-  Operation &firstOp = *op.body().getOps().begin();
+std::string translation::getTaskletName(Operation &op) {
+  Operation &firstOp = *op.getRegion(0).getOps().begin();
 
   if (isa<arith::AddFOp>(firstOp) || isa<arith::AddIOp>(firstOp))
     return "add";

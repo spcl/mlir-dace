@@ -240,7 +240,7 @@ LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
   Tasklet tasklet(op.getLoc());
-  tasklet.setName(getTaskletName(op));
+  tasklet.setName(getTaskletName(*op));
   scope.addNode(tasklet);
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -258,7 +258,7 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
     insertTransientArray(op.getLoc(), connector, op.getResult(i), scope);
   }
 
-  Optional<std::string> code_data = liftToPython(op);
+  Optional<std::string> code_data = liftToPython(*op);
   if (code_data.hasValue()) {
     Code code(code_data.getValue(), "Python");
     tasklet.setCode(code);
@@ -369,11 +369,25 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
     llvm::SmallString<4U> num_pes;
     op.num_pes().getValue().toStringUnsigned(num_pes);
     consumeEntry.setNumPes(num_pes.str().str());
+  } else {
+    consumeEntry.setNumPes("1");
   }
 
   consumeEntry.setPeIndex(utils::valueToString(op.pe()));
 
   // TODO: Add condition
+  if (op.condition().hasValue()) {
+    StateNode parentState = utils::getParentState(*op);
+    Operation *condFunc = parentState.lookupSymbol(op.condition().getValue());
+
+    Optional<std::string> code_data = liftToPython(*condFunc);
+    if (code_data.hasValue()) {
+      Code code(code_data.getValue(), "Python");
+      consumeEntry.setCondition(code);
+    } else {
+      // TODO: Write content as code
+    }
+  }
 
   Connector stream(consumeEntry, "IN_stream");
   consumeEntry.addInConnector(stream);

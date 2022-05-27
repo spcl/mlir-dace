@@ -653,13 +653,13 @@ Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
     ScopeNode scope(parent);
     Connector srcConn = scope.lookup(value);
 
-    Connector dstConn(mapEntry, "IN_" + std::to_string(inConnectors.size()));
+    Connector dstConn(mapEntry, "IN_" + utils::valueToString(value));
     addInConnector(dstConn);
 
     MultiEdge multiedge(srcConn, dstConn);
     scope.addEdge(multiedge);
 
-    Connector outConn(mapEntry, "OUT_" + std::to_string(outConnectors.size()));
+    Connector outConn(mapEntry, "OUT_" + utils::valueToString(value));
     addOutConnector(outConn);
     ScopeNodeImpl::mapConnector(value, outConn);
   }
@@ -742,6 +742,9 @@ Connector ConsumeEntry::lookup(Value value) {
 
 void ConsumeEntry::setNumPes(StringRef pes) { ptr->setNumPes(pes); }
 void ConsumeEntry::setPeIndex(StringRef pe) { ptr->setPeIndex(pe); }
+void ConsumeEntry::setCondition(Code condition) {
+  ptr->setCondition(condition);
+}
 
 void ConsumeEntry::setExit(ConsumeExit exit) { ptr->setExit(exit); }
 ConsumeExit ConsumeEntry::getExit() { return ptr->getExit(); }
@@ -758,6 +761,10 @@ void ConsumeEntryImpl::setNumPes(StringRef pes) { num_pes = pes.str(); }
 void ConsumeEntryImpl::setPeIndex(StringRef pe) {
   pe_index = pe.str();
   utils::sanitizeName(pe_index);
+}
+
+void ConsumeEntryImpl::setCondition(Code condition) {
+  this->condition = condition;
 }
 
 void ConsumeEntryImpl::routeWrite(Connector from, Connector to) {
@@ -790,16 +797,16 @@ void ConsumeEntryImpl::mapConnector(Value value, Connector connector) {
 
 Connector ConsumeEntryImpl::lookup(Value value, ConsumeEntry entry) {
   if (lut.find(utils::valueToString(value)) == lut.end()) {
-    State state = getParent().getState();
-    Connector srcConn = state.lookup(value);
+    ScopeNode scope(parent);
 
-    Connector dstConn(entry, "IN_" + std::to_string(inConnectors.size()));
+    Connector srcConn = scope.lookup(value);
+    Connector dstConn(entry, "IN_" + utils::valueToString(value));
     addInConnector(dstConn);
 
     MultiEdge multiedge(srcConn, dstConn);
-    state.addEdge(multiedge);
+    scope.addEdge(multiedge);
 
-    Connector outConn(entry, "OUT_" + std::to_string(outConnectors.size()));
+    Connector outConn(entry, "OUT_" + utils::valueToString(value));
     addOutConnector(outConn);
     ScopeNodeImpl::mapConnector(value, outConn);
   }
