@@ -153,6 +153,11 @@ LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
       return failure();
   }
 
+  for (AllocSymbolOp allocSymbolOp : op.getRegion(0).getOps<AllocSymbolOp>()) {
+    if (collect(allocSymbolOp, sdfg).failed())
+      return failure();
+  }
+
   if (op.hasAttr("entry")) {
     std::string entryName = utils::attributeToString(op.getAttr("entry"), op);
     entryName.erase(0, 1);
@@ -245,6 +250,17 @@ LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
               utils::getSizedType(op.getType()));
   scope.getSDFG().addArray(array);
 
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// AllocSymbolOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(AllocSymbolOp &op, SDFG &sdfg) {
+  // NOTE: Support other types?
+  Symbol sym(op.sym(), DType::int64);
+  sdfg.addSymbol(sym);
   return success();
 }
 

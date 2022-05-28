@@ -15,6 +15,7 @@ LogicalResult translateToSDFG(ModuleOp &op, JsonEmitter &jemit);
 LogicalResult collect(StateNode &op, SDFG &sdfg);
 LogicalResult collect(EdgeOp &op, SDFG &sdfg);
 LogicalResult collect(AllocOp &op, SDFG &sdfg);
+LogicalResult collect(AllocSymbolOp &op, SDFG &sdfg);
 
 LogicalResult collect(AllocOp &op, ScopeNode &scope);
 LogicalResult collect(TaskletNode &op, ScopeNode &scope);

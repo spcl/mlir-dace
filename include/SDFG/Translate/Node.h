@@ -380,6 +380,7 @@ public:
   void addArray(Array array);
   void addArg(Array arg);
   void addSymbol(Symbol symbol);
+  std::vector<Symbol> getSymbols();
 
   void emit(emitter::JsonEmitter &jemit) override;
   void emitNested(emitter::JsonEmitter &jemit);
@@ -410,6 +411,7 @@ public:
   void addArray(Array array);
   void addArg(Array arg);
   void addSymbol(Symbol symbol);
+  std::vector<Symbol> getSymbols();
 
   void emit(emitter::JsonEmitter &jemit) override;
   void emitNested(emitter::JsonEmitter &jemit);

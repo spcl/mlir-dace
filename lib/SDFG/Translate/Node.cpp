@@ -417,6 +417,7 @@ void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
 void SDFG::addArray(Array array) { ptr->addArray(array); }
 void SDFG::addArg(Array arg) { ptr->addArg(arg); }
 void SDFG::addSymbol(Symbol symbol) { ptr->addSymbol(symbol); }
+std::vector<Symbol> SDFG::getSymbols() { return ptr->getSymbols(); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
 void SDFG::emitNested(emitter::JsonEmitter &jemit) { ptr->emitNested(jemit); };
 
@@ -449,6 +450,7 @@ void SDFGImpl::addArg(Array arg) {
 }
 
 void SDFGImpl::addSymbol(Symbol symbol) { symbols.push_back(symbol); }
+std::vector<Symbol> SDFGImpl::getSymbols() { return symbols; }
 
 void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -518,6 +520,14 @@ void NestedSDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.printKVPair("label", name);
   ConnectorNodeImpl::emit(jemit);
+
+  jemit.startNamedObject("symbol_mapping");
+  for (Symbol s : parent.getSDFG().getSymbols()) {
+    jemit.printKVPair(s.name, s.name);
+    sdfg.addSymbol(s);
+  }
+  jemit.endObject(); // symbol_mapping
+
   sdfg.emitNested(jemit);
 
   jemit.endObject(); // attributes
