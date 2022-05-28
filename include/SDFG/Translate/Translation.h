@@ -20,11 +20,14 @@ LogicalResult collect(AllocOp &op, ScopeNode &scope);
 LogicalResult collect(TaskletNode &op, ScopeNode &scope);
 LogicalResult collect(NestedSDFGNode &op, ScopeNode &scope);
 LogicalResult collect(MapNode &op, ScopeNode &scope);
-LogicalResult collect(ConsumeNode &op, ScopeNode &scope);
 
+LogicalResult collect(ConsumeNode &op, ScopeNode &scope);
 LogicalResult collect(CopyOp &op, ScopeNode &scope);
 LogicalResult collect(StoreOp &op, ScopeNode &scope);
 LogicalResult collect(LoadOp &op, ScopeNode &scope);
+
+LogicalResult collect(AllocSymbolOp &op, ScopeNode &scope);
+LogicalResult collect(SymOp &op, ScopeNode &scope);
 
 } // namespace mlir::sdfg::translation
 

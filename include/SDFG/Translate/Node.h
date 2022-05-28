@@ -66,13 +66,20 @@ public:
 // DataClasses
 //===----------------------------------------------------------------------===//
 
-enum class DType { int32, int64, float32, float64 };
+enum class DType { null, int32, int64, float32, float64 };
 enum class NType { SDFG, State, Access, MapEntry, ConsumeEntry, Other };
 
 class Attribute {
 public:
   std::string name;
   // Store attribute or string?
+};
+
+class Symbol {
+public:
+  std::string name;
+  DType type;
+  Symbol(StringRef name, DType type) : name(name), type(type) {}
 };
 
 class Condition {
@@ -237,7 +244,7 @@ public:
   ConnectorNode parent;
   std::string name;
   bool isNull;
-  // DType?
+  // NOTE: DType?
 
   Connector(ConnectorNode parent)
       : parent(parent), name("null"), isNull(true) {}
@@ -372,6 +379,7 @@ public:
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
   void addArg(Array arg);
+  void addSymbol(Symbol symbol);
 
   void emit(emitter::JsonEmitter &jemit) override;
   void emitNested(emitter::JsonEmitter &jemit);
@@ -384,6 +392,7 @@ private:
   std::vector<InterstateEdge> edges;
   std::vector<Array> arrays;
   std::vector<Array> args;
+  std::vector<Symbol> symbols;
   State startState;
   static unsigned list_id;
 
@@ -400,6 +409,7 @@ public:
   void addEdge(InterstateEdge edge);
   void addArray(Array array);
   void addArg(Array arg);
+  void addSymbol(Symbol symbol);
 
   void emit(emitter::JsonEmitter &jemit) override;
   void emitNested(emitter::JsonEmitter &jemit);

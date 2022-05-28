@@ -8,27 +8,45 @@ using namespace translation;
 // Helpers
 //===----------------------------------------------------------------------===//
 
-std::string typeToString(Type t) {
+DType typeToDtype(Type t) {
   if (t.isInteger(32))
-    return "int32";
+    return DType::int32;
 
   if (t.isInteger(64))
-    return "int64";
+    return DType::int64;
 
   if (t.isF32())
-    return "float32";
+    return DType::float32;
 
   if (t.isF64())
-    return "float64";
+    return DType::float64;
 
   if (t.isIndex())
-    return "int64";
+    return DType::int64;
 
   std::string type;
   llvm::raw_string_ostream typeStream(type);
   t.print(typeStream);
 
-  return "Unsupported: " + type;
+  emitWarning(Builder(t.getContext()).getUnknownLoc(),
+              "Unsupported Type: " + type);
+
+  return DType::null;
+}
+
+std::string dtypeToString(DType t) {
+  switch (t) {
+  case DType::int32:
+    return "int32";
+  case DType::int64:
+    return "int64";
+  case DType::float32:
+    return "float32";
+  case DType::float64:
+    return "float64";
+  case DType::null:
+    return "null";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -50,7 +68,9 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 
   jemit.printKVPair("transient", transient ? "true" : "false",
                     /*stringify=*/false);
-  jemit.printKVPair("dtype", typeToString(shape.getElementType()));
+
+  jemit.printKVPair("dtype",
+                    dtypeToString(typeToDtype(shape.getElementType())));
 
   jemit.startNamedList("shape");
 
@@ -137,12 +157,10 @@ void InterstateEdgeImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject("attributes");
   jemit.startNamedObject("data");
   jemit.printKVPair("type", "InterstateEdge");
-  // label
 
   jemit.startNamedObject("attributes");
 
   jemit.startNamedObject("assignments");
-
   for (Assignment a : assignments)
     jemit.printKVPair(a.key, a.value);
   jemit.endObject(); // assignments
@@ -181,7 +199,7 @@ void MultiEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  // more data
+  // NOTE: More data
 
   jemit.endObject(); // attributes
   jemit.endObject(); // data
@@ -398,6 +416,7 @@ void SDFG::setStartState(State state) { ptr->setStartState(state); }
 void SDFG::addEdge(InterstateEdge edge) { ptr->addEdge(edge); }
 void SDFG::addArray(Array array) { ptr->addArray(array); }
 void SDFG::addArg(Array arg) { ptr->addArg(arg); }
+void SDFG::addSymbol(Symbol symbol) { ptr->addSymbol(symbol); }
 void SDFG::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); };
 void SDFG::emitNested(emitter::JsonEmitter &jemit) { ptr->emitNested(jemit); };
 
@@ -428,6 +447,8 @@ void SDFGImpl::addArg(Array arg) {
   args.push_back(arg);
   addArray(arg);
 }
+
+void SDFGImpl::addSymbol(Symbol symbol) { symbols.push_back(symbol); }
 
 void SDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -464,6 +485,8 @@ void SDFGImpl::emitBody(emitter::JsonEmitter &jemit) {
   jemit.endObject(); // _arrays
 
   jemit.startNamedObject("symbols");
+  for (Symbol s : symbols)
+    jemit.printKVPair(s.name, dtypeToString(s.type));
   jemit.endObject(); // symbols
 
   jemit.endObject(); // attributes

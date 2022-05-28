@@ -100,6 +100,20 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
       continue;
     }
 
+    if (AllocSymbolOp oper = dyn_cast<AllocSymbolOp>(operation)) {
+      if (collect(oper, scope).failed()) {
+        return failure();
+      }
+      continue;
+    }
+
+    if (SymOp oper = dyn_cast<SymOp>(operation)) {
+      if (collect(oper, scope).failed()) {
+        return failure();
+      }
+      continue;
+    }
+
     // emitError(operation.getLoc(), "Unsupported Operation");
     // return failure();
   }
@@ -454,6 +468,38 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   Connector connector = scope.lookup(op.arr());
   scope.mapConnector(op.res(), connector);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// AllocSymbolOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(AllocSymbolOp &op, ScopeNode &scope) {
+  // NOTE: Support other types?
+  Symbol sym(op.sym(), DType::int64);
+
+  scope.getSDFG().addSymbol(sym);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// SymOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(SymOp &op, ScopeNode &scope) {
+  Tasklet task(op.getLoc());
+  task.setName("SYM_" + op.expr().str());
+
+  Connector taskOut(task, "_SYM_OUT");
+  task.addOutConnector(taskOut);
+
+  Code code("_SYM_OUT = " + op.expr().str(), "Python");
+  task.setCode(code);
+
+  scope.addNode(task);
+  insertTransientArray(op.getLoc(), taskOut, op.res(), scope);
 
   return success();
 }
