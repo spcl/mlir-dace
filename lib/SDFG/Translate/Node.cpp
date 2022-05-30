@@ -47,6 +47,8 @@ std::string dtypeToString(DType t) {
   case DType::null:
     return "null";
   }
+
+  return "Unsupported DType";
 }
 
 //===----------------------------------------------------------------------===//

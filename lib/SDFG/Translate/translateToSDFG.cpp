@@ -359,8 +359,25 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   mapExit.setEntry(mapEntry);
   mapEntry.setExit(mapExit);
 
+  scope.addNode(mapEntry);
+  scope.addNode(mapExit);
+
   for (BlockArgument bArg : op.body().getArguments()) {
-    mapEntry.addParam(utils::valueToString(bArg));
+    std::string name = utils::valueToString(bArg);
+
+    mapEntry.addParam(name);
+
+    Tasklet task(op.getLoc());
+    task.setName("SYM_" + name);
+
+    Connector taskOut(task, "_SYM_OUT");
+    task.addOutConnector(taskOut);
+
+    Code code("_SYM_OUT = " + name, "Python");
+    task.setCode(code);
+
+    mapEntry.addNode(task);
+    insertTransientArray(op.getLoc(), taskOut, bArg, mapEntry);
   }
 
   for (unsigned i = 0; i < op.lowerBounds().size(); ++i) {
@@ -371,9 +388,6 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
     Range r(lb, ub, st, "1");
     mapEntry.addRange(r);
   }
-
-  scope.addNode(mapEntry);
-  scope.addNode(mapExit);
 
   if (collectOperations(*op, mapEntry).failed())
     return failure();
@@ -429,6 +443,8 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 
   consumeEntry.addOutConnector(elem);
   consumeEntry.mapConnector(op.elem(), elem);
+
+  // TODO: Map PE
 
   scope.addNode(consumeEntry);
   scope.addNode(consumeExit);
