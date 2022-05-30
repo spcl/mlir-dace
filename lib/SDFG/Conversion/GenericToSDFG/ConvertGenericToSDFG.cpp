@@ -55,8 +55,10 @@ public:
           shape.push_back(true);
         }
       }
-      return ArrayType::get(mem.getContext(), mem.getElementType(), symbols,
-                            ints, shape);
+      SizedType sized = SizedType::get(mem.getContext(), mem.getElementType(),
+                                       symbols, ints, shape);
+
+      return ArrayType::get(mem.getContext(), sized);
     }
     return llvm::None;
   }
@@ -219,7 +221,9 @@ public:
       // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op->getResultTypes()[0]);
-      nt = ArrayType::get(op->getLoc().getContext(), nt, {}, {}, {});
+      SizedType sized =
+          SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
+      nt = ArrayType::get(op->getLoc().getContext(), sized);
 
       SDFGNode sdfg = getTopSDFG(state);
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
@@ -308,7 +312,9 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     Type type = getTypeConverter()->convertType(op.getType());
     Type arrT = type;
-    arrT = ArrayType::get(op->getLoc().getContext(), arrT, {}, {}, {});
+    SizedType sized =
+        SizedType::get(op->getLoc().getContext(), arrT, {}, {}, {});
+    arrT = ArrayType::get(op->getLoc().getContext(), sized);
 
     SDFGNode sdfg = getTopSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
