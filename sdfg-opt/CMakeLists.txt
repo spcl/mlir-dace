@@ -6,8 +6,7 @@ set(LIBS
   ${conversion_libs} 
   MLIROptLib 
   MLIR_SDFG
-  # NOTE: Temporarly disabled
-  # GenericToSDFG
+  GenericToSDFG
 )
 
 add_llvm_executable(sdfg-opt sdfg-opt.cpp)

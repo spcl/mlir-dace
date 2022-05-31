@@ -24,15 +24,14 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
     let arguments = (ins 
         I32Attr:$ID,
         OptionalAttr<FlatSymbolRefAttr>:$entry,
-        I32Attr:$num_args,
-        Variadic<AnyType>:$operands
+        I32Attr:$num_args
     );
 
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
-        static SDFGNode create(PatternRewriter &rewriter, Location location, FunctionType type);
-        static SDFGNode create(PatternRewriter &rewriter, Location location, FunctionType type, StringRef name);
+        static SDFGNode create(PatternRewriter &rewriter, Location location, unsigned num_args, TypeRange args);
+        static SDFGNode create(PatternRewriter &rewriter, Location location);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
     }];

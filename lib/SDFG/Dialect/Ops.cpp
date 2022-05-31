@@ -225,26 +225,24 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-/* SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
-                          FunctionType ft) {
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, utils::generateID(), utils::generateName("sdfg"),
-        "state_0", ft);
+  build(builder, state, utils::generateID(), nullptr, 0);
   SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&sdfg.getRegion(), {}, ft.getInputs());
+  rewriter.createBlock(&sdfg.getRegion(), {}, {});
   return sdfg;
 }
 
 SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
-                          FunctionType ft, StringRef name) {
+                          unsigned num_args, TypeRange args) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, utils::generateID(), name, "state_0", ft);
+  build(builder, state, utils::generateID(), nullptr, num_args);
   SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&sdfg.getRegion(), {}, ft.getInputs());
+  rewriter.createBlock(&sdfg.getRegion(), {}, args);
   return sdfg;
-} */
+}
 
 static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

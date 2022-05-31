@@ -158,24 +158,23 @@ public:
   matchAndRewrite(FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
-    SmallVector<Type> inputResults;
+    SmallVector<Type> args;
     for (unsigned i = 0; i < op.getNumArguments(); i++) {
       // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op.getType().getInput(i));
-      inputResults.push_back(nt);
+      args.push_back(nt);
     }
 
-    SmallVector<Type> outputResults;
     for (unsigned i = 0; i < op.getNumResults(); i++) {
       // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op.getType().getResult(i));
-      outputResults.push_back(nt);
+      args.push_back(nt);
     }
 
-    FunctionType ft = rewriter.getFunctionType(inputResults, outputResults);
-    SDFGNode sdfg = SDFGNode::create(rewriter, op.getLoc(), ft, op.sym_name());
+    SDFGNode sdfg =
+        SDFGNode::create(rewriter, op.getLoc(), op.getNumArguments(), args);
     StateNode state = StateNode::create(rewriter, op.getLoc(), "init");
 
     rewriter.updateRootInPlace(sdfg, [&] {
@@ -184,13 +183,14 @@ public:
     });
 
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
-      op.getArgument(i).replaceAllUsesWith(sdfg.getArgument(i));
+      op.getArgument(i).replaceAllUsesWith(sdfg.body().getArgument(i));
     }
 
     rewriter.inlineRegionBefore(op.body(), sdfg.body(), sdfg.body().end());
     rewriter.eraseOp(op);
     rewriter.mergeBlocks(&sdfg.body().getBlocks().back(),
-                         &sdfg.body().getBlocks().front(), sdfg.getArguments());
+                         &sdfg.body().getBlocks().front(),
+                         sdfg.body().getArguments());
 
     // hasValue() is inaccessable
     if (rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
@@ -233,12 +233,14 @@ public:
 
       rewriter.restoreInsertionPoint(ip);
 
-      FunctionType ft =
-          rewriter.getFunctionType(op->getOperandTypes(), op->getResultTypes());
-      TaskletNode task = TaskletNode::create(rewriter, op->getLoc(), ft);
+      SmallVector<Value> loadedOps =
+          createLoads(rewriter, op->getLoc(), operands);
+
+      TaskletNode task = TaskletNode::create(rewriter, op->getLoc(), loadedOps,
+                                             op->getResultTypes());
 
       BlockAndValueMapping mapping;
-      mapping.map(op->getOperands(), task.getArguments());
+      mapping.map(op->getOperands(), task.body().getArguments());
 
       Operation *opClone = op->clone(mapping);
       rewriter.updateRootInPlace(
@@ -249,13 +251,7 @@ public:
 
       rewriter.setInsertionPointAfter(task);
 
-      SmallVector<Value> loadedOps =
-          createLoads(rewriter, op->getLoc(), operands);
-
-      sdfg::CallOp call =
-          sdfg::CallOp::create(rewriter, op->getLoc(), task, loadedOps);
-
-      StoreOp::create(rewriter, op->getLoc(), call.getResult(0), alloc,
+      StoreOp::create(rewriter, op->getLoc(), task.getResult(0), alloc,
                       ValueRange());
 
       LoadOp load = LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
@@ -473,12 +469,12 @@ void populateSAMToSDFGConversionPatterns(RewritePatternSet &patterns,
 }
 
 namespace {
-struct SAMToSDFGPass : public SAMToSDFGPassBase<SAMToSDFGPass> {
+struct GenericToSDFGPass : public GenericToSDFGPassBase<GenericToSDFGPass> {
   void runOnOperation() override;
 };
 } // namespace
 
-void SAMToSDFGPass::runOnOperation() {
+void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
   SDFGTarget target(getContext());

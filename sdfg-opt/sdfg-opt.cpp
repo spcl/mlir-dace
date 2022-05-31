@@ -12,8 +12,7 @@ int main(int argc, char **argv) {
   mlir::registerAllPasses();
 
   // Register SDFG passes
-  // NOTE: Temporarily disabled
-  // mlir::sdfg::conversion::registerGenericToSDFGPasses();
+  mlir::sdfg::conversion::registerGenericToSDFGPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::sdfg::SDFGDialect>();
