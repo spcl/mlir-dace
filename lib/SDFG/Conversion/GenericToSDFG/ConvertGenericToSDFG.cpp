@@ -307,10 +307,10 @@ public:
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type type = getTypeConverter()->convertType(op.getType());
-    Type arrT = type;
+
     SizedType sized =
-        SizedType::get(op->getLoc().getContext(), arrT, {}, {}, {});
-    arrT = ArrayType::get(op->getLoc().getContext(), sized);
+        SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
+    Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
 
     SDFGNode sdfg = getTopSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
@@ -319,16 +319,13 @@ public:
                                     /*transient=*/true);
 
     rewriter.restoreInsertionPoint(ip);
-
     StateNode state = StateNode::create(rewriter, op->getLoc());
-
     Value memref = createLoad(rewriter, op.getLoc(), adaptor.memref());
 
     SmallVector<Value> indices = adaptor.indices();
     indices = createLoads(rewriter, op.getLoc(), indices);
 
     LoadOp load = LoadOp::create(rewriter, op.getLoc(), type, memref, indices);
-
     StoreOp::create(rewriter, op->getLoc(), load, alloc, ValueRange());
 
     LoadOp newLoad =
@@ -426,9 +423,10 @@ public:
     StateNode exitState = StateNode::create(rewriter, op.getLoc(), "exit");
 
     rewriter.setInsertionPointAfter(exitState);
-    ArrayAttr emptyArr;
-    StringAttr emptyStr;
+    ArrayAttr emptyArr = rewriter.getStrArrayAttr({});
+    StringAttr emptyStr = rewriter.getStringAttr("1");
     ArrayAttr initArr = rewriter.getStrArrayAttr({idxName + ": ref"});
+
     EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
                    mappedValue(adaptor.getLowerBound()));
 
@@ -457,8 +455,8 @@ public:
 // Pass
 //===----------------------------------------------------------------------===//
 
-void populateSAMToSDFGConversionPatterns(RewritePatternSet &patterns,
-                                         TypeConverter &converter) {
+void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
+                                             TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
@@ -481,9 +479,9 @@ void GenericToSDFGPass::runOnOperation() {
   MemrefToMemletConverter converter;
 
   RewritePatternSet patterns(&getContext());
-  populateSAMToSDFGConversionPatterns(patterns, converter);
+  populateGenericToSDFGConversionPatterns(patterns, converter);
 
-  if (failed(applyFullConversion(module, target, std::move(patterns))))
+  if (applyPartialConversion(module, target, std::move(patterns)).failed())
     signalPassFailure();
 }
 

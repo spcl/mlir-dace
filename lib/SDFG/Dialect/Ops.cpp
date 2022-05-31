@@ -226,12 +226,7 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 //===----------------------------------------------------------------------===//
 
 SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  build(builder, state, utils::generateID(), nullptr, 0);
-  SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
-  rewriter.createBlock(&sdfg.getRegion(), {}, {});
-  return sdfg;
+  return create(rewriter, loc, 0, {});
 }
 
 SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
@@ -814,7 +809,8 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, from.sym_name(), to.sym_name(), nullptr, "1", nullptr);
+  build(builder, state, from.sym_name(), to.sym_name(),
+        rewriter.getStrArrayAttr({}), "1", nullptr);
   return cast<EdgeOp>(rewriter.createOperation(state));
 }
 
@@ -1017,7 +1013,9 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
                       Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  t = utils::getSizedType(t).getElementType();
+
+  if (utils::isSizedType(t))
+    t = utils::getSizedType(t).getElementType();
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
