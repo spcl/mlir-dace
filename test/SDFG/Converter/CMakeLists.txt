@@ -14,4 +14,4 @@ add_lit_testsuite(
 )
 
 set_target_properties(check-sdfg-converter PROPERTIES FOLDER "Tests")
-add_lit_testsuites(SDFG-TRANSLATE ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${SDFG_TEST_DEPENDS})
+add_lit_testsuites(SDFG-CONVERTER ${CMAKE_CURRENT_SOURCE_DIR} DEPENDS ${SDFG_TEST_DEPENDS})

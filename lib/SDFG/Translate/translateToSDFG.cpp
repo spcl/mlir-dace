@@ -11,9 +11,6 @@
 using namespace mlir;
 using namespace sdfg;
 
-// Checks should be minimal
-// A check might indicate that the IR is unsound
-
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -128,11 +125,11 @@ LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
 
   for (BlockArgument ba : op.getRegion(0).getArguments()) {
     if (utils::isSizedType(ba.getType())) {
-      Array array(utils::valueToString(ba), /*transient=*/true,
+      Array array(utils::valueToString(ba), /*transient=*/false,
                   /*stream=*/false, utils::getSizedType(ba.getType()));
       sdfg.addArg(array);
     } else {
-      Array array(utils::valueToString(ba), /*transient=*/true,
+      Array array(utils::valueToString(ba), /*transient=*/false,
                   /*stream=*/false, ba.getType());
       sdfg.addArg(array);
     }
@@ -221,13 +218,30 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
   InterstateEdge edge(src, dest);
   sdfg.addEdge(edge);
 
-  edge.setCondition(op.condition());
+  std::string refname = "";
+
+  if (op.ref() != Value()) {
+    refname = utils::valueToString(op.ref());
+
+    if (op.ref().getDefiningOp() != nullptr) {
+      AllocOp allocOp = cast<AllocOp>(op.ref().getDefiningOp());
+      refname = allocOp.getName();
+    }
+  }
+
+  std::string replacedCondition =
+      std::regex_replace(op.condition().str(), std::regex("ref"), refname);
+  edge.setCondition(StringRef(replacedCondition));
 
   for (mlir::Attribute attr : op.assign()) {
     std::pair<StringRef, StringRef> kv =
         attr.cast<StringAttr>().getValue().split(':');
 
-    edge.addAssignment(Assignment(kv.first.trim(), kv.second.trim()));
+    std::string replacedAssignment =
+        std::regex_replace(kv.second.trim().str(), std::regex("ref"), refname);
+
+    edge.addAssignment(
+        Assignment(kv.first.trim(), StringRef(replacedAssignment)));
   }
 
   return success();
@@ -419,7 +433,6 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 
   consumeEntry.setPeIndex(utils::valueToString(op.pe()));
 
-  // TODO: Add condition
   if (op.condition().hasValue()) {
     StateNode parentState = utils::getParentState(*op);
     Operation *condFunc = parentState.lookupSymbol(op.condition().getValue());
@@ -461,7 +474,15 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
   Access access(op.getLoc());
-  access.setName(utils::valueToString(op.dest()));
+
+  std::string name = utils::valueToString(op.dest());
+
+  if (op.dest().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.dest().getDefiningOp());
+    name = allocOp.getName();
+  }
+
+  access.setName(name);
   scope.addNode(access);
 
   Connector accOut(access);
@@ -480,7 +501,14 @@ LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   Access access(op.getLoc());
-  access.setName(utils::valueToString(op.arr()));
+  std::string name = utils::valueToString(op.arr());
+
+  if (op.arr().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.arr().getDefiningOp());
+    name = allocOp.getName();
+  }
+
+  access.setName(name);
   scope.addNode(access);
 
   Connector accOut(access);

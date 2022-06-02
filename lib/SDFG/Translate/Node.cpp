@@ -546,7 +546,14 @@ void State::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 Connector StateImpl::lookup(Value value) {
   if (lut.find(utils::valueToString(value)) == lut.end()) {
     Access access(location);
-    access.setName(utils::valueToString(value));
+    std::string name = utils::valueToString(value);
+
+    if (value.getDefiningOp() != nullptr) {
+      AllocOp allocOp = cast<AllocOp>(value.getDefiningOp());
+      name = allocOp.getName();
+    }
+
+    access.setName(name);
     addNode(access);
 
     Connector accOut(access);
