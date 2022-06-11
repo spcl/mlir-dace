@@ -1,5 +1,4 @@
-// RUN: sdfg-translate --mlir-to-sdfg %s | not python3 %S/../import_translation_test.py 2>&1 | FileCheck %s
-// CHECK: Isolated node
+// RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 
 sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
   %A = sdfg.alloc() : !sdfg.stream<i32>
@@ -12,5 +11,7 @@ sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
 
     sdfg.stream_push %1, %A : i32 -> !sdfg.stream<i32>
     %a_1 = sdfg.stream_pop %A : !sdfg.stream<i32> -> i32
+
+    sdfg.store %a_1, %r[] : i32 -> !sdfg.array<i32>
   }
 }

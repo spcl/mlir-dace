@@ -40,6 +40,9 @@ class MultiEdge;
 class Tasklet;
 class TaskletImpl;
 
+class Library;
+class LibraryImpl;
+
 class Access;
 class AccessImpl;
 
@@ -68,6 +71,7 @@ public:
 
 enum class DType { null, int32, int64, float32, float64 };
 enum class NType { SDFG, State, Access, MapEntry, ConsumeEntry, Other };
+enum class CodeLanguage { Python, MLIR };
 
 class Attribute {
 public:
@@ -100,10 +104,11 @@ public:
 class Code {
 public:
   std::string data;
-  std::string language;
+  CodeLanguage language;
 
-  Code() : data(""), language("Python") {}
-  Code(StringRef data, StringRef language) : data(data), language(language) {}
+  Code() : data(""), language(CodeLanguage::Python) {}
+  Code(StringRef data, CodeLanguage language)
+      : data(data), language(language) {}
 };
 
 class Array : public Emittable {
@@ -508,6 +513,35 @@ public:
   TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
 
   void setCode(Code code);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+//===----------------------------------------------------------------------===//
+// Library
+//===----------------------------------------------------------------------===//
+
+class Library : public ConnectorNode {
+private:
+  std::shared_ptr<LibraryImpl> ptr;
+
+public:
+  Library(Location location)
+      : ConnectorNode(std::static_pointer_cast<ConnectorNodeImpl>(
+            std::make_shared<LibraryImpl>(location))),
+        ptr(std::static_pointer_cast<LibraryImpl>(ConnectorNode::ptr)) {}
+
+  void setClasspath(StringRef classpath);
+  void emit(emitter::JsonEmitter &jemit) override;
+};
+
+class LibraryImpl : public ConnectorNodeImpl {
+private:
+  std::string classpath;
+
+public:
+  LibraryImpl(Location location) : ConnectorNodeImpl(location) {}
+
+  void setClasspath(StringRef classpath);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 

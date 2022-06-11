@@ -62,6 +62,9 @@ def SDFG_LibCallOp : SDFG_Op<"libcall", [
         CallInterfaceCallable getCallableForCallee() {
             return (*this)->getAttrOfType<SymbolRefAttr>("callee");
         }
+
+        std::string getInputName(unsigned idx);
+        std::string getOutputName(unsigned idx);
     }];
 }
 

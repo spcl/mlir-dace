@@ -51,6 +51,17 @@ std::string dtypeToString(DType t) {
   return "Unsupported DType";
 }
 
+std::string codeLanguageToString(CodeLanguage lang) {
+  switch (lang) {
+  case CodeLanguage::Python:
+    return "Python";
+  case CodeLanguage::MLIR:
+    return "MLIR";
+  }
+
+  return "Unsupported CodeLanguage";
+}
+
 //===----------------------------------------------------------------------===//
 // Array
 //===----------------------------------------------------------------------===//
@@ -598,9 +609,38 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
 
   jemit.startNamedObject("code");
   jemit.printKVPair("string_data", code.data);
-  jemit.printKVPair("language", code.language);
+  jemit.printKVPair("language", codeLanguageToString(code.language));
   jemit.endObject(); // code
 
+  ConnectorNodeImpl::emit(jemit);
+  jemit.endObject(); // attributes
+
+  jemit.endObject();
+}
+
+//===----------------------------------------------------------------------===//
+// Library
+//===----------------------------------------------------------------------===//
+
+void Library::setClasspath(StringRef classpath) {
+  ptr->setClasspath(classpath);
+}
+
+void Library::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
+
+void LibraryImpl::setClasspath(StringRef classpath) {
+  this->classpath = classpath.str();
+}
+
+void LibraryImpl::emit(emitter::JsonEmitter &jemit) {
+  jemit.startObject();
+  jemit.printKVPair("type", "LibraryNode");
+  jemit.printKVPair("label", name);
+  jemit.printKVPair("id", id, /*stringify=*/false);
+  jemit.printKVPair("classpath", classpath);
+
+  jemit.startNamedObject("attributes");
+  jemit.printKVPair("name", name);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes
 
@@ -876,7 +916,7 @@ void ConsumeEntryImpl::emit(emitter::JsonEmitter &jemit) {
 
   jemit.startNamedObject("condition");
   jemit.printKVPair("string_data", condition.data);
-  jemit.printKVPair("language", condition.language);
+  jemit.printKVPair("language", codeLanguageToString(condition.language));
   jemit.endObject(); // condition
 
   ConnectorNodeImpl::emit(jemit);

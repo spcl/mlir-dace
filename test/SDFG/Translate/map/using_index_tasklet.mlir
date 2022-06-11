@@ -1,14 +1,16 @@
 // RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 
 sdfg.sdfg () -> () {
-  %A = sdfg.alloc() : !sdfg.stream<i32>
   %C = sdfg.alloc() : !sdfg.array<i32>
+  %B = sdfg.alloc() : !sdfg.array<i32>
 
   sdfg.state @state_0 {
-    sdfg.consume{num_pes=5} (%A : !sdfg.stream<i32>) -> (pe: %p, elem: %e) {
-      %res = sdfg.tasklet(%e: i32, %p: index) -> (i32) {
-        %0 = arith.index_cast %p : index to i32
-        %res = arith.addi %e, %0 : i32
+    sdfg.map (%i) = (0) to (2) step (1) {
+      %a = sdfg.load %C[] : !sdfg.array<i32> -> i32
+
+      %res = sdfg.tasklet(%i: index, %a: i32) -> (i32) {
+        %0 = arith.index_cast %i : index to i32
+        %res = arith.addi %a, %0 : i32
         sdfg.return %res : i32
       }
 

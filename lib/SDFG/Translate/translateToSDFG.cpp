@@ -55,6 +55,12 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
       continue;
     }
 
+    if (LibCallOp oper = dyn_cast<LibCallOp>(operation)) {
+      if (collect(oper, scope).failed())
+        return failure();
+      continue;
+    }
+
     if (NestedSDFGNode oper = dyn_cast<NestedSDFGNode>(operation)) {
       if (collect(oper, scope).failed())
         return failure();
@@ -105,6 +111,20 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
     }
 
     if (SymOp oper = dyn_cast<SymOp>(operation)) {
+      if (collect(oper, scope).failed()) {
+        return failure();
+      }
+      continue;
+    }
+
+    if (StreamPushOp oper = dyn_cast<StreamPushOp>(operation)) {
+      if (collect(oper, scope).failed()) {
+        return failure();
+      }
+      continue;
+    }
+
+    if (StreamPopOp oper = dyn_cast<StreamPopOp>(operation)) {
       if (collect(oper, scope).failed()) {
         return failure();
       }
@@ -304,10 +324,38 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
 
   Optional<std::string> code_data = liftToPython(*op);
   if (code_data.hasValue()) {
-    Code code(code_data.getValue(), "Python");
+    Code code(code_data.getValue(), CodeLanguage::Python);
     tasklet.setCode(code);
   } else {
     // TODO: Write content as code
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// LibCallOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(LibCallOp &op, ScopeNode &scope) {
+  Library lib(op.getLoc());
+  lib.setName(utils::generateName("Lib"));
+  lib.setClasspath(op.callee());
+  scope.addNode(lib);
+
+  for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+    Connector connector(lib, op.getInputName(i));
+    lib.addInConnector(connector);
+
+    MultiEdge edge(scope.lookup(op.getOperand(i)), connector);
+    scope.addEdge(edge);
+  }
+
+  for (unsigned i = 0; i < op.getNumResults(); ++i) {
+    Connector connector(lib, op.getOutputName(i));
+    lib.addOutConnector(connector);
+
+    insertTransientArray(op.getLoc(), connector, op.getResult(i), scope);
   }
 
   return success();
@@ -341,7 +389,12 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
     Connector connector(
         nestedSDFG,
         utils::valueToString(op.body().getArgument(i), *op.getOperation()));
+
     nestedSDFG.addOutConnector(connector);
+    nestedSDFG.addInConnector(connector);
+
+    MultiEdge edge_in(scope.lookup(op.getOperand(i)), connector);
+    scope.addEdge(edge_in);
 
     Access access(op.getLoc());
     access.setName(utils::valueToString(op.getOperand(i)));
@@ -350,8 +403,8 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
     Connector accOut(access);
     access.addOutConnector(accOut);
 
-    MultiEdge edge(connector, accOut);
-    scope.addEdge(edge);
+    MultiEdge edge_out(connector, accOut);
+    scope.addEdge(edge_out);
 
     scope.mapConnector(op.getOperand(i), accOut);
   }
@@ -382,12 +435,12 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
     mapEntry.addParam(name);
 
     Tasklet task(op.getLoc());
-    task.setName("SYM_" + name);
+    task.setName("SYM" + name);
 
     Connector taskOut(task, "_SYM_OUT");
     task.addOutConnector(taskOut);
 
-    Code code("_SYM_OUT = " + name, "Python");
+    Code code("_SYM_OUT = " + name, CodeLanguage::Python);
     task.setCode(code);
 
     mapEntry.addNode(task);
@@ -420,6 +473,9 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   ConsumeExit consumeExit(op.getLoc());
   consumeExit.setName(utils::generateName("consumeExit"));
 
+  scope.addNode(consumeEntry);
+  scope.addNode(consumeExit);
+
   consumeExit.setEntry(consumeEntry);
   consumeEntry.setExit(consumeExit);
 
@@ -439,7 +495,7 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 
     Optional<std::string> code_data = liftToPython(*condFunc);
     if (code_data.hasValue()) {
-      Code code(code_data.getValue(), "Python");
+      Code code(code_data.getValue(), CodeLanguage::Python);
       consumeEntry.setCondition(code);
     } else {
       // TODO: Write content as code
@@ -457,10 +513,17 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   consumeEntry.addOutConnector(elem);
   consumeEntry.mapConnector(op.elem(), elem);
 
-  // TODO: Map PE
+  std::string name = utils::valueToString(op.pe());
+  Tasklet task(op.getLoc());
+  task.setName("SYM" + name);
 
-  scope.addNode(consumeEntry);
-  scope.addNode(consumeExit);
+  Connector taskOut(task, "_SYM_OUT");
+  task.addOutConnector(taskOut);
+  Code code("_SYM_OUT = " + name, CodeLanguage::Python);
+  task.setCode(code);
+
+  consumeEntry.addNode(task);
+  insertTransientArray(op.getLoc(), taskOut, op.pe(), consumeEntry);
 
   if (collectOperations(*op, consumeEntry).failed())
     return failure();
@@ -555,11 +618,48 @@ LogicalResult translation::collect(SymOp &op, ScopeNode &scope) {
   Connector taskOut(task, "_SYM_OUT");
   task.addOutConnector(taskOut);
 
-  Code code("_SYM_OUT = " + op.expr().str(), "Python");
+  Code code("_SYM_OUT = " + op.expr().str(), CodeLanguage::Python);
   task.setCode(code);
 
   scope.addNode(task);
   insertTransientArray(op.getLoc(), taskOut, op.res(), scope);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// StreamPushOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(StreamPushOp &op, ScopeNode &scope) {
+  Access access(op.getLoc());
+  std::string name = utils::valueToString(op.str());
+
+  if (op.str().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.str().getDefiningOp());
+    name = allocOp.getName();
+  }
+
+  access.setName(name);
+  scope.addNode(access);
+
+  Connector accOut(access);
+  access.addOutConnector(accOut);
+
+  Connector source = scope.lookup(op.val());
+  scope.routeWrite(source, accOut);
+  scope.mapConnector(op.str(), accOut);
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// StreamPopOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult translation::collect(StreamPopOp &op, ScopeNode &scope) {
+  Connector connector = scope.lookup(op.str());
+  scope.mapConnector(op.res(), connector);
 
   return success();
 }

@@ -127,10 +127,9 @@ void JsonEmitter::printKVPair(StringRef key, int val, bool stringify) {
   printString(key);
   printLiteral(": ");
   if (stringify)
-    printLiteral("\"");
-  os << val;
-  if (stringify)
-    printLiteral("\"");
+    printInt(val);
+  else
+    os << val;
 }
 
 void JsonEmitter::printKVPair(StringRef key, Attribute val, bool stringify) {

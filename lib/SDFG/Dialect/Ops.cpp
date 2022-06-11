@@ -1708,6 +1708,15 @@ static void print(OpAsmPrinter &p, LibCallOp op) {
 
 LogicalResult verify(LibCallOp op) { return success(); }
 
+std::string LibCallOp::getInputName(unsigned idx) {
+  return utils::valueToString(getOperand(idx), *getOperation());
+}
+
+std::string LibCallOp::getOutputName(unsigned idx) {
+  // TODO: Implement multiple return values
+  return "__out" + std::to_string(idx);
+}
+
 //===----------------------------------------------------------------------===//
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
