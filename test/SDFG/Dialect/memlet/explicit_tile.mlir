@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: sdfg-opt %s | sdfg-opt | FileCheck %s
 
 // CHECK: module
