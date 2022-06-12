@@ -581,12 +581,11 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     Connector source = scope.lookup(op.val());
     scope.routeWrite(source, accOut);
     scope.mapConnector(op.arr(), accOut);
-
     return success();
   }
 
   Tasklet task(op.getLoc());
-  task.setName("indirect_store_" + name);
+  task.setName("indirect_store" + name);
   scope.addNode(task);
 
   Connector taskOut(task, "_out");

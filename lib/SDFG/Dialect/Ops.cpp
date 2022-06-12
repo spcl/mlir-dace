@@ -1697,11 +1697,28 @@ static void print(OpAsmPrinter &p, LibCallOp op) {
 LogicalResult verify(LibCallOp op) { return success(); }
 
 std::string LibCallOp::getInputName(unsigned idx) {
+  if (getOperation()->hasAttr("inputs")) {
+    if (ArrayAttr inputs =
+            getOperation()->getAttr("inputs").dyn_cast<ArrayAttr>()) {
+      if (idx <= inputs.size() && inputs[idx].isa<StringAttr>()) {
+        return inputs[idx].cast<StringAttr>().getValue().str();
+      }
+    }
+  }
+
   return utils::valueToString(getOperand(idx), *getOperation());
 }
 
 std::string LibCallOp::getOutputName(unsigned idx) {
-  // TODO: Implement multiple return values
+  if (getOperation()->hasAttr("outputs")) {
+    if (ArrayAttr outputs =
+            getOperation()->getAttr("outputs").dyn_cast<ArrayAttr>()) {
+      if (idx <= outputs.size() && outputs[idx].isa<StringAttr>()) {
+        return outputs[idx].cast<StringAttr>().getValue().str();
+      }
+    }
+  }
+
   return "__out" + std::to_string(idx);
 }
 
