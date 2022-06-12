@@ -589,8 +589,26 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
-  Connector connector = scope.lookup(op.arr());
-  scope.mapConnector(op.res(), connector);
+  if (!op.isIndirect()) {
+    Connector connector = scope.lookup(op.arr());
+    scope.mapConnector(op.res(), connector);
+    return success();
+  }
+
+  Tasklet task(op.getLoc());
+  task.setName("Indirect load: " + utils::valueToString(op.arr()));
+  scope.addNode(task);
+
+  Connector taskOut(task, "__out");
+  task.addOutConnector(taskOut);
+  insertTransientArray(op.getLoc(), taskOut, op.arr(), scope);
+
+  Connector taskArr(task, "__array");
+  task.addInConnector(taskArr);
+  MultiEdge arrayEdge(scope.lookup(op.arr()), taskArr);
+  scope.addEdge(arrayEdge);
+
+  // TODO: Add connectors for each index + generate code
 
   return success();
 }
