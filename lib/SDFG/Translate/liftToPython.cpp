@@ -129,22 +129,27 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     std::string code = "";
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
       if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
+        if (i > 0)
+          code.append("\\n");
         code.append(task.getOutputName(i) + " = " +
-                    utils::valueToString(op.getOperand(0), op));
+                    utils::valueToString(op.getOperand(i), op));
         continue;
       }
 
       // Tasklets are the only ones using sdfg.return
       return None;
     }
+
     return code;
   }
 
   if (isa<mlir::ReturnOp>(op)) {
     std::string code = "";
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+      if (i > 0)
+        code.append("\\n");
       // NOTE: What's the proper return name?
-      code.append("_out = " + utils::valueToString(op.getOperand(0), op));
+      code.append("_out = " + utils::valueToString(op.getOperand(i), op));
     }
     return code;
   }
