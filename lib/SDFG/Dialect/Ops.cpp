@@ -153,7 +153,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
     OptionalParseResult opOPR = parser.parseOptionalOperand(op);
     if (opOPR.hasValue() && opOPR.getValue().succeeded()) {
       opList.push_back(op);
-      numList.push_back(parser.getBuilder().getUI32IntegerAttr(opIdx++));
+      numList.push_back(parser.getBuilder().getI32IntegerAttr(opIdx++));
       continue;
     }
 
@@ -196,7 +196,7 @@ static void printNumberList(OpAsmPrinter &p, Operation *op,
         p.printAttributeWithoutType(attr);
 
     } else {
-      unsigned idx = num.getUInt();
+      unsigned idx = num.getInt();
       Value val = op->getOperand(idx);
       p.printOperand(val);
     }
@@ -1019,7 +1019,7 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
-    numList.push_back(builder.getUI32IntegerAttr(i));
+    numList.push_back(builder.getI32IntegerAttr(i));
   }
   ArrayAttr numArr = rewriter.getArrayAttr(numList);
   state.addAttribute("indices_numList", numArr);
@@ -1043,7 +1043,7 @@ LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
-    numList.push_back(builder.getUI32IntegerAttr(i));
+    numList.push_back(builder.getI32IntegerAttr(i));
   }
   ArrayAttr numArr = builder.getArrayAttr(numList);
   state.addAttribute("indices_numList", numArr);
@@ -1124,7 +1124,7 @@ StoreOp StoreOp::create(PatternRewriter &rewriter, Location loc, Value val,
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
-    numList.push_back(builder.getUI32IntegerAttr(i));
+    numList.push_back(builder.getI32IntegerAttr(i));
   }
   ArrayAttr numArr = rewriter.getArrayAttr(numList);
   state.addAttribute("indices_numList", numArr);
@@ -1144,7 +1144,7 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem,
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
-    numList.push_back(builder.getUI32IntegerAttr(i));
+    numList.push_back(builder.getI32IntegerAttr(i));
   }
   ArrayAttr numArr = builder.getArrayAttr(numList);
   state.addAttribute("indices_numList", numArr);
@@ -1164,7 +1164,7 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem,
 
   SmallVector<Attribute> numList;
   for (size_t i = 0; i < indices.size(); ++i) {
-    numList.push_back(builder.getUI32IntegerAttr(-1));
+    numList.push_back(builder.getI32IntegerAttr(-1));
   }
   ArrayAttr numArr = builder.getArrayAttr(numList);
   state.addAttribute("indices_numList", numArr);

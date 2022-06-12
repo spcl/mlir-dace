@@ -563,7 +563,6 @@ LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
-  Access access(op.getLoc());
   std::string name = utils::valueToString(op.arr());
 
   if (op.arr().getDefiningOp() != nullptr) {
@@ -571,14 +570,70 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     name = allocOp.getName();
   }
 
+  Access access(op.getLoc());
   access.setName(name);
   scope.addNode(access);
 
   Connector accOut(access);
   access.addOutConnector(accOut);
 
-  Connector source = scope.lookup(op.val());
-  scope.routeWrite(source, accOut);
+  if (!op.isIndirect()) {
+    Connector source = scope.lookup(op.val());
+    scope.routeWrite(source, accOut);
+    scope.mapConnector(op.arr(), accOut);
+
+    return success();
+  }
+
+  Tasklet task(op.getLoc());
+  task.setName("indirect_store_" + name);
+  scope.addNode(task);
+
+  Connector taskOut(task, "_out");
+  task.addOutConnector(taskOut);
+
+  Connector taskArr(task, "_array");
+  task.addInConnector(taskArr);
+  MultiEdge arrayEdge(scope.lookup(op.arr()), taskArr);
+  scope.addEdge(arrayEdge);
+
+  Connector taskVal(task, "_value");
+  task.addInConnector(taskVal);
+  MultiEdge valEdge(scope.lookup(op.val()), taskVal);
+  scope.addEdge(valEdge);
+
+  std::string accessCode = "_array[";
+
+  ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
+  ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
+  unsigned symNumCounter = 0;
+
+  for (unsigned i = 0; i < numList.size(); ++i) {
+    if (i > 0)
+      accessCode.append(", ");
+
+    IntegerAttr num = numList[i].cast<IntegerAttr>();
+    if (num.getInt() < 0) {
+      mlir::Attribute symNum = symNumList[symNumCounter++];
+
+      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
+        accessCode.append(std::to_string(numAttr.getInt()));
+      } else {
+        StringAttr symAttr = symNum.cast<StringAttr>();
+        accessCode.append(symAttr.getValue().str());
+      }
+    } else {
+      Connector input(task, "_i" + std::to_string(num.getInt()));
+      task.addInConnector(input);
+      MultiEdge inputEdge(scope.lookup(op.getOperand(num.getInt())), input);
+      scope.addEdge(inputEdge);
+      accessCode.append("_i" + std::to_string(num.getInt()));
+    }
+  }
+
+  task.setCode(Code(accessCode + "] = _value", CodeLanguage::Python));
+
+  scope.routeWrite(taskOut, accOut);
   scope.mapConnector(op.arr(), accOut);
 
   return success();
@@ -596,19 +651,48 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   }
 
   Tasklet task(op.getLoc());
-  task.setName("Indirect load: " + utils::valueToString(op.arr()));
+  task.setName("indirect_load" + utils::valueToString(op.arr()));
   scope.addNode(task);
 
-  Connector taskOut(task, "__out");
+  Connector taskOut(task, "_out");
   task.addOutConnector(taskOut);
-  insertTransientArray(op.getLoc(), taskOut, op.arr(), scope);
+  insertTransientArray(op.getLoc(), taskOut, op.res(), scope);
 
-  Connector taskArr(task, "__array");
+  Connector taskArr(task, "_array");
   task.addInConnector(taskArr);
   MultiEdge arrayEdge(scope.lookup(op.arr()), taskArr);
   scope.addEdge(arrayEdge);
 
-  // TODO: Add connectors for each index + generate code
+  std::string accessCode = "_out = _array[";
+
+  ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
+  ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
+  unsigned symNumCounter = 0;
+
+  for (unsigned i = 0; i < numList.size(); ++i) {
+    if (i > 0)
+      accessCode.append(", ");
+
+    IntegerAttr num = numList[i].cast<IntegerAttr>();
+    if (num.getInt() < 0) {
+      mlir::Attribute symNum = symNumList[symNumCounter++];
+
+      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
+        accessCode.append(std::to_string(numAttr.getInt()));
+      } else {
+        StringAttr symAttr = symNum.cast<StringAttr>();
+        accessCode.append(symAttr.getValue().str());
+      }
+    } else {
+      Connector input(task, "_i" + std::to_string(num.getInt()));
+      task.addInConnector(input);
+      MultiEdge inputEdge(scope.lookup(op.getOperand(num.getInt())), input);
+      scope.addEdge(inputEdge);
+      accessCode.append("_i" + std::to_string(num.getInt()));
+    }
+  }
+
+  task.setCode(Code(accessCode + "]", CodeLanguage::Python));
 
   return success();
 }
