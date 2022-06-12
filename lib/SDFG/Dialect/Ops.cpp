@@ -1111,13 +1111,7 @@ LogicalResult verify(LoadOp op) {
   return success();
 }
 
-bool LoadOp::isIndirect() {
-  for (Value v : indices())
-    if (!isa<sdfg::TaskletNode>(v.getDefiningOp()))
-      return true;
-
-  return false;
-}
+bool LoadOp::isIndirect() { return !indices().empty(); }
 
 //===----------------------------------------------------------------------===//
 // StoreOp
@@ -1268,13 +1262,7 @@ LogicalResult verify(StoreOp op) {
   return success();
 }
 
-bool StoreOp::isIndirect() {
-  for (Value v : indices())
-    if (!isa<sdfg::TaskletNode>(v.getDefiningOp()))
-      return true;
-
-  return false;
-}
+bool StoreOp::isIndirect() { return !indices().empty(); }
 
 //===----------------------------------------------------------------------===//
 // CopyOp
