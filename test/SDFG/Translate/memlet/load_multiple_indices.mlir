@@ -4,12 +4,13 @@ sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
   %A = sdfg.alloc() : !sdfg.array<12x45xi32>
 
   sdfg.state @state_0 {
-    %0 = sdfg.tasklet() -> (index) {
-      %0 = arith.constant 0 : index
-      sdfg.return %0 : index
+    %a_1 = sdfg.load %A[6, 12] : !sdfg.array<12x45xi32> -> i32
+
+    %res = sdfg.tasklet(%a_1: i32) -> (i32) {
+        %z = arith.addi %a_1, %a_1 : i32
+        sdfg.return %z : i32
     }
 
-    %a_1 = sdfg.load %A[%0, %0] : !sdfg.array<12x45xi32> -> i32
-    sdfg.store %a_1, %A[%0, %0] : i32 -> !sdfg.array<12x45xi32>
+    sdfg.store %res, %A[6, 12] : i32 -> !sdfg.array<12x45xi32>
   }
 } 

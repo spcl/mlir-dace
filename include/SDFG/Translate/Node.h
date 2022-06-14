@@ -249,6 +249,7 @@ public:
   ConnectorNode parent;
   std::string name;
   bool isNull;
+  std::vector<Range> ranges;
   // NOTE: DType?
 
   Connector(ConnectorNode parent)
@@ -259,6 +260,8 @@ public:
   bool operator==(const Connector other) const {
     return other.parent == parent && other.name == name;
   }
+
+  void addRange(Range range) { ranges.push_back(range); }
 };
 
 //===----------------------------------------------------------------------===//
@@ -266,11 +269,9 @@ public:
 //===----------------------------------------------------------------------===//
 
 class MultiEdge : public Emittable {
-
 private:
   Connector source;
   Connector destination;
-  mlir::sdfg::SizedType shape;
 
 public:
   MultiEdge(Connector source, Connector destination)

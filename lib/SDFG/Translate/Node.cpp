@@ -62,6 +62,22 @@ std::string codeLanguageToString(CodeLanguage lang) {
   return "Unsupported CodeLanguage";
 }
 
+void printRangeVector(std::vector<Range> ranges, std::string name,
+                      emitter::JsonEmitter &jemit) {
+  if (ranges.empty()) {
+    jemit.printKVPair(name, "null", /*stringify=*/false);
+    return;
+  }
+
+  jemit.startNamedObject(name);
+  jemit.printKVPair("type", "Range");
+  jemit.startNamedList("ranges");
+  for (Range r : ranges)
+    r.emit(jemit);
+  jemit.endList();   // ranges
+  jemit.endObject(); // name
+}
+
 //===----------------------------------------------------------------------===//
 // Array
 //===----------------------------------------------------------------------===//
@@ -212,7 +228,17 @@ void MultiEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  // NOTE: More data
+  if (source.parent.getType() == NType::Access) {
+    jemit.printKVPair("data", source.parent.getName());
+  } else if (destination.parent.getType() == NType::Access) {
+    jemit.printKVPair("data", destination.parent.getName());
+  }
+
+  printRangeVector(source.ranges, "subset", jemit);
+  printRangeVector(source.ranges, "src_subset", jemit);
+
+  printRangeVector(destination.ranges, "other_subset", jemit);
+  printRangeVector(destination.ranges, "dst_subset", jemit);
 
   jemit.endObject(); // attributes
   jemit.endObject(); // data
@@ -766,13 +792,7 @@ void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
   }
   jemit.endList(); // params
 
-  jemit.startNamedObject("range");
-  jemit.printKVPair("type", "Range");
-  jemit.startNamedList("ranges");
-  for (Range r : ranges)
-    r.emit(jemit);
-  jemit.endList();   // ranges
-  jemit.endObject(); // range
+  printRangeVector(ranges, "range", jemit);
 
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */

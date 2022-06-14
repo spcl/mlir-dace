@@ -577,7 +577,25 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   Connector accOut(access);
   access.addOutConnector(accOut);
 
+  ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
+  ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
+  unsigned symNumCounter = 0;
+
   if (!op.isIndirect()) {
+    for (unsigned i = 0; i < numList.size(); ++i) {
+      mlir::Attribute symNum = symNumList[symNumCounter++];
+      std::string idx = "";
+
+      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
+        idx = std::to_string(numAttr.getInt());
+      } else {
+        idx = symNum.cast<StringAttr>().getValue().str();
+      }
+
+      Range range(idx, idx, "1", "1");
+      accOut.addRange(range);
+    }
+
     Connector source = scope.lookup(op.val());
     scope.routeWrite(source, accOut);
     scope.mapConnector(op.arr(), accOut);
@@ -602,10 +620,6 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   scope.addEdge(valEdge);
 
   std::string accessCode = "_array[";
-
-  ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
-  ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
-  unsigned symNumCounter = 0;
 
   for (unsigned i = 0; i < numList.size(); ++i) {
     if (i > 0)
@@ -643,8 +657,27 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
+  ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
+  ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
+  unsigned symNumCounter = 0;
+
   if (!op.isIndirect()) {
     Connector connector = scope.lookup(op.arr());
+
+    for (unsigned i = 0; i < numList.size(); ++i) {
+      mlir::Attribute symNum = symNumList[symNumCounter++];
+      std::string idx = "";
+
+      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
+        idx = std::to_string(numAttr.getInt());
+      } else {
+        idx = symNum.cast<StringAttr>().getValue().str();
+      }
+
+      Range range(idx, idx, "1", "1");
+      connector.addRange(range);
+    }
+
     scope.mapConnector(op.res(), connector);
     return success();
   }
@@ -663,10 +696,6 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   scope.addEdge(arrayEdge);
 
   std::string accessCode = "_out = _array[";
-
-  ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
-  ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
-  unsigned symNumCounter = 0;
 
   for (unsigned i = 0; i < numList.size(); ++i) {
     if (i > 0)
