@@ -27,8 +27,6 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + utils::valueToString(indexCast.getIn(), op);
   }
 
-  // TODO: Add arith ops
-
   if (arith::CmpIOp cmp = dyn_cast<arith::CmpIOp>(op)) {
     std::string lhs = utils::valueToString(cmp.getLhs(), op);
     std::string rhs = utils::valueToString(cmp.getRhs(), op);

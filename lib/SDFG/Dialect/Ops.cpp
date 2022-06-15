@@ -539,7 +539,6 @@ std::string TaskletNode::getInputName(unsigned idx) {
 }
 
 std::string TaskletNode::getOutputName(unsigned idx) {
-  // TODO: Implement multiple return values
   return "__out" + std::to_string(idx);
 }
 

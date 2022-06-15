@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 
 sdfg.sdfg () -> () {

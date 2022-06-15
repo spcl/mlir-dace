@@ -160,14 +160,12 @@ public:
 
     SmallVector<Type> args;
     for (unsigned i = 0; i < op.getNumArguments(); i++) {
-      // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op.getType().getInput(i));
       args.push_back(nt);
     }
 
     for (unsigned i = 0; i < op.getNumResults(); i++) {
-      // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op.getType().getResult(i));
       args.push_back(nt);
@@ -218,7 +216,6 @@ public:
 
       StateNode state = StateNode::create(rewriter, op->getLoc());
 
-      // NOTE: Hotfix, check if a better solution exists
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op->getResultTypes()[0]);
       SizedType sized =

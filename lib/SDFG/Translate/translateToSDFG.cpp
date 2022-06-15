@@ -434,23 +434,7 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
   for (BlockArgument bArg : op.body().getArguments()) {
     std::string name = utils::valueToString(bArg);
-
     mapEntry.addParam(name);
-
-    /*     Tasklet task(op.getLoc());
-        task.setName("SYM" + name);
-
-        Connector taskOut(task, "_SYM_OUT");
-        task.addOutConnector(taskOut);
-
-        Code code("_SYM_OUT = " + name, CodeLanguage::Python);
-        task.setCode(code);
-
-        mapEntry.addNode(task);
-        insertTransientArray(op.getLoc(), taskOut, bArg, mapEntry); */
-    /*     Connector param(mapEntry, name);
-        mapEntry.addOutConnector(param);
-        mapEntry.mapConnector(bArg, param); */
   }
 
   ArrayAttr lbList = op->getAttr("lowerBounds_numList").cast<ArrayAttr>();
@@ -569,17 +553,20 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   consumeEntry.addOutConnector(elem);
   consumeEntry.mapConnector(op.elem(), elem);
 
-  std::string name = utils::valueToString(op.pe());
-  Tasklet task(op.getLoc());
-  task.setName("SYM" + name);
+  if (!op.pe().getUses().empty()) {
+    // TODO: Handle uses of PE
+    /* std::string name = utils::valueToString(op.pe());
+    Tasklet task(op.getLoc());
+    task.setName("SYM" + name);
 
-  Connector taskOut(task, "_SYM_OUT");
-  task.addOutConnector(taskOut);
-  Code code("_SYM_OUT = " + name, CodeLanguage::Python);
-  task.setCode(code);
+    Connector taskOut(task, "_SYM_OUT");
+    task.addOutConnector(taskOut);
+    Code code("_SYM_OUT = " + name, CodeLanguage::Python);
+    task.setCode(code);
 
-  consumeEntry.addNode(task);
-  insertTransientArray(op.getLoc(), taskOut, op.pe(), consumeEntry);
+    consumeEntry.addNode(task);
+    insertTransientArray(op.getLoc(), taskOut, op.pe(), consumeEntry); */
+  }
 
   if (collectOperations(*op, consumeEntry).failed())
     return failure();
@@ -652,6 +639,52 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     return success();
   }
 
+  // If any of the operands comes from a non-map op
+  bool dependsOnNonMap = false;
+
+  for (unsigned i = 0; i < numList.size(); ++i) {
+    IntegerAttr num = numList[i].cast<IntegerAttr>();
+    if (num.getInt() >= 0) {
+
+      if (BlockArgument bArg =
+              op.getOperand(num.getInt()).dyn_cast<BlockArgument>()) {
+        if (!isa<MapNode>(bArg.getParentRegion()->getParentOp())) {
+          dependsOnNonMap = true;
+        } else if (dependsOnNonMap) {
+          emitError(op.getLoc(),
+                    "Mixing of map-indices and non-map-indices not supported");
+          return failure();
+        }
+      } else if (!dependsOnNonMap && i > 0) {
+        emitError(op.getLoc(),
+                  "Mixing of map-indices and non-map-indices not supported");
+        return failure();
+      } else {
+        dependsOnNonMap = true;
+      }
+    }
+  }
+
+  if (!dependsOnNonMap) {
+    for (unsigned i = 0; i < numList.size(); ++i) {
+      IntegerAttr num = numList[i].cast<IntegerAttr>();
+      if (num.getInt() < 0) {
+        std::string idx =
+            utils::attributeToString(symNumList[symNumCounter++], *op);
+        Range range(idx, idx, "1", "1");
+        accOut.addRange(range);
+      } else {
+        std::string idx = utils::valueToString(op.getOperand(num.getInt()));
+        Range range(idx, idx, "1", "1");
+        accOut.addRange(range);
+      }
+    }
+
+    scope.routeWrite(scope.lookup(op.val()), accOut);
+    scope.mapConnector(op.arr(), accOut);
+    return success();
+  }
+
   Tasklet task(op.getLoc());
   task.setName("indirect_store" + name);
   scope.addNode(task);
@@ -680,19 +713,18 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
       accessCode.append(
           utils::attributeToString(symNumList[symNumCounter++], *op));
     } else {
+      Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
       task.addInConnector(input);
-      MultiEdge inputEdge(scope.lookup(op.getOperand(num.getInt())), input);
+      MultiEdge inputEdge(scope.lookup(idxOp), input);
       scope.addEdge(inputEdge);
       accessCode.append("_i" + std::to_string(num.getInt()));
     }
   }
 
   task.setCode(Code(accessCode + "] = _value", CodeLanguage::Python));
-
   scope.routeWrite(taskOut, accOut);
   scope.mapConnector(op.arr(), accOut);
-
   return success();
 }
 
@@ -714,6 +746,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 
   if (!op.isIndirect()) {
     Connector connector = scope.lookup(op.arr());
+    connector.setData(name);
 
     for (unsigned i = 0; i < numList.size(); ++i) {
       std::string idx =
@@ -722,7 +755,55 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
       connector.addRange(range);
     }
 
+    scope.mapConnector(op.res(), connector);
+    return success();
+  }
+
+  // If any of the operands comes from a non-map op
+  bool dependsOnNonMap = false;
+
+  for (unsigned i = 0; i < numList.size(); ++i) {
+    IntegerAttr num = numList[i].cast<IntegerAttr>();
+    if (num.getInt() >= 0) {
+      if (BlockArgument bArg =
+              op.getOperand(num.getInt()).dyn_cast<BlockArgument>()) {
+
+        if (!isa<MapNode>(bArg.getParentRegion()->getParentOp())) {
+          dependsOnNonMap = true;
+        } else if (dependsOnNonMap) {
+          emitError(op.getLoc(),
+                    "Mixing of map-indices and non-map-indices not supported");
+          return failure();
+        }
+
+      } else if (!dependsOnNonMap && i > 0) {
+        emitError(op.getLoc(),
+                  "Mixing of map-indices and non-map-indices not supported");
+        return failure();
+      } else {
+        dependsOnNonMap = true;
+      }
+    }
+  }
+
+  if (!dependsOnNonMap) {
+    Connector connector = scope.lookup(op.arr());
     connector.setData(name);
+
+    for (unsigned i = 0; i < numList.size(); ++i) {
+      IntegerAttr num = numList[i].cast<IntegerAttr>();
+      if (num.getInt() < 0) {
+        std::string idx =
+            utils::attributeToString(symNumList[symNumCounter++], *op);
+        Range range(idx, idx, "1", "1");
+        connector.addRange(range);
+      } else {
+        std::string idx = utils::valueToString(op.getOperand(num.getInt()));
+        Range range(idx, idx, "1", "1");
+        connector.addRange(range);
+      }
+    }
+
     scope.mapConnector(op.res(), connector);
     return success();
   }
@@ -751,9 +832,10 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
       accessCode.append(
           utils::attributeToString(symNumList[symNumCounter++], *op));
     } else {
+      Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
       task.addInConnector(input);
-      MultiEdge inputEdge(scope.lookup(op.getOperand(num.getInt())), input);
+      MultiEdge inputEdge(scope.lookup(idxOp), input);
       scope.addEdge(inputEdge);
       accessCode.append("_i" + std::to_string(num.getInt()));
     }

@@ -19,11 +19,7 @@ sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
         sdfg.return %res : i32
       }
 
-      %0 = sdfg.tasklet() -> (index) {
-        %0 = arith.constant 0 : index
-        sdfg.return %0 : index
-      }
-      sdfg.store{wcr="add"} %res, %C[%0] : i32 -> !sdfg.array<6xi32>
+      sdfg.store{wcr="add"} %res, %C[0] : i32 -> !sdfg.array<6xi32>
     }
   }
 }
