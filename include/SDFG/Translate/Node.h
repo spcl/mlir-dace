@@ -250,6 +250,7 @@ public:
   std::string name;
   bool isNull;
   std::vector<Range> ranges;
+  std::string data;
   // NOTE: DType?
 
   Connector(ConnectorNode parent)
@@ -262,6 +263,8 @@ public:
   }
 
   void addRange(Range range) { ranges.push_back(range); }
+  void setRanges(std::vector<Range> ranges) { this->ranges = ranges; }
+  void setData(StringRef data) { this->data = data.str(); }
 };
 
 //===----------------------------------------------------------------------===//

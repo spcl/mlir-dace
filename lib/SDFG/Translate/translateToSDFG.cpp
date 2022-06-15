@@ -36,6 +36,9 @@ void insertTransientArray(Location location, translation::Connector connector,
   Connector accIn(access);
   Connector accOut(access);
 
+  accIn.setData(array.name);
+  accOut.setData(array.name);
+
   access.addInConnector(accIn);
   access.addOutConnector(accOut);
 
@@ -434,23 +437,76 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
     mapEntry.addParam(name);
 
-    Tasklet task(op.getLoc());
-    task.setName("SYM" + name);
+    /*     Tasklet task(op.getLoc());
+        task.setName("SYM" + name);
 
-    Connector taskOut(task, "_SYM_OUT");
-    task.addOutConnector(taskOut);
+        Connector taskOut(task, "_SYM_OUT");
+        task.addOutConnector(taskOut);
 
-    Code code("_SYM_OUT = " + name, CodeLanguage::Python);
-    task.setCode(code);
+        Code code("_SYM_OUT = " + name, CodeLanguage::Python);
+        task.setCode(code);
 
-    mapEntry.addNode(task);
-    insertTransientArray(op.getLoc(), taskOut, bArg, mapEntry);
+        mapEntry.addNode(task);
+        insertTransientArray(op.getLoc(), taskOut, bArg, mapEntry); */
+    /*     Connector param(mapEntry, name);
+        mapEntry.addOutConnector(param);
+        mapEntry.mapConnector(bArg, param); */
   }
 
-  for (unsigned i = 0; i < op.lowerBounds().size(); ++i) {
-    std::string lb = utils::attributeToString(op.lowerBounds()[i], *op);
-    std::string ub = utils::attributeToString(op.upperBounds()[i], *op);
-    std::string st = utils::attributeToString(op.steps()[i], *op);
+  ArrayAttr lbList = op->getAttr("lowerBounds_numList").cast<ArrayAttr>();
+  ArrayAttr ubList = op->getAttr("upperBounds_numList").cast<ArrayAttr>();
+  ArrayAttr stList = op->getAttr("steps_numList").cast<ArrayAttr>();
+
+  unsigned lbSymNumCounter = 0;
+  unsigned ubSymNumCounter = 0;
+  unsigned stSymNumCounter = 0;
+
+  for (unsigned i = 0; i < lbList.size(); ++i) {
+    std::string lb = "";
+    std::string ub = "";
+    std::string st = "";
+
+    int64_t lbNum = lbList[i].cast<IntegerAttr>().getInt();
+    if (lbNum < 0) {
+      lb = utils::attributeToString(op.lowerBounds()[lbSymNumCounter++], *op);
+    } else {
+      Value val = op.getOperand(lbNum);
+      lb = utils::generateName("LB");
+
+      Connector valConn(mapEntry, lb);
+      mapEntry.addInConnector(valConn);
+
+      MultiEdge multiedge(scope.lookup(val), valConn);
+      scope.addEdge(multiedge);
+    }
+
+    int64_t ubNum = ubList[i].cast<IntegerAttr>().getInt();
+    if (ubNum < 0) {
+      ub = utils::attributeToString(op.upperBounds()[ubSymNumCounter++], *op);
+    } else {
+      Value val = op.getOperand(ubNum);
+      ub = utils::generateName("UB");
+
+      Connector valConn(mapEntry, ub);
+      mapEntry.addInConnector(valConn);
+
+      MultiEdge multiedge(scope.lookup(val), valConn);
+      scope.addEdge(multiedge);
+    }
+
+    int64_t stNum = stList[i].cast<IntegerAttr>().getInt();
+    if (stNum < 0) {
+      st = utils::attributeToString(op.steps()[stSymNumCounter++], *op);
+    } else {
+      Value val = op.getOperand(stNum);
+      st = utils::generateName("ST");
+
+      Connector valConn(mapEntry, st);
+      mapEntry.addInConnector(valConn);
+
+      MultiEdge multiedge(scope.lookup(val), valConn);
+      scope.addEdge(multiedge);
+    }
 
     Range r(lb, ub, st, "1");
     mapEntry.addRange(r);
@@ -575,6 +631,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   scope.addNode(access);
 
   Connector accOut(access);
+  accOut.setData(name);
   access.addOutConnector(accOut);
 
   ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
@@ -583,15 +640,8 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 
   if (!op.isIndirect()) {
     for (unsigned i = 0; i < numList.size(); ++i) {
-      mlir::Attribute symNum = symNumList[symNumCounter++];
-      std::string idx = "";
-
-      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
-        idx = std::to_string(numAttr.getInt());
-      } else {
-        idx = symNum.cast<StringAttr>().getValue().str();
-      }
-
+      std::string idx =
+          utils::attributeToString(symNumList[symNumCounter++], *op);
       Range range(idx, idx, "1", "1");
       accOut.addRange(range);
     }
@@ -627,14 +677,8 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 
     IntegerAttr num = numList[i].cast<IntegerAttr>();
     if (num.getInt() < 0) {
-      mlir::Attribute symNum = symNumList[symNumCounter++];
-
-      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
-        accessCode.append(std::to_string(numAttr.getInt()));
-      } else {
-        StringAttr symAttr = symNum.cast<StringAttr>();
-        accessCode.append(symAttr.getValue().str());
-      }
+      accessCode.append(
+          utils::attributeToString(symNumList[symNumCounter++], *op));
     } else {
       Connector input(task, "_i" + std::to_string(num.getInt()));
       task.addInConnector(input);
@@ -657,6 +701,13 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
+  std::string name = utils::valueToString(op.arr());
+
+  if (op.arr().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.arr().getDefiningOp());
+    name = allocOp.getName();
+  }
+
   ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
   ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
   unsigned symNumCounter = 0;
@@ -665,19 +716,13 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
     Connector connector = scope.lookup(op.arr());
 
     for (unsigned i = 0; i < numList.size(); ++i) {
-      mlir::Attribute symNum = symNumList[symNumCounter++];
-      std::string idx = "";
-
-      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
-        idx = std::to_string(numAttr.getInt());
-      } else {
-        idx = symNum.cast<StringAttr>().getValue().str();
-      }
-
+      std::string idx =
+          utils::attributeToString(symNumList[symNumCounter++], *op);
       Range range(idx, idx, "1", "1");
       connector.addRange(range);
     }
 
+    connector.setData(name);
     scope.mapConnector(op.res(), connector);
     return success();
   }
@@ -703,14 +748,8 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 
     IntegerAttr num = numList[i].cast<IntegerAttr>();
     if (num.getInt() < 0) {
-      mlir::Attribute symNum = symNumList[symNumCounter++];
-
-      if (IntegerAttr numAttr = symNum.dyn_cast<IntegerAttr>()) {
-        accessCode.append(std::to_string(numAttr.getInt()));
-      } else {
-        StringAttr symAttr = symNum.cast<StringAttr>();
-        accessCode.append(symAttr.getValue().str());
-      }
+      accessCode.append(
+          utils::attributeToString(symNumList[symNumCounter++], *op));
     } else {
       Connector input(task, "_i" + std::to_string(num.getInt()));
       task.addInConnector(input);

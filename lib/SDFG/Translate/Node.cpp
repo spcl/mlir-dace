@@ -228,10 +228,10 @@ void MultiEdge::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
 
-  if (source.parent.getType() == NType::Access) {
-    jemit.printKVPair("data", source.parent.getName());
-  } else if (destination.parent.getType() == NType::Access) {
-    jemit.printKVPair("data", destination.parent.getName());
+  if (!source.data.empty()) {
+    jemit.printKVPair("data", source.data);
+  } else if (!destination.data.empty()) {
+    jemit.printKVPair("data", destination.data);
   }
 
   printRangeVector(source.ranges, "subset", jemit);
@@ -594,6 +594,7 @@ Connector StateImpl::lookup(Value value) {
     addNode(access);
 
     Connector accOut(access);
+    accOut.setData(name);
     access.addOutConnector(accOut);
 
     return accOut;
@@ -731,6 +732,8 @@ void MapEntryImpl::addNode(ConnectorNode node) {
 void MapEntryImpl::routeWrite(Connector from, Connector to) {
   MapExit mapExit = getExit();
   Connector in(mapExit, "IN_" + std::to_string(mapExit.getInConnectorCount()));
+  in.setData(from.data);
+  in.setRanges(from.ranges);
   mapExit.addInConnector(in);
 
   MultiEdge edge(from, in);
@@ -738,6 +741,8 @@ void MapEntryImpl::routeWrite(Connector from, Connector to) {
 
   Connector out(mapExit,
                 "OUT_" + std::to_string(mapExit.getOutConnectorCount()));
+  out.setData(in.data);
+  out.setRanges(in.ranges);
   mapExit.addOutConnector(out);
 
   ScopeNode scope(parent);
@@ -761,13 +766,17 @@ Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
     ScopeNode scope(parent);
     Connector srcConn = scope.lookup(value);
 
-    Connector dstConn(mapEntry, "IN_" + utils::valueToString(value));
+    Connector dstConn(mapEntry, "IN" + utils::valueToString(value));
+    dstConn.setData(srcConn.data);
+    dstConn.setRanges(srcConn.ranges);
     addInConnector(dstConn);
 
     MultiEdge multiedge(srcConn, dstConn);
     scope.addEdge(multiedge);
 
-    Connector outConn(mapEntry, "OUT_" + utils::valueToString(value));
+    Connector outConn(mapEntry, "OUT" + utils::valueToString(value));
+    outConn.setData(dstConn.data);
+    outConn.setRanges(dstConn.ranges);
     addOutConnector(outConn);
     ScopeNodeImpl::mapConnector(value, outConn);
   }
@@ -873,6 +882,8 @@ void ConsumeEntryImpl::routeWrite(Connector from, Connector to) {
   ConsumeExit consumeExit = getExit();
   Connector in(consumeExit,
                "IN_" + std::to_string(consumeExit.getInConnectorCount()));
+  in.setData(from.data);
+  in.setRanges(from.ranges);
   consumeExit.addInConnector(in);
 
   MultiEdge edge(from, in);
@@ -880,6 +891,8 @@ void ConsumeEntryImpl::routeWrite(Connector from, Connector to) {
 
   Connector out(consumeExit,
                 "OUT_" + std::to_string(consumeExit.getOutConnectorCount()));
+  out.setData(in.data);
+  out.setRanges(in.ranges);
   consumeExit.addOutConnector(out);
 
   ScopeNode scope(parent);
@@ -903,12 +916,16 @@ Connector ConsumeEntryImpl::lookup(Value value, ConsumeEntry entry) {
 
     Connector srcConn = scope.lookup(value);
     Connector dstConn(entry, "IN_" + utils::valueToString(value));
+    dstConn.setData(srcConn.data);
+    dstConn.setRanges(srcConn.ranges);
     addInConnector(dstConn);
 
     MultiEdge multiedge(srcConn, dstConn);
     scope.addEdge(multiedge);
 
     Connector outConn(entry, "OUT_" + utils::valueToString(value));
+    outConn.setData(dstConn.data);
+    outConn.setRanges(dstConn.ranges);
     addOutConnector(outConn);
     ScopeNodeImpl::mapConnector(value, outConn);
   }

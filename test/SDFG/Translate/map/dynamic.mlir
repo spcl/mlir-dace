@@ -9,15 +9,15 @@ sdfg.sdfg () -> (%r: !sdfg.array<index>) {
     %c = sdfg.load %r[] : !sdfg.array<index> -> index
 
     sdfg.map (%i, %j) = (%c, %c) to (%c, %c) step (1, 1) {
-      %a_ij = sdfg.load %A[%i, %j] : !sdfg.array<2x6xi32> -> i32
-      %b_ij = sdfg.load %B[%i, %j] : !sdfg.array<2x6xi32> -> i32
+      %a_ij = sdfg.load %A[0, 0] : !sdfg.array<2x6xi32> -> i32
+      %b_ij = sdfg.load %B[0, 0] : !sdfg.array<2x6xi32> -> i32
 
       %res = sdfg.tasklet(%a_ij: i32, %b_ij: i32) -> (i32) {
         %z = arith.addi %a_ij, %b_ij : i32
         sdfg.return %z : i32
       }
 
-      sdfg.store %res, %C[%i, %j] : i32 -> !sdfg.array<2x6xi32>
+      sdfg.store %res, %C[0, 0] : i32 -> !sdfg.array<2x6xi32>
     }
   }
 }
