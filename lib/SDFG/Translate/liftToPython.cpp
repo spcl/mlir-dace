@@ -1,6 +1,5 @@
 #include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 using namespace mlir;
 using namespace sdfg;
@@ -141,7 +140,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return code;
   }
 
-  if (isa<mlir::ReturnOp>(op)) {
+  if (isa<func::ReturnOp>(op)) {
     std::string code = "";
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
       if (i > 0)

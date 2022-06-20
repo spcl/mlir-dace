@@ -1,6 +1,7 @@
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
@@ -14,11 +15,10 @@ using namespace sdfg;
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
-                               SmallVector<OpAsmParser::OperandType, 4> &args,
-                               SmallVector<Type, 4> &argTypes,
+                               SmallVector<OpAsmParser::Argument, 4> &args,
                                bool enableShadowing) {
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, args, argTypes, enableShadowing))
+  if (parser.parseRegion(*body, args, enableShadowing))
     return failure();
 
   if (body->empty())
@@ -28,8 +28,7 @@ static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
 }
 
 static ParseResult parseArgsList(OpAsmParser &parser,
-                                 SmallVector<OpAsmParser::OperandType, 4> &args,
-                                 SmallVector<Type, 4> &argTypes) {
+                                 SmallVector<OpAsmParser::Argument, 4> &args) {
   if (parser.parseLParen())
     return failure();
 
@@ -37,14 +36,12 @@ static ParseResult parseArgsList(OpAsmParser &parser,
     if (i > 0 && parser.parseComma())
       return failure();
 
-    OpAsmParser::OperandType arg;
-    Type type;
+    OpAsmParser::Argument arg;
 
-    if (parser.parseRegionArgument(arg) || parser.parseColonType(type))
+    if (parser.parseArgument(arg, /*allowType=*/true))
       return failure();
 
     args.push_back(arg);
-    argTypes.push_back(type);
   }
 
   return success();
@@ -64,8 +61,7 @@ static void printArgsList(OpAsmPrinter &p, Region::BlockArgListType args,
 }
 
 static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
-                               SmallVector<OpAsmParser::OperandType, 4> &args,
-                               SmallVector<Type, 4> &argTypes) {
+                               SmallVector<OpAsmParser::Argument, 4> &args) {
   if (parser.parseLParen())
     return failure();
 
@@ -73,29 +69,30 @@ static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
     if (i > 0 && parser.parseComma())
       return failure();
 
-    OpAsmParser::OperandType operand;
-    OpAsmParser::OperandType arg;
-    Type opType;
+    OpAsmParser::UnresolvedOperand operand;
+    OpAsmParser::Argument arg;
 
     if (parser.parseOperand(operand))
       return failure();
 
-    if (parser.parseOptionalKeyword("as").succeeded())
-      if (parser.parseRegionArgument(arg))
+    if (parser.parseOptionalKeyword("as").succeeded()) {
+      if (parser.parseArgument(arg, /*allowType=*/true))
         return failure();
 
-    if (parser.parseColonType(opType))
+    } else {
+      Type type;
+
+      if (parser.parseColonType(type))
+        return failure();
+
+      arg.type = type;
+      arg.ssaName = operand;
+    }
+
+    if (parser.resolveOperand(operand, arg.type, result.operands))
       return failure();
 
-    if (parser.resolveOperand(operand, opType, result.operands))
-      return failure();
-
-    if (arg.location.isValid())
-      args.push_back(arg);
-    else
-      args.push_back(operand);
-
-    argTypes.push_back(opType);
+    args.push_back(arg);
   }
 
   return success();
@@ -121,7 +118,7 @@ static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
 
 static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
                                    StringRef attrName) {
-  SmallVector<OpAsmParser::OperandType> opList;
+  SmallVector<OpAsmParser::UnresolvedOperand> opList;
   SmallVector<Attribute> attrList;
   SmallVector<Attribute> numList;
   int opIdx = result.operands.size();
@@ -149,7 +146,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
       continue;
     }
 
-    OpAsmParser::OperandType op;
+    OpAsmParser::UnresolvedOperand op;
     OptionalParseResult opOPR = parser.parseOptionalOperand(op);
     if (opOPR.hasValue() && opOPR.getValue().succeeded()) {
       opList.push_back(op);
@@ -165,9 +162,9 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
   ArrayAttr attrArr = parser.getBuilder().getArrayAttr(attrList);
   result.addAttribute(attrName, attrArr);
 
-  SmallVector<Value> valList;
-  parser.resolveOperands(opList, parser.getBuilder().getIndexType(), valList);
-  result.addOperands(valList);
+  if (parser.resolveOperands(opList, parser.getBuilder().getIndexType(),
+                             result.operands))
+    return failure();
 
   ArrayAttr numArr = parser.getBuilder().getArrayAttr(numList);
   result.addAttribute(attrName.str() + "_numList", numArr);
@@ -234,12 +231,12 @@ SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), nullptr, num_args);
-  SDFGNode sdfg = cast<SDFGNode>(rewriter.createOperation(state));
+  SDFGNode sdfg = cast<SDFGNode>(rewriter.create(state));
   rewriter.createBlock(&sdfg.getRegion(), {}, args);
   return sdfg;
 }
 
-static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
+ParseResult SDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -247,46 +244,44 @@ static ParseResult parseSDFGNode(OpAsmParser &parser, OperationState &result) {
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
-  SmallVector<OpAsmParser::OperandType, 4> args;
-  SmallVector<Type, 4> argTypes;
+  SmallVector<OpAsmParser::Argument, 4> args;
 
-  if (parseArgsList(parser, args, argTypes))
+  if (parseArgsList(parser, args))
     return failure();
 
   result.addAttribute("num_args",
                       parser.getBuilder().getI32IntegerAttr(args.size()));
 
-  if (parser.parseArrow() || parseArgsList(parser, args, argTypes))
+  if (parser.parseArrow() || parseArgsList(parser, args))
     return failure();
 
-  if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
+  if (parseRegion(parser, result, args, /*enableShadowing*/ true))
     return failure();
 
   return success();
 }
 
-static void print(OpAsmPrinter &p, SDFGNode op) {
-  p.printOptionalAttrDict(op->getAttrs(),
+void SDFGNode::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
 
-  printArgsList(p, op.body().getArguments(), 0, op.num_args());
+  printArgsList(p, body().getArguments(), 0, num_args());
   p << " ->";
-  printArgsList(p, op.body().getArguments(), op.num_args(),
-                op.body().getNumArguments());
+  printArgsList(p, body().getArguments(), num_args(), body().getNumArguments());
 
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
-LogicalResult verify(SDFGNode op) {
+LogicalResult SDFGNode::verify() {
   // Verify that no other dialect is used in the body
-  for (Operation &oper : op.body().getOps())
-    if (oper.getDialect() != (*op).getDialect())
-      return op.emitOpError("does not support other dialects");
+  for (Operation &oper : body().getOps())
+    if (oper.getDialect() != (*this)->getDialect())
+      return emitOpError("does not support other dialects");
 
   // Verify that body contains at least one state
-  if (op.body().getOps<StateNode>().empty())
-    return op.emitOpError() << "must contain at least one state";
+  if (body().getOps<StateNode>().empty())
+    return emitOpError() << "must contain at least one state";
 
   return success();
 }
@@ -320,8 +315,7 @@ StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
 // NestedSDFGNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseNestedSDFGNode(OpAsmParser &parser,
-                                       OperationState &result) {
+ParseResult NestedSDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -329,51 +323,50 @@ static ParseResult parseNestedSDFGNode(OpAsmParser &parser,
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
-  SmallVector<OpAsmParser::OperandType, 4> args;
-  SmallVector<Type, 4> argTypes;
+  SmallVector<OpAsmParser::Argument, 4> args;
 
-  if (parseAsArgs(parser, result, args, argTypes))
+  if (parseAsArgs(parser, result, args))
     return failure();
 
   size_t num_args = result.operands.size();
   result.addAttribute("num_args",
                       parser.getBuilder().getI32IntegerAttr(num_args));
 
-  if (parser.parseArrow() || parseAsArgs(parser, result, args, argTypes))
+  if (parser.parseArrow() || parseAsArgs(parser, result, args))
     return failure();
 
-  if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
+  if (parseRegion(parser, result, args, /*enableShadowing*/ true))
     return failure();
 
   return success();
 }
 
-static void print(OpAsmPrinter &p, NestedSDFGNode op) {
-  p.printOptionalAttrDict(op->getAttrs(),
+void NestedSDFGNode::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
 
-  printAsArgs(p, op.getOperands(), op.body().getArguments(), 0, op.num_args());
+  printAsArgs(p, getOperands(), body().getArguments(), 0, num_args());
   p << " ->";
-  printAsArgs(p, op.getOperands(), op.body().getArguments(), op.num_args(),
-              op.getNumOperands());
+  printAsArgs(p, getOperands(), body().getArguments(), num_args(),
+              getNumOperands());
 
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
-LogicalResult verify(NestedSDFGNode op) {
+LogicalResult NestedSDFGNode::verify() {
   // Verify that no other dialect is used in the body
-  for (Operation &oper : op.body().getOps())
-    if (oper.getDialect() != (*op).getDialect())
-      return op.emitOpError("does not support other dialects");
+  for (Operation &oper : body().getOps())
+    if (oper.getDialect() != (*this)->getDialect())
+      return emitOpError("does not support other dialects");
 
   // Verify that body contains at least one state
-  if (op.body().getOps<StateNode>().empty())
-    return op.emitOpError() << "must contain at least one state";
+  if (body().getOps<StateNode>().empty())
+    return emitOpError() << "must contain at least one state";
 
   // Verify that operands and arguments line up
-  if (op.getNumOperands() != op.body().getNumArguments())
-    op.emitOpError() << "must have matching amount of operands and arguments";
+  if (getNumOperands() != body().getNumArguments())
+    emitOpError() << "must have matching amount of operands and arguments";
 
   return success();
 }
@@ -417,7 +410,7 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName(name.str()));
-  StateNode stateNode = cast<StateNode>(rewriter.createOperation(state));
+  StateNode stateNode = cast<StateNode>(rewriter.create(state));
   rewriter.createBlock(&stateNode.body());
   return stateNode;
 }
@@ -429,7 +422,7 @@ StateNode StateNode::create(Location loc, StringRef name) {
   return cast<StateNode>(Operation::create(state));
 }
 
-static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
+ParseResult StateNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -451,19 +444,21 @@ static ParseResult parseStateNode(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, StateNode op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID", "sym_name"});
+void StateNode::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs(),
+                          /*elidedAttrs=*/{"ID", "sym_name"});
   p << ' ';
-  p.printSymbolName(op.sym_name());
-  p.printRegion(op.body());
+  p.printSymbolName(sym_name());
+  p.printRegion(body());
 }
 
-LogicalResult verify(StateNode op) {
+LogicalResult StateNode::verify() {
   // Verify that no other dialect is used in the body
   // Except func operations
-  for (Operation &oper : op.body().getOps())
-    if (oper.getDialect() != (*op).getDialect() && !dyn_cast<FuncOp>(oper))
-      return op.emitOpError("does not support other dialects");
+  for (Operation &oper : body().getOps())
+    if (oper.getDialect() != (*this)->getDialect() &&
+        !dyn_cast<func::FuncOp>(oper))
+      return emitOpError("does not support other dialects");
   return success();
 }
 
@@ -471,8 +466,7 @@ LogicalResult verify(StateNode op) {
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseTaskletNode(OpAsmParser &parser,
-                                    OperationState &result) {
+ParseResult TaskletNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -480,34 +474,32 @@ static ParseResult parseTaskletNode(OpAsmParser &parser,
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("ID", intAttr);
 
-  SmallVector<OpAsmParser::OperandType, 4> args;
-  SmallVector<Type, 4> argTypes;
+  SmallVector<OpAsmParser::Argument, 4> args;
 
-  if (parseAsArgs(parser, result, args, argTypes))
+  if (parseAsArgs(parser, result, args))
     return failure();
 
   if (parser.parseOptionalArrowTypeList(result.types))
     return failure();
 
-  if (parseRegion(parser, result, args, argTypes, /*enableShadowing*/ true))
+  if (parseRegion(parser, result, args, /*enableShadowing*/ true))
     return failure();
 
   return success();
 }
 
-static void print(OpAsmPrinter &p, TaskletNode op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"ID"});
-  printAsArgs(p, op.getOperands(), op.body().getArguments(), 0,
-              op.getNumOperands());
-  p << " -> (" << op.getResultTypes() << ")";
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+void TaskletNode::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"ID"});
+  printAsArgs(p, getOperands(), body().getArguments(), 0, getNumOperands());
+  p << " -> (" << getResultTypes() << ")";
+  p.printRegion(body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
-LogicalResult verify(TaskletNode op) {
+LogicalResult TaskletNode::verify() {
   // Verify that operands and arguments line up
-  if (op.getNumOperands() != op.body().getNumArguments())
-    op.emitOpError() << "must have matching amount of operands and arguments";
+  if (getNumOperands() != body().getNumArguments())
+    emitOpError() << "must have matching amount of operands and arguments";
 
   return success();
 }
@@ -518,7 +510,7 @@ TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
   OperationState state(location, getOperationName());
   build(builder, state, results, utils::generateID(), operands);
 
-  TaskletNode task = cast<TaskletNode>(rewriter.createOperation(state));
+  TaskletNode task = cast<TaskletNode>(rewriter.create(state));
   rewriter.createBlock(&task.getRegion(), {}, operands.getTypes());
   return task;
 }
@@ -546,10 +538,7 @@ std::string TaskletNode::getOutputName(unsigned idx) {
 // MapNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
-  Builder &builder = parser.getBuilder();
-  IndexType indexType = builder.getIndexType();
-
+ParseResult MapNode::parse(OpAsmParser &parser, OperationState &result) {
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("entryID", intAttr);
@@ -557,8 +546,8 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  SmallVector<OpAsmParser::OperandType, 4> ivs;
-  if (parser.parseRegionArgumentList(ivs, OpAsmParser::Delimiter::Paren))
+  SmallVector<OpAsmParser::Argument, 4> ivs;
+  if (parser.parseArgumentList(ivs, OpAsmParser::Delimiter::Paren))
     return failure();
 
   if (parser.parseEqual())
@@ -582,10 +571,11 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
       parser.parseRParen())
     return failure();
 
+  for (unsigned i = 0; i < ivs.size(); ++i)
+    ivs[i].type = parser.getBuilder().getIndexType();
+
   // Now parse the body.
-  Region *body = result.addRegion();
-  SmallVector<Type, 4> types(ivs.size(), indexType);
-  if (parser.parseRegion(*body, ivs, types))
+  if (parseRegion(parser, result, ivs, /*enableShadowing=*/false))
     return failure();
 
   intAttr = parser.getBuilder().getI32IntegerAttr(utils::generateID());
@@ -593,61 +583,53 @@ static ParseResult parseMapNode(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, MapNode op) {
+void MapNode::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(
-      p, op->getAttrs(),
+      p, (*this)->getAttrs(),
       {"entryID", "exitID", "lowerBounds", "upperBounds", "steps"});
 
-  p << " (" << op.getBody()->getArguments() << ") = (";
+  p << " (" << getBody()->getArguments() << ") = (";
 
-  printNumberList(p, op.getOperation(), "lowerBounds");
+  printNumberList(p, getOperation(), "lowerBounds");
 
   p << ") to (";
 
-  printNumberList(p, op.getOperation(), "upperBounds");
+  printNumberList(p, getOperation(), "upperBounds");
 
   p << ") step (";
 
-  printNumberList(p, op.getOperation(), "steps");
+  printNumberList(p, getOperation(), "steps");
 
   p << ")";
 
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
-LogicalResult verify(MapNode op) {
-  size_t var_count = op.getBody()->getArguments().size();
+LogicalResult MapNode::verify() {
+  size_t var_count = getBody()->getArguments().size();
 
-  if (getNumListSize(op, "lowerBounds") != var_count)
-    return op.emitOpError("failed to verify that size of "
-                          "lower bounds matches size of arguments");
+  if (getNumListSize(*this, "lowerBounds") != var_count)
+    return emitOpError("failed to verify that size of "
+                       "lower bounds matches size of arguments");
 
-  if (getNumListSize(op, "upperBounds") != var_count)
-    return op.emitOpError("failed to verify that size of "
-                          "upper bounds matches size of arguments");
+  if (getNumListSize(*this, "upperBounds") != var_count)
+    return emitOpError("failed to verify that size of "
+                       "upper bounds matches size of arguments");
 
-  if (getNumListSize(op, "steps") != var_count)
-    return op.emitOpError("failed to verify that size of "
-                          "steps matches size of arguments");
+  if (getNumListSize(*this, "steps") != var_count)
+    return emitOpError("failed to verify that size of "
+                       "steps matches size of arguments");
 
   // Verify that no other dialect is used in the body
-  for (Operation &oper : op.body().getOps())
-    if (oper.getDialect() != (*op).getDialect())
-      return op.emitOpError("does not support other dialects");
+  for (Operation &oper : body().getOps())
+    if (oper.getDialect() != (*this)->getDialect())
+      return emitOpError("does not support other dialects");
 
   return success();
 }
 
-bool MapNode::isDefinedOutsideOfLoop(Value value) {
-  return !body().isAncestor(value.getParentRegion());
-}
-
 Region &MapNode::getLoopBody() { return body(); }
-
-LogicalResult MapNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
-  return failure();
-}
 
 void MapNode::setEntryID(unsigned id) {
   Builder builder(*this);
@@ -665,8 +647,7 @@ void MapNode::setExitID(unsigned id) {
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseConsumeNode(OpAsmParser &parser,
-                                    OperationState &result) {
+ParseResult ConsumeNode::parse(OpAsmParser &parser, OperationState &result) {
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
   result.addAttribute("entryID", intAttr);
@@ -677,7 +658,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   if (parser.parseLParen())
     return failure();
 
-  OpAsmParser::OperandType stream;
+  OpAsmParser::UnresolvedOperand stream;
   Type streamType;
   if (parser.parseOperand(stream) || parser.parseColonType(streamType) ||
       parser.resolveOperand(stream, streamType, result.operands) ||
@@ -687,20 +668,22 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   if (parser.parseRParen() || parser.parseArrow() || parser.parseLParen())
     return failure();
 
-  SmallVector<OpAsmParser::OperandType, 4> ivs;
-  OpAsmParser::OperandType num_pes_op;
+  SmallVector<OpAsmParser::Argument, 4> ivs;
+  OpAsmParser::Argument num_pes_op;
   if (parser.parseKeyword("pe") || parser.parseColon() ||
-      parser.parseOperand(num_pes_op))
+      parser.parseArgument(num_pes_op))
     return failure();
+  num_pes_op.type = parser.getBuilder().getIndexType();
   ivs.push_back(num_pes_op);
 
   if (parser.parseComma())
     return failure();
 
-  OpAsmParser::OperandType elem_op;
+  OpAsmParser::Argument elem_op;
   if (parser.parseKeyword("elem") || parser.parseColon() ||
-      parser.parseOperand(elem_op))
+      parser.parseArgument(elem_op))
     return failure();
+  elem_op.type = utils::getSizedType(streamType).getElementType();
   ivs.push_back(elem_op);
 
   if (parser.parseRParen())
@@ -708,10 +691,7 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
 
   // Now parse the body.
   Region *body = result.addRegion();
-  SmallVector<Type, 4> types;
-  types.push_back(parser.getBuilder().getIndexType());
-  types.push_back(utils::getSizedType(streamType).getElementType());
-  if (parser.parseRegion(*body, ivs, types))
+  if (parser.parseRegion(*body, ivs))
     return failure();
 
   intAttr = parser.getBuilder().getI32IntegerAttr(utils::generateID());
@@ -719,25 +699,25 @@ static ParseResult parseConsumeNode(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, ConsumeNode op) {
-  p.printOptionalAttrDict(op->getAttrs(),
+void ConsumeNode::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"entryID", "exitID"});
-  p << " (" << op.stream() << " : " << op.stream().getType() << ")";
-  p << " -> (pe: " << op.getBody()->getArgument(0);
-  p << ", elem: " << op.getBody()->getArgument(1) << ")";
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+  p << " (" << stream() << " : " << stream().getType() << ")";
+  p << " -> (pe: " << getBody()->getArgument(0);
+  p << ", elem: " << getBody()->getArgument(1) << ")";
+  p.printRegion(body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
-LogicalResult verify(ConsumeNode op) {
-  if (op.num_pes().hasValue() && op.num_pes().getValue().isNonPositive())
-    return op.emitOpError("failed to verify that number of "
-                          "processing elements is at least one");
+LogicalResult ConsumeNode::verify() {
+  if (num_pes().hasValue() && num_pes().getValue().isNonPositive())
+    return emitOpError("failed to verify that number of "
+                       "processing elements is at least one");
 
   // Verify that no other dialect is used in the body
-  for (Operation &oper : op.body().getOps())
-    if (oper.getDialect() != (*op).getDialect())
-      return op.emitOpError("does not support other dialects");
+  for (Operation &oper : body().getOps())
+    if (oper.getDialect() != (*this)->getDialect())
+      return emitOpError("does not support other dialects");
 
   return success();
 }
@@ -750,7 +730,8 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   if (!condAttr)
     return success();
 
-  FuncOp cond = symbolTable.lookupNearestSymbolFrom<FuncOp>(*this, condAttr);
+  func::FuncOp cond =
+      symbolTable.lookupNearestSymbolFrom<func::FuncOp>(*this, condAttr);
   if (!cond)
     return emitOpError() << "'" << condAttr.getValue()
                          << "' does not reference a valid func";
@@ -766,15 +747,7 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
-bool ConsumeNode::isDefinedOutsideOfLoop(Value value) {
-  return !body().isAncestor(value.getParentRegion());
-}
-
 Region &ConsumeNode::getLoopBody() { return body(); }
-
-LogicalResult ConsumeNode::moveOutOfLoop(ArrayRef<Operation *> ops) {
-  return failure();
-}
 
 void ConsumeNode::setEntryID(unsigned id) {
   Builder builder(*this);
@@ -801,7 +774,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, from.sym_name(), to.sym_name(), assign, condition, ref);
-  return cast<EdgeOp>(rewriter.createOperation(state));
+  return cast<EdgeOp>(rewriter.create(state));
 }
 
 EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
@@ -810,7 +783,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   OperationState state(loc, getOperationName());
   build(builder, state, from.sym_name(), to.sym_name(),
         rewriter.getStrArrayAttr({}), "1", nullptr);
-  return cast<EdgeOp>(rewriter.createOperation(state));
+  return cast<EdgeOp>(rewriter.create(state));
 }
 
 EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
@@ -821,7 +794,7 @@ EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
   return cast<EdgeOp>(Operation::create(state));
 }
 
-static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
+ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
   FlatSymbolRefAttr srcAttr;
   FlatSymbolRefAttr destAttr;
 
@@ -829,7 +802,7 @@ static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   if (parser.parseOptionalLParen().succeeded()) {
-    OpAsmParser::OperandType op;
+    OpAsmParser::UnresolvedOperand op;
     SmallVector<Value> valList;
     Type t;
 
@@ -853,20 +826,20 @@ static ParseResult parseEdgeOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, EdgeOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
+void EdgeOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
   p << ' ';
-  if (!op.refMutable().empty())
-    p << "(ref: " << op.ref() << ": " << op.ref().getType() << ") ";
-  p.printAttributeWithoutType(op.srcAttr());
+  if (!refMutable().empty())
+    p << "(ref: " << ref() << ": " << ref().getType() << ") ";
+  p.printAttributeWithoutType(srcAttr());
   p << " -> ";
-  p.printAttributeWithoutType(op.destAttr());
+  p.printAttributeWithoutType(destAttr());
 }
 
-LogicalResult verify(EdgeOp op) {
+LogicalResult EdgeOp::verify() {
   // Check that condition is non-empty
-  if (op.condition().empty())
-    return op.emitOpError() << "condition must be non-empty or omitted";
+  if (condition().empty())
+    return emitOpError() << "condition must be non-empty or omitted";
 
   return success();
 }
@@ -901,11 +874,11 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 // AllocOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
+ParseResult AllocOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  SmallVector<OpAsmParser::OperandType, 4> paramsOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> paramsOperands;
   if (parser.parseOperandList(paramsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
@@ -921,24 +894,24 @@ static ParseResult parseAllocOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, AllocOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
+void AllocOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
   p << " (";
-  p.printOperands(op.params());
+  p.printOperands(params());
   p << ") : ";
-  p << op.getOperation()->getResultTypes();
+  p << getOperation()->getResultTypes();
 }
 
-LogicalResult verify(AllocOp op) {
-  SizedType res = utils::getSizedType(op.res().getType());
+LogicalResult AllocOp::verify() {
+  SizedType result = utils::getSizedType(res().getType());
 
-  if (res.getUndefRank() != op.params().size())
-    return op.emitOpError("failed to verify that parameter size "
-                          "matches undefined dimensions size");
+  if (result.getUndefRank() != params().size())
+    return emitOpError("failed to verify that parameter size "
+                       "matches undefined dimensions size");
 
-  if (res.hasZeros())
-    return op.emitOpError("failed to verify that return type "
-                          "doesn't contain dimensions of size zero");
+  if (result.hasZeros())
+    return emitOpError("failed to verify that return type "
+                       "doesn't contain dimensions of size zero");
 
   return success();
 }
@@ -949,7 +922,7 @@ AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
   OperationState state(loc, getOperationName());
   StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
   build(builder, state, res, {}, nameAttr, transient);
-  return cast<AllocOp>(rewriter.createOperation(state));
+  return cast<AllocOp>(rewriter.create(state));
 }
 
 AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
@@ -1028,7 +1001,7 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
   state.addAttribute("indices", attrArr);
 
   build(builder, state, t, indices, mem);
-  return cast<LoadOp>(rewriter.createOperation(state));
+  return cast<LoadOp>(rewriter.create(state));
 }
 
 LoadOp LoadOp::create(Location loc, AllocOp alloc, ValueRange indices) {
@@ -1055,17 +1028,20 @@ LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
   return cast<LoadOp>(Operation::create(state));
 }
 
-static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
+ParseResult LoadOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType memletOperand;
+  OpAsmParser::UnresolvedOperand memletOperand;
   if (parser.parseOperand(memletOperand))
     return failure();
 
   if (parser.parseLSquare())
     return failure();
-  parseNumberList(parser, result, "indices");
+
+  if (parseNumberList(parser, result, "indices"))
+    return failure();
+
   if (parser.parseRSquare())
     return failure();
 
@@ -1087,25 +1063,25 @@ static ParseResult parseLoadOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, LoadOp op) {
-  printOptionalAttrDictNoNumList(p, op->getAttrs(),
+void LoadOp::print(OpAsmPrinter &p) {
+  printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  /*elidedAttrs*/ {"indices"});
-  p << ' ' << op.arr();
+  p << ' ' << arr();
   p << "[";
-  printNumberList(p, op.getOperation(), "indices");
+  printNumberList(p, getOperation(), "indices");
   p << "]";
   p << " : ";
-  p << ArrayRef<Type>(op.arr().getType());
+  p << ArrayRef<Type>(arr().getType());
   p << " -> ";
-  p << ArrayRef<Type>(op.res().getType());
+  p << ArrayRef<Type>(res().getType());
 }
 
-LogicalResult verify(LoadOp op) {
-  size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size = utils::getSizedType(op.arr().getType()).getRank();
+LogicalResult LoadOp::verify() {
+  size_t idx_size = getNumListSize(getOperation(), "indices");
+  size_t mem_size = utils::getSizedType(arr().getType()).getRank();
 
   if (idx_size != mem_size)
-    return op.emitOpError("incorrect number of indices for load");
+    return emitOpError("incorrect number of indices for load");
 
   return success();
 }
@@ -1133,7 +1109,7 @@ StoreOp StoreOp::create(PatternRewriter &rewriter, Location loc, Value val,
   state.addAttribute("indices", attrArr);
 
   build(builder, state, indices, val, mem);
-  return cast<StoreOp>(rewriter.createOperation(state));
+  return cast<StoreOp>(rewriter.create(state));
 }
 
 StoreOp StoreOp::create(Location loc, Value val, Value mem,
@@ -1198,23 +1174,26 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem) {
   return cast<StoreOp>(Operation::create(state));
 }
 
-static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
+ParseResult StoreOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType valOperand;
+  OpAsmParser::UnresolvedOperand valOperand;
   if (parser.parseOperand(valOperand))
     return failure();
   if (parser.parseComma())
     return failure();
 
-  OpAsmParser::OperandType memletOperand;
+  OpAsmParser::UnresolvedOperand memletOperand;
   if (parser.parseOperand(memletOperand))
     return failure();
 
   if (parser.parseLSquare())
     return failure();
-  parseNumberList(parser, result, "indices");
+
+  if (parseNumberList(parser, result, "indices"))
+    return failure();
+
   if (parser.parseRSquare())
     return failure();
 
@@ -1238,25 +1217,25 @@ static ParseResult parseStoreOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, StoreOp op) {
-  printOptionalAttrDictNoNumList(p, op->getAttrs(),
+void StoreOp::print(OpAsmPrinter &p) {
+  printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  /*elidedAttrs=*/{"indices"});
-  p << ' ' << op.val() << "," << ' ' << op.arr();
+  p << ' ' << val() << "," << ' ' << arr();
   p << "[";
-  printNumberList(p, op.getOperation(), "indices");
+  printNumberList(p, getOperation(), "indices");
   p << "]";
   p << " : ";
-  p << ArrayRef<Type>(op.val().getType());
+  p << ArrayRef<Type>(val().getType());
   p << " -> ";
-  p << ArrayRef<Type>(op.arr().getType());
+  p << ArrayRef<Type>(arr().getType());
 }
 
-LogicalResult verify(StoreOp op) {
-  size_t idx_size = getNumListSize(op.getOperation(), "indices");
-  size_t mem_size = utils::getSizedType(op.arr().getType()).getRank();
+LogicalResult StoreOp::verify() {
+  size_t idx_size = getNumListSize(getOperation(), "indices");
+  size_t mem_size = utils::getSizedType(arr().getType()).getRank();
 
   if (idx_size != mem_size)
-    return op.emitOpError("incorrect number of indices for store");
+    return emitOpError("incorrect number of indices for store");
 
   return success();
 }
@@ -1267,18 +1246,18 @@ bool StoreOp::isIndirect() { return !indices().empty(); }
 // CopyOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result) {
+ParseResult CopyOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType srcOperand;
+  OpAsmParser::UnresolvedOperand srcOperand;
   if (parser.parseOperand(srcOperand))
     return failure();
 
   if (parser.parseArrow())
     return failure();
 
-  OpAsmParser::OperandType destOperand;
+  OpAsmParser::UnresolvedOperand destOperand;
   if (parser.parseOperand(destOperand))
     return failure();
 
@@ -1295,25 +1274,24 @@ static ParseResult parseCopyOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, CopyOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.src() << " -> " << op.dest();
+void CopyOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << ' ' << src() << " -> " << dest();
   p << " : ";
-  p << ArrayRef<Type>(op.src().getType());
+  p << ArrayRef<Type>(src().getType());
 }
 
-LogicalResult verify(CopyOp op) { return success(); }
+LogicalResult CopyOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // MemletCastOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseMemletCastOp(OpAsmParser &parser,
-                                     OperationState &result) {
+ParseResult MemletCastOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType memletOperand;
+  OpAsmParser::UnresolvedOperand memletOperand;
   if (parser.parseOperand(memletOperand))
     return failure();
 
@@ -1335,21 +1313,21 @@ static ParseResult parseMemletCastOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, MemletCastOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.src();
+void MemletCastOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << ' ' << src();
   p << " : ";
-  p << ArrayRef<Type>(op.src().getType());
+  p << ArrayRef<Type>(src().getType());
   p << " -> ";
-  p << op.getOperation()->getResultTypes();
+  p << getOperation()->getResultTypes();
 }
 
-LogicalResult verify(MemletCastOp op) {
-  size_t src_size = utils::getSizedType(op.src().getType()).getRank();
-  size_t res_size = utils::getSizedType(op.res().getType()).getRank();
+LogicalResult MemletCastOp::verify() {
+  size_t src_size = utils::getSizedType(src().getType()).getRank();
+  size_t res_size = utils::getSizedType(res().getType()).getRank();
 
   if (src_size != res_size)
-    return op.emitOpError("incorrect rank for memlet_cast");
+    return emitOpError("incorrect rank for memlet_cast");
 
   return success();
 }
@@ -1358,12 +1336,11 @@ LogicalResult verify(MemletCastOp op) {
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseViewCastOp(OpAsmParser &parser,
-                                   OperationState &result) {
+ParseResult ViewCastOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType memletOperand;
+  OpAsmParser::UnresolvedOperand memletOperand;
   if (parser.parseOperand(memletOperand))
     return failure();
 
@@ -1385,21 +1362,21 @@ static ParseResult parseViewCastOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, ViewCastOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.src();
+void ViewCastOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << ' ' << src();
   p << " : ";
-  p << ArrayRef<Type>(op.src().getType());
+  p << ArrayRef<Type>(src().getType());
   p << " -> ";
-  p << op.getOperation()->getResultTypes();
+  p << getOperation()->getResultTypes();
 }
 
-LogicalResult verify(ViewCastOp op) {
-  size_t src_size = utils::getSizedType(op.src().getType()).getRank();
-  size_t res_size = utils::getSizedType(op.res().getType()).getRank();
+LogicalResult ViewCastOp::verify() {
+  size_t src_size = utils::getSizedType(src().getType()).getRank();
+  size_t res_size = utils::getSizedType(res().getType()).getRank();
 
   if (src_size != res_size)
-    return op.emitOpError("incorrect rank for view_cast");
+    return emitOpError("incorrect rank for view_cast");
 
   return success();
 }
@@ -1408,11 +1385,11 @@ LogicalResult verify(ViewCastOp op) {
 // SubviewOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseSubviewOp(OpAsmParser &parser, OperationState &result) {
+ParseResult SubviewOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType memletOperand;
+  OpAsmParser::UnresolvedOperand memletOperand;
   if (parser.parseOperand(memletOperand))
     return failure();
 
@@ -1446,34 +1423,33 @@ static ParseResult parseSubviewOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, SubviewOp op) {
-  printOptionalAttrDictNoNumList(p, op->getAttrs(),
+void SubviewOp::print(OpAsmPrinter &p) {
+  printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  {"offsets", "sizes", "strides"});
-  p << ' ' << op.src() << "[";
-  printNumberList(p, op.getOperation(), "offsets");
+  p << ' ' << src() << "[";
+  printNumberList(p, getOperation(), "offsets");
   p << "][";
-  printNumberList(p, op.getOperation(), "sizes");
+  printNumberList(p, getOperation(), "sizes");
   p << "][";
-  printNumberList(p, op.getOperation(), "strides");
+  printNumberList(p, getOperation(), "strides");
   p << "]";
   p << " : ";
-  p << ArrayRef<Type>(op.src().getType());
+  p << ArrayRef<Type>(src().getType());
   p << " -> ";
-  p << op.getOperation()->getResultTypes();
+  p << getOperation()->getResultTypes();
 }
 
-LogicalResult verify(SubviewOp op) { return success(); }
+LogicalResult SubviewOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamPopOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStreamPopOp(OpAsmParser &parser,
-                                    OperationState &result) {
+ParseResult StreamPopOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType streamOperand;
+  OpAsmParser::UnresolvedOperand streamOperand;
   if (parser.parseOperand(streamOperand))
     return failure();
 
@@ -1495,33 +1471,32 @@ static ParseResult parseStreamPopOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, StreamPopOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.str();
+void StreamPopOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << ' ' << str();
   p << " : ";
-  p << ArrayRef<Type>(op.str().getType());
+  p << ArrayRef<Type>(str().getType());
   p << " -> ";
-  p << ArrayRef<Type>(op.res().getType());
+  p << ArrayRef<Type>(res().getType());
 }
 
-LogicalResult verify(StreamPopOp op) { return success(); }
+LogicalResult StreamPopOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamPushOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStreamPushOp(OpAsmParser &parser,
-                                     OperationState &result) {
+ParseResult StreamPushOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType valOperand;
+  OpAsmParser::UnresolvedOperand valOperand;
   if (parser.parseOperand(valOperand))
     return failure();
   if (parser.parseComma())
     return failure();
 
-  OpAsmParser::OperandType streamOperand;
+  OpAsmParser::UnresolvedOperand streamOperand;
   if (parser.parseOperand(streamOperand))
     return failure();
 
@@ -1545,27 +1520,26 @@ static ParseResult parseStreamPushOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, StreamPushOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.val() << ", " << op.str();
+void StreamPushOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << ' ' << val() << ", " << str();
   p << " : ";
-  p << ArrayRef<Type>(op.val().getType());
+  p << ArrayRef<Type>(val().getType());
   p << " -> ";
-  p << ArrayRef<Type>(op.str().getType());
+  p << ArrayRef<Type>(str().getType());
 }
 
-LogicalResult verify(StreamPushOp op) { return success(); }
+LogicalResult StreamPushOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamLengthOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseStreamLengthOp(OpAsmParser &parser,
-                                       OperationState &result) {
+ParseResult StreamLengthOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  OpAsmParser::OperandType streamOperand;
+  OpAsmParser::UnresolvedOperand streamOperand;
   if (parser.parseOperand(streamOperand))
     return failure();
 
@@ -1587,26 +1561,26 @@ static ParseResult parseStreamLengthOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, StreamLengthOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  p << ' ' << op.str();
+void StreamLengthOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << ' ' << str();
   p << " : ";
-  p << ArrayRef<Type>(op.str().getType());
+  p << ArrayRef<Type>(str().getType());
   p << " -> ";
-  p << op.getOperation()->getResultTypes();
+  p << getOperation()->getResultTypes();
 }
 
-LogicalResult verify(StreamLengthOp op) { return success(); }
+LogicalResult StreamLengthOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
+ParseResult sdfg::ReturnOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
-  SmallVector<OpAsmParser::OperandType, 4> returnOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> returnOperands;
   if (parser.parseOperandList(returnOperands))
     return failure();
 
@@ -1621,17 +1595,17 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, sdfg::ReturnOp op) {
-  p.printOptionalAttrDict(op->getAttrs());
-  if (op.getNumOperands() > 0)
-    p << ' ' << op.input() << " : " << op.input().getTypes();
+void sdfg::ReturnOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  if (getNumOperands() > 0)
+    p << ' ' << input() << " : " << input().getTypes();
 }
 
-LogicalResult verify(sdfg::ReturnOp op) {
-  TaskletNode task = dyn_cast<TaskletNode>(op->getParentOp());
+LogicalResult sdfg::ReturnOp::verify() {
+  TaskletNode task = dyn_cast<TaskletNode>((*this)->getParentOp());
 
-  if (task.getResultTypes() != op.getOperandTypes())
-    return op.emitOpError("must match tasklet return types");
+  if (task.getResultTypes() != getOperandTypes())
+    return emitOpError("must match tasklet return types");
 
   return success();
 }
@@ -1641,7 +1615,7 @@ sdfg::ReturnOp sdfg::ReturnOp::create(PatternRewriter &rewriter, Location loc,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, input);
-  return cast<sdfg::ReturnOp>(rewriter.createOperation(state));
+  return cast<sdfg::ReturnOp>(rewriter.create(state));
 }
 
 sdfg::ReturnOp sdfg::ReturnOp::create(Location loc, mlir::ValueRange input) {
@@ -1655,7 +1629,7 @@ sdfg::ReturnOp sdfg::ReturnOp::create(Location loc, mlir::ValueRange input) {
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result) {
+ParseResult LibCallOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -1664,7 +1638,7 @@ static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result) {
                             "callee", result.attributes))
     return failure();
 
-  SmallVector<OpAsmParser::OperandType, 4> operandsOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> operandsOperands;
   if (parser.parseOperandList(operandsOperands, OpAsmParser::Delimiter::Paren))
     return failure();
 
@@ -1683,17 +1657,18 @@ static ParseResult parseLibCallOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, LibCallOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"callee"});
+void LibCallOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict(getOperation()->getAttrs(),
+                          /*elidedAttrs=*/{"callee"});
   p << ' ';
-  p.printAttributeWithoutType(op.calleeAttr());
-  p << " (" << op.operands() << ")";
+  p.printAttributeWithoutType(calleeAttr());
+  p << " (" << operands() << ")";
   p << " : ";
-  p.printFunctionalType(op.operands().getTypes(),
-                        op.getOperation()->getResultTypes());
+  p.printFunctionalType(operands().getTypes(),
+                        getOperation()->getResultTypes());
 }
 
-LogicalResult verify(LibCallOp op) { return success(); }
+LogicalResult LibCallOp::verify() { return success(); }
 
 std::string LibCallOp::getInputName(unsigned idx) {
   if (getOperation()->hasAttr("inputs")) {
@@ -1730,7 +1705,7 @@ AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, sym);
-  return cast<AllocSymbolOp>(rewriter.createOperation(state));
+  return cast<AllocSymbolOp>(rewriter.create(state));
 }
 
 AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
@@ -1740,8 +1715,7 @@ AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
   return cast<AllocSymbolOp>(Operation::create(state));
 }
 
-static ParseResult parseAllocSymbolOp(OpAsmParser &parser,
-                                      OperationState &result) {
+ParseResult AllocSymbolOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr symAttr;
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1757,25 +1731,25 @@ static ParseResult parseAllocSymbolOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, AllocSymbolOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"sym"});
+void AllocSymbolOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"sym"});
   p << " (";
-  p.printAttributeWithoutType(op.symAttr());
+  p.printAttributeWithoutType(symAttr());
   p << ")";
 }
 
-LogicalResult verify(AllocSymbolOp op) {
-  if (op.sym().empty())
-    return op.emitOpError("failed to verify that input string is not empty");
+LogicalResult AllocSymbolOp::verify() {
+  if (sym().empty())
+    return emitOpError("failed to verify that input string is not empty");
 
-  if (!isalpha(op.sym().front()))
-    return op.emitOpError("failed to verify that input string starts with "
-                          "an alphabetical character");
+  if (!isalpha(sym().front()))
+    return emitOpError("failed to verify that input string starts with "
+                       "an alphabetical character");
 
-  for (char c : op.sym())
+  for (char c : sym())
     if (!isalnum(c) && c != '_')
-      return op.emitOpError("failed to verify that input string only "
-                            "contains alphanumeric characters");
+      return emitOpError("failed to verify that input string only "
+                         "contains alphanumeric characters");
 
   return success();
 }
@@ -1789,7 +1763,7 @@ SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
   build(builder, state, type, expr);
-  return cast<SymOp>(rewriter.createOperation(state));
+  return cast<SymOp>(rewriter.create(state));
 }
 
 SymOp SymOp::create(Location loc, Type type, StringRef expr) {
@@ -1799,7 +1773,7 @@ SymOp SymOp::create(Location loc, Type type, StringRef expr) {
   return cast<SymOp>(Operation::create(state));
 }
 
-static ParseResult parseSymOp(OpAsmParser &parser, OperationState &result) {
+ParseResult SymOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
 
@@ -1817,14 +1791,14 @@ static ParseResult parseSymOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void print(OpAsmPrinter &p, SymOp op) {
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"expr"});
+void SymOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"expr"});
   p << " (";
-  p.printAttributeWithoutType(op.exprAttr());
-  p << ") : " << op->getResultTypes();
+  p.printAttributeWithoutType(exprAttr());
+  p << ") : " << getOperation()->getResultTypes();
 }
 
-LogicalResult verify(SymOp op) { return success(); }
+LogicalResult SymOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions

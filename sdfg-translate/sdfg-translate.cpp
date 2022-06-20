@@ -1,6 +1,6 @@
 #include "mlir/InitAllTranslations.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/MlirTranslateMain.h"
 #include "llvm/IR/LLVMContext.h"
 
 #include "SDFG/Translate/Translation.h"

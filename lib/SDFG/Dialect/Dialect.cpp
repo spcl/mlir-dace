@@ -101,28 +101,49 @@ static void printDimensionList(AsmPrinter &printer, Type &elemType,
   printer << elemType << ">";
 }
 
-#define GET_TYPEDEF_CLASSES
-#include "SDFG/Dialect/OpsTypes.cpp.inc"
-
-Type SDFGDialect::parseType(DialectAsmParser &parser) const {
-  StringRef mnemonic;
-  if (parser.parseKeyword(&mnemonic))
+::mlir::Type ArrayType::parse(::mlir::AsmParser &odsParser) {
+  Type elementType;
+  SmallVector<StringAttr> symbols;
+  SmallVector<int64_t> integers;
+  SmallVector<bool> shape;
+  if (parseDimensionList(odsParser, elementType, symbols, integers, shape))
     return Type();
 
-  Type genType;
-  OptionalParseResult parseResult =
-      generatedTypeParser(parser, mnemonic, genType);
-  if (parseResult.hasValue())
-    return genType;
-
-  llvm::SMLoc typeLoc = parser.getCurrentLocation();
-  parser.emitError(typeLoc, "unknown type in SDFG dialect");
-
-  return Type();
+  SizedType sized = SizedType::get(odsParser.getContext(), elementType, symbols,
+                                   integers, shape);
+  return get(odsParser.getContext(), sized);
 }
 
-void SDFGDialect::printType(Type type, DialectAsmPrinter &os) const {
-  LogicalResult logRes = generatedTypePrinter(type, os);
-  if (logRes.failed())
-    emitError(nullptr, "Failed to print dialect type");
+void ArrayType::print(::mlir::AsmPrinter &odsPrinter) const {
+  Type elemType = getDimensions().getElementType();
+  ArrayRef<StringAttr> symbols = getDimensions().getSymbols();
+  ArrayRef<int64_t> integers = getDimensions().getIntegers();
+  ArrayRef<bool> shape = getDimensions().getShape();
+
+  printDimensionList(odsPrinter, elemType, symbols, integers, shape);
 }
+
+::mlir::Type StreamType::parse(::mlir::AsmParser &odsParser) {
+  Type elementType;
+  SmallVector<StringAttr> symbols;
+  SmallVector<int64_t> integers;
+  SmallVector<bool> shape;
+  if (parseDimensionList(odsParser, elementType, symbols, integers, shape))
+    return Type();
+
+  SizedType sized = SizedType::get(odsParser.getContext(), elementType, symbols,
+                                   integers, shape);
+  return get(odsParser.getContext(), sized);
+}
+
+void StreamType::print(::mlir::AsmPrinter &odsPrinter) const {
+  Type elemType = getDimensions().getElementType();
+  ArrayRef<StringAttr> symbols = getDimensions().getSymbols();
+  ArrayRef<int64_t> integers = getDimensions().getIntegers();
+  ArrayRef<bool> shape = getDimensions().getShape();
+
+  printDimensionList(odsPrinter, elemType, symbols, integers, shape);
+}
+
+#define GET_TYPEDEF_CLASSES
+#include "SDFG/Dialect/OpsTypes.cpp.inc"

@@ -11,6 +11,6 @@ add_mlir_translation_library(
 
   LINK_LIBS PUBLIC
   MLIRIR
-  MLIRTranslation
+  MLIRTranslateLib
   SDFG_UTILS
 )

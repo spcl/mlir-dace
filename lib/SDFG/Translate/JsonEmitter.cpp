@@ -1,5 +1,4 @@
 #include "SDFG/Translate/JsonEmitter.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/Types.h"
 
 using namespace mlir;

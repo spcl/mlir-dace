@@ -2,7 +2,7 @@
 #define SDFG_EdgeOp
 
 def SDFG_EdgeOp : SDFG_Op<"edge", [
-    HasParent<"SDFGNode">,
+    ParentOneOf<["SDFGNode", "NestedSDFGNode"]>,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>
 ]> {
     let summary = "edge operation";

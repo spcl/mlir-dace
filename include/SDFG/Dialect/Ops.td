@@ -7,11 +7,10 @@ include "SDFG/Dialect/Dialect.td"
 // Base class for all SDFG ops
 //===----------------------------------------------------------------------===//
 
-class SDFG_Op<string mnemonic, list<OpTrait> traits = []> : 
+class SDFG_Op<string mnemonic, list<Trait> traits = []> : 
                                             Op<SDFG_Dialect, mnemonic, traits>{
-    let parser = [{ return ::parse$cppClass(parser, result); }];
-    let printer = [{ ::print(p, *this); }];
-    let verifier = [{ return ::verify(*this); }];
+    let hasCustomAssemblyFormat = 1;
+    let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

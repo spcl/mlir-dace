@@ -1,9 +1,9 @@
 #ifndef SDFG_DIALECT_DIALECT_H
 #define SDFG_DIALECT_DIALECT_H
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/InitAllDialects.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 

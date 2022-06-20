@@ -62,7 +62,7 @@ std::string codeLanguageToString(CodeLanguage lang) {
   return "Unsupported CodeLanguage";
 }
 
-void printRangeVector(std::vector<Range> ranges, std::string name,
+void printRangeVector(std::vector<translation::Range> ranges, std::string name,
                       emitter::JsonEmitter &jemit) {
   if (ranges.empty()) {
     jemit.printKVPair(name, "null", /*stringify=*/false);
@@ -72,7 +72,7 @@ void printRangeVector(std::vector<Range> ranges, std::string name,
   jemit.startNamedObject(name);
   jemit.printKVPair("type", "Range");
   jemit.startNamedList("ranges");
-  for (Range r : ranges)
+  for (translation::Range r : ranges)
     r.emit(jemit);
   jemit.endList();   // ranges
   jemit.endObject(); // name
@@ -146,7 +146,7 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 // Range
 //===----------------------------------------------------------------------===//
 
-void Range::emit(emitter::JsonEmitter &jemit) {
+void translation::Range::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("start", start);
   jemit.printKVPair("end", end);

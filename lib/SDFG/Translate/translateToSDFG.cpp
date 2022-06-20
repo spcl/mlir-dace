@@ -2,7 +2,6 @@
 #include "SDFG/Translate/Translation.h"
 #include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/DenseMap.h"
 #include <regex>

@@ -2,6 +2,7 @@
 #define SDFG_Dialect
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
@@ -52,54 +53,34 @@ def SDFG_SizedType : SDFG_Type<"Sized">{
     }];
 }
 
-class SDFG_SizedBaseType<string name> : SDFG_Type<name>{
-    let parameters = (ins SDFG_SizedType:$dimensions);
-
-    let printer = [{
-        Type elemType = getImpl()->dimensions.getElementType();
-        ArrayRef<StringAttr> symbols = getImpl()->dimensions.getSymbols();
-        ArrayRef<int64_t> integers = getImpl()->dimensions.getIntegers();
-        ArrayRef<bool> shape = getImpl()->dimensions.getShape();
-
-        printDimensionList($_printer, elemType, symbols, integers, shape);
-    }];
-
-    let parser = [{
-        Type elementType;
-        SmallVector<StringAttr> symbols;
-        SmallVector<int64_t> integers;
-        SmallVector<bool> shape;
-        if(parseDimensionList($_parser, elementType, symbols, integers, shape))
-            return Type();
-
-        
-        SizedType sized = SizedType::get($_ctxt, elementType, symbols, integers, shape);
-        return get($_ctxt, sized);
-    }];
-}
-
 //===----------------------------------------------------------------------===//
 // ArrayType
 //===----------------------------------------------------------------------===//
 
-def SDFG_ArrayType : SDFG_SizedBaseType<"Array">{
+def SDFG_ArrayType : SDFG_Type<"Array">{
     let mnemonic = "array";
     let summary = "A array type";
     let description = [{
         A type representing a array.
     }];
+
+    let parameters = (ins SDFG_SizedType:$dimensions);
+    let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
 // StreamType
 //===----------------------------------------------------------------------===//
 
-def SDFG_StreamType : SDFG_SizedBaseType<"Stream">{
+def SDFG_StreamType : SDFG_Type<"Stream">{
     let mnemonic = "stream";
     let summary = "A stream type";
     let description = [{
         A type representing a stream.
     }];
+
+    let parameters = (ins SDFG_SizedType:$dimensions);
+    let hasCustomAssemblyFormat = 1;
 }
 
 #endif // SDFG_Dialect

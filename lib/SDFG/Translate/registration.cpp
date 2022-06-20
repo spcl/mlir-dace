@@ -1,6 +1,6 @@
 #include "SDFG/Translate/Translation.h"
 #include "mlir/InitAllDialects.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 //===----------------------------------------------------------------------===//
 // SDFG registration
@@ -27,7 +27,7 @@ void mlir::sdfg::translation::registerToSDFGTranslation() {
       },
       [](mlir::DialectRegistry &registry) {
         registry.insert<mlir::sdfg::SDFGDialect>();
-        registry.insert<mlir::StandardOpsDialect>();
+        registry.insert<mlir::func::FuncDialect>();
         registry.insert<mlir::arith::ArithmeticDialect>();
       });
 }
