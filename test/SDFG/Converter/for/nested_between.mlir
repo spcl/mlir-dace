@@ -1,5 +1,5 @@
 // RUN: sdfg-opt --convert-to-sdfg %s
-func private @kernel_2mm(%arg4: f64, %arg6: memref<?x900xf64>) {
+func.func private @kernel_2mm(%arg4: f64, %arg6: memref<?x900xf64>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   scf.for %arg12 = %c0 to %c0 step %c1 {

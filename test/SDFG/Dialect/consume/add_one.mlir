@@ -12,8 +12,8 @@ sdfg.sdfg () -> (%r: !sdfg.array<i32>){
   // CHECK: sdfg.state
   // CHECK-SAME: @state_0
   sdfg.state @state_0 {
-    // CHECK: builtin.func @empty
-    builtin.func @empty(%x: !sdfg.stream<i32>) -> i1{
+    // CHECK: func.func @empty
+    func.func @empty(%x: !sdfg.stream<i32>) -> i1{
       %0 = arith.constant 0 : i32
       %length = sdfg.stream_length %x : !sdfg.stream<i32> -> i32
       %isZero = arith.cmpi "eq", %length, %0 : i32

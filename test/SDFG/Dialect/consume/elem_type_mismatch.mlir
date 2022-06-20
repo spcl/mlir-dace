@@ -6,7 +6,7 @@ sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
   %C = sdfg.alloc() : !sdfg.array<6xi64>
 
   sdfg.state @state_0 {
-    builtin.func @empty(%x: !sdfg.stream<i32>) -> i1{
+    func.func @empty(%x: !sdfg.stream<i32>) -> i1{
       %0 = arith.constant 0 : i32
       %length = sdfg.stream_length %x : !sdfg.stream<i32> -> i32
       %isZero = arith.cmpi "eq", %length, %0 : i32

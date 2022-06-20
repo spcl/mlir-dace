@@ -2,7 +2,7 @@
 // CHECK: failed to legalize operation 'affine.for'
 
 module{
-    func @kernel_2mm(%ni: index) {   
+    func.func @kernel_2mm(%ni: index) {   
         affine.for %i = 0 to %ni {
         }
         return
