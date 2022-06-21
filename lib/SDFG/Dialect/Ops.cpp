@@ -232,7 +232,12 @@ SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), nullptr, num_args);
   SDFGNode sdfg = cast<SDFGNode>(rewriter.create(state));
-  rewriter.createBlock(&sdfg.getRegion(), {}, args);
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < args.size(); ++i)
+    locs.push_back(loc);
+
+  rewriter.createBlock(&sdfg.getRegion(), {}, args, locs);
   return sdfg;
 }
 
@@ -511,7 +516,12 @@ TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
   build(builder, state, results, utils::generateID(), operands);
 
   TaskletNode task = cast<TaskletNode>(rewriter.create(state));
-  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes());
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < operands.size(); ++i)
+    locs.push_back(location);
+
+  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes(), locs);
   return task;
 }
 
@@ -522,7 +532,12 @@ TaskletNode TaskletNode::create(Location location, ValueRange operands,
   build(builder, state, results, utils::generateID(), operands);
 
   TaskletNode task = cast<TaskletNode>(Operation::create(state));
-  builder.createBlock(&task.body(), {}, operands.getTypes());
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < operands.size(); ++i)
+    locs.push_back(location);
+
+  builder.createBlock(&task.body(), {}, operands.getTypes(), locs);
   return task;
 }
 
@@ -1570,7 +1585,18 @@ void StreamLengthOp::print(OpAsmPrinter &p) {
   p << getOperation()->getResultTypes();
 }
 
-LogicalResult StreamLengthOp::verify() { return success(); }
+LogicalResult StreamLengthOp::verify() {
+  Operation *parent = (*this)->getParentOp();
+  if (parent == nullptr)
+    return emitOpError("must be in a StateNode, MapNode or FuncOp");
+
+  if (isa<StateNode>(parent) || isa<MapNode>(parent) ||
+      isa<func::FuncOp>(parent)) {
+    return success();
+  }
+
+  return emitOpError("must be in a StateNode, MapNode or FuncOp");
+}
 
 //===----------------------------------------------------------------------===//
 // ReturnOp

@@ -4,6 +4,7 @@
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/AsmState.h"
@@ -24,7 +25,7 @@ struct SDFGTarget : public ConversionTarget {
     // Implicit top level module operation is legal
     // if it is empty or only contains a single SDFGNode
     addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
-      size_t numOps = op.body().getBlocks().front().getOperations().size();
+      size_t numOps = op.getBody()->getOperations().size();
       return numOps == 0 || numOps == 1;
     });
     // All other operations are illegal
@@ -150,24 +151,30 @@ bool markedToLink(Operation &op) {
 // Patterns
 //===----------------------------------------------------------------------===//
 
-class FuncToSDFG : public OpConversionPattern<FuncOp> {
+class FuncToSDFG : public OpConversionPattern<func::FuncOp> {
 public:
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncOp op, OpAdaptor adaptor,
+  matchAndRewrite(func::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
 
     SmallVector<Type> args;
     for (unsigned i = 0; i < op.getNumArguments(); i++) {
       MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op.getType().getInput(i));
+      Type nt = memo.convertType(op.getArgumentTypes()[i]);
       args.push_back(nt);
     }
 
     for (unsigned i = 0; i < op.getNumResults(); i++) {
       MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op.getType().getResult(i));
+      Type nt = memo.convertType(op.getResultTypes()[i]);
+
+      if (!nt.isa<ArrayType>()) {
+        SizedType sized = SizedType::get(nt.getContext(), nt, {}, {}, {});
+        nt = ArrayType::get(nt.getContext(), sized);
+      }
+
       args.push_back(nt);
     }
 
@@ -184,11 +191,12 @@ public:
       op.getArgument(i).replaceAllUsesWith(sdfg.body().getArgument(i));
     }
 
-    rewriter.inlineRegionBefore(op.body(), sdfg.body(), sdfg.body().end());
+    rewriter.inlineRegionBefore(op.getBody(), sdfg.body(), sdfg.body().end());
     rewriter.eraseOp(op);
-    rewriter.mergeBlocks(&sdfg.body().getBlocks().back(),
-                         &sdfg.body().getBlocks().front(),
-                         sdfg.body().getArguments());
+
+    rewriter.mergeBlocks(
+        &sdfg.body().getBlocks().back(), &sdfg.body().getBlocks().front(),
+        sdfg.body().getArguments().take_front(sdfg.num_args()));
 
     // hasValue() is inaccessable
     if (rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
@@ -266,13 +274,14 @@ public:
   }
 };
 
-class EraseTerminators : public RewritePattern {
+class EraseTerminators : public ConversionPattern {
 public:
-  EraseTerminators(PatternBenefit benefit, MLIRContext *context)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
+  EraseTerminators(TypeConverter &converter, MLIRContext *context)
+      : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
 
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
 
     if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
@@ -283,8 +292,19 @@ public:
       return success();
     }
 
-    if (isa<mlir::ReturnOp>(op) && !isa<FuncOp>(op->getParentOp())) {
+    if (isa<func::ReturnOp>(op) && !isa<func::FuncOp>(op->getParentOp())) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
+      SDFGNode sdfg = getTopSDFG(state);
+
+      SmallVector<Value> loadedOps =
+          createLoads(rewriter, op->getLoc(), operands);
+
+      for (unsigned i = 0; i < loadedOps.size(); ++i) {
+        StoreOp::create(rewriter, op->getLoc(), loadedOps[i],
+                        sdfg.body().getArgument(sdfg.num_args() + i),
+                        ValueRange());
+      }
+
       linkToLastState(rewriter, op->getLoc(), state);
       if (markedToLink(*op))
         linkToNextState(rewriter, op->getLoc(), state);
@@ -410,8 +430,9 @@ public:
       copies.push_back(&nop);
 
     copies.back()->setAttr("linkToNext", rewriter.getBoolAttr(true));
-    if (op.moveOutOfLoop(copies).failed())
-      return failure();
+
+    for (Operation *oper : copies)
+      op.moveOutOfLoop(oper);
 
     StateNode returnState =
         StateNode::create(rewriter, op.getLoc(), "loopReturn");
@@ -457,7 +478,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   MLIRContext *ctxt = patterns.getContext();
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
-  patterns.add<EraseTerminators>(1, ctxt);
+  patterns.add<EraseTerminators>(converter, ctxt);
   patterns.add<MemrefLoadToSDFG>(converter, ctxt);
   patterns.add<MemrefStoreToSDFG>(converter, ctxt);
   patterns.add<SCFForToSDFG>(converter, ctxt);

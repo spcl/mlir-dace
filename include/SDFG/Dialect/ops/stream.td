@@ -59,9 +59,7 @@ def SDFG_StreamPushOp : SDFG_Op<"stream_push", [
 // StreamLengthOp
 //===----------------------------------------------------------------------===//
 
-def SDFG_StreamLengthOp : SDFG_Op<"stream_length", [
-    ParentOneOf<["StateNode", "MapNode", "FuncOp"]>
-]> {
+def SDFG_StreamLengthOp : SDFG_Op<"stream_length"> {
     let summary = "Stream length operation";
     let description = [{
         Returns the length of the stream.
