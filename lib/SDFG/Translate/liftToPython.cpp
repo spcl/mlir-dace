@@ -174,23 +174,5 @@ Optional<std::string> translation::liftToPython(Operation &op) {
 
 std::string translation::getTaskletName(Operation &op) {
   Operation &firstOp = *op.getRegion(0).getOps().begin();
-
-  if (isa<arith::AddFOp>(firstOp) || isa<arith::AddIOp>(firstOp))
-    return "add";
-  else if (isa<arith::MulFOp>(firstOp) || isa<arith::MulIOp>(firstOp))
-    return "mult";
-  else if (isa<arith::ConstantOp>(firstOp))
-    return "constant";
-  else if (isa<arith::IndexCastOp>(firstOp))
-    return "cast";
-  else if (isa<StoreOp>(firstOp))
-    return "store";
-  else if (isa<LoadOp>(firstOp))
-    return "load";
-  else if (isa<SymOp>(firstOp))
-    return "sym";
-  else if (isa<sdfg::ReturnOp>(firstOp))
-    return "return";
-
-  return "task";
+  return utils::operationToString(firstOp);
 }

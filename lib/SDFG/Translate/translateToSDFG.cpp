@@ -808,7 +808,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   }
 
   Tasklet task(op.getLoc());
-  task.setName("indirect_load" + utils::valueToString(op.arr()));
+  task.setName("indirect_load" + name);
   scope.addNode(task);
 
   Connector taskOut(task, "_out");
