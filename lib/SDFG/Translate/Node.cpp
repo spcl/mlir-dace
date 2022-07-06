@@ -9,6 +9,9 @@ using namespace translation;
 //===----------------------------------------------------------------------===//
 
 DType typeToDtype(Type t) {
+  if (t.isInteger(1))
+    return DType::boolean;
+
   if (t.isInteger(32))
     return DType::int32;
 
@@ -36,6 +39,8 @@ DType typeToDtype(Type t) {
 
 std::string dtypeToString(DType t) {
   switch (t) {
+  case DType::boolean:
+    return "bool";
   case DType::int32:
     return "int32";
   case DType::int64:
