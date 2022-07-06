@@ -24,12 +24,12 @@ struct SDFGTarget : public ConversionTarget {
     addLegalDialect<SDFGDialect>();
     // Implicit top level module operation is legal
     // if it is empty or only contains a single SDFGNode
-    addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
-      size_t numOps = op.getBody()->getOperations().size();
-      return numOps == 0 || numOps == 1;
-    });
+    /*     addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
+          size_t numOps = op.getBody()->getOperations().size();
+          return numOps == 0 || numOps == 1;
+        }); */
     // All other operations are illegal
-    markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
+    // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -158,6 +158,11 @@ public:
   LogicalResult
   matchAndRewrite(func::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+
+    if (op.isDeclaration()) {
+      rewriter.eraseOp(op);
+      return success();
+    }
 
     SmallVector<Type> args;
     for (unsigned i = 0; i < op.getNumArguments(); i++) {
@@ -384,6 +389,67 @@ public:
   }
 };
 
+class MemrefGlobalToSDFG : public OpConversionPattern<memref::GlobalOp> {
+public:
+  using OpConversionPattern<memref::GlobalOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::GlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class MemrefGetGlobalToSDFG : public OpConversionPattern<memref::GetGlobalOp> {
+public:
+  using OpConversionPattern<memref::GetGlobalOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SDFGNode sdfg = getTopSDFG(op);
+
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+
+    Type type = getTypeConverter()->convertType(op.getType());
+    AllocOp alloc =
+        AllocOp::create(rewriter, op->getLoc(), type, adaptor.name(),
+                        /*transient=*/false);
+
+    // TODO: Replace all memref.get_global using the same global array
+
+    rewriter.restoreInsertionPoint(ip);
+    rewriter.replaceOp(op, {alloc});
+    return success();
+  }
+};
+
+class MemrefAllocToSDFG : public OpConversionPattern<memref::AllocOp> {
+public:
+  using OpConversionPattern<memref::AllocOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::AllocOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SDFGNode sdfg = getTopSDFG(op);
+
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+
+    Type type = getTypeConverter()->convertType(op.getType());
+    AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type, "_tmp",
+                                    /*transient=*/true);
+
+    // TODO: Handle params
+
+    rewriter.restoreInsertionPoint(ip);
+    rewriter.replaceOp(op, {alloc});
+    return success();
+  }
+};
+
 class SCFForToSDFG : public OpConversionPattern<scf::ForOp> {
 public:
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
@@ -440,7 +506,7 @@ public:
     rewriter.setInsertionPointAfter(op);
     StateNode exitState = StateNode::create(rewriter, op.getLoc(), "exit");
 
-    rewriter.setInsertionPointAfter(exitState);
+    rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
     ArrayAttr emptyArr = rewriter.getStrArrayAttr({});
     StringAttr emptyStr = rewriter.getStringAttr("1");
     ArrayAttr initArr = rewriter.getStrArrayAttr({idxName + ": ref"});
@@ -469,6 +535,91 @@ public:
   }
 };
 
+class SCFIfToSDFG : public OpConversionPattern<scf::IfOp> {
+public:
+  using OpConversionPattern<scf::IfOp>::OpConversionPattern;
+
+  Value mappedValue(Value val) const {
+    if (val.getDefiningOp() != nullptr && isa<LoadOp>(val.getDefiningOp())) {
+      LoadOp load = cast<LoadOp>(val.getDefiningOp());
+      AllocOp alloc = cast<AllocOp>(load.arr().getDefiningOp());
+      return alloc;
+    }
+
+    return val;
+  }
+
+  LogicalResult
+  matchAndRewrite(scf::IfOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    std::string condName = utils::generateName("cond");
+
+    SDFGNode sdfg = getTopSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    AllocSymbolOp::create(rewriter, op.getLoc(), condName);
+
+    rewriter.restoreInsertionPoint(ip);
+    StateNode init = StateNode::create(rewriter, op.getLoc(), "init");
+    linkToLastState(rewriter, op.getLoc(), init);
+
+    rewriter.setInsertionPointAfter(init);
+    StateNode guard = StateNode::create(rewriter, op.getLoc(), "guard");
+
+    rewriter.setInsertionPointAfter(guard);
+    StateNode ifBranch = StateNode::create(rewriter, op.getLoc(), "if");
+
+    rewriter.setInsertionPointAfter(ifBranch);
+
+    Operation *lastOpThen = nullptr;
+    for (Operation &nop : op.thenBlock()->getOperations())
+      lastOpThen = rewriter.clone(nop);
+
+    if (lastOpThen != nullptr)
+      lastOpThen->setAttr("linkToNext", rewriter.getBoolAttr(true));
+
+    StateNode jump = StateNode::create(rewriter, op.getLoc(), "jump");
+
+    rewriter.setInsertionPointAfter(jump);
+    StateNode elseBranch = StateNode::create(rewriter, op.getLoc(), "else");
+
+    rewriter.setInsertionPointAfter(elseBranch);
+
+    Operation *lastOpElse = nullptr;
+    for (Operation &nop : op.elseBlock()->getOperations())
+      lastOpElse = rewriter.clone(nop);
+
+    if (lastOpElse != nullptr)
+      lastOpElse->setAttr("linkToNext", rewriter.getBoolAttr(true));
+
+    StateNode merge = StateNode::create(rewriter, op.getLoc(), "merge");
+
+    rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+
+    ArrayAttr initArr = rewriter.getStrArrayAttr({condName + ": ref"});
+    StringAttr trueCondition = rewriter.getStringAttr("1");
+    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, trueCondition,
+                   mappedValue(adaptor.getCondition()));
+
+    ArrayAttr emptyArray = rewriter.getStrArrayAttr({});
+    StringAttr condStr = rewriter.getStringAttr(condName);
+    EdgeOp::create(rewriter, op.getLoc(), guard, ifBranch, emptyArray, condStr,
+                   nullptr);
+
+    StringAttr notCondStr = rewriter.getStringAttr("not (" + condName + ")");
+    EdgeOp::create(rewriter, op.getLoc(), guard, elseBranch, emptyArray,
+                   notCondStr, nullptr);
+
+    EdgeOp::create(rewriter, op.getLoc(), jump, merge);
+
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), merge);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -476,12 +627,19 @@ public:
 void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
                                              TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
+
   patterns.add<FuncToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
   patterns.add<EraseTerminators>(converter, ctxt);
+
   patterns.add<MemrefLoadToSDFG>(converter, ctxt);
   patterns.add<MemrefStoreToSDFG>(converter, ctxt);
+  patterns.add<MemrefGlobalToSDFG>(converter, ctxt);
+  patterns.add<MemrefGetGlobalToSDFG>(converter, ctxt);
+  patterns.add<MemrefAllocToSDFG>(converter, ctxt);
+
   patterns.add<SCFForToSDFG>(converter, ctxt);
+  patterns.add<SCFIfToSDFG>(converter, ctxt);
 }
 
 namespace {
