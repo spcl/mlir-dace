@@ -7,5 +7,6 @@ add_library (
   GetParents.cpp
   ValueToString.cpp
   AttributeToString.cpp
+  OperationToString.cpp
 )
 target_include_directories (SDFG_UTILS PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

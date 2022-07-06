@@ -6,6 +6,7 @@
 #include "GetSizedType.h"
 #include "IDGenerator.h"
 #include "NameGenerator.h"
+#include "OperationToString.h"
 #include "Sanitizer.h"
 #include "ValueToString.h"
 
