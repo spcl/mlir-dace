@@ -24,12 +24,9 @@ struct SDFGTarget : public ConversionTarget {
     addLegalDialect<SDFGDialect>();
     // Implicit top level module operation is legal
     // if it is empty or only contains a single SDFGNode
-    /*     addDynamicallyLegalOp<ModuleOp>([](ModuleOp op) {
-          size_t numOps = op.getBody()->getOperations().size();
-          return numOps == 0 || numOps == 1;
-        }); */
+    addLegalOp<ModuleOp>();
     // All other operations are illegal
-    // markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
+    markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -218,6 +215,67 @@ public:
     if (rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
             .getPointer() == nullptr)
       return failure();
+
+    return success();
+  }
+};
+
+class CallToSDFG : public OpConversionPattern<func::CallOp> {
+public:
+  using OpConversionPattern<func::CallOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(func::CallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    std::string callee = op.getCallee().str();
+
+    SDFGNode sdfg = getTopSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+
+    std::vector<AllocOp> allocs = {};
+
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
+      MemrefToMemletConverter memo;
+      Type newType = memo.convertType(op.getResultTypes()[i]);
+      SizedType sized =
+          SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
+      newType = ArrayType::get(op->getLoc().getContext(), sized);
+
+      AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), newType,
+                                      "_" + callee + std::to_string(i) + "_tmp",
+                                      /*transient=*/true);
+      allocs.push_back(alloc);
+    }
+
+    rewriter.restoreInsertionPoint(ip);
+
+    StateNode state = StateNode::create(rewriter, op.getLoc(), "_" + callee);
+
+    std::vector<Value> args = {};
+    for (Value v : adaptor.getOperands())
+      args.push_back(v);
+
+    SmallVector<Value> loadedArgs = createLoads(rewriter, op.getLoc(), args);
+
+    LibCallOp libcall = LibCallOp::create(
+        rewriter, op.getLoc(), op.getResultTypes(), callee, loadedArgs);
+
+    std::vector<Value> loads = {};
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
+      StoreOp::create(rewriter, op->getLoc(), libcall.getResult(i), allocs[i],
+                      ValueRange());
+
+      LoadOp load =
+          LoadOp::create(rewriter, op->getLoc(), allocs[i], ValueRange());
+      loads.push_back(load.getResult());
+    }
+
+    rewriter.replaceOp(op, loads);
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
 
     return success();
   }
@@ -454,25 +512,31 @@ public:
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type, "_alloc_tmp",
                                     /*transient=*/true);
 
-    // TODO: Handle params
     rewriter.restoreInsertionPoint(ip);
     StateNode init = StateNode::create(rewriter, op.getLoc(), "alloc_init");
     linkToLastState(rewriter, op.getLoc(), init);
 
-    rewriter.setInsertionPointAfter(init);
-    StateNode alloc_exit =
-        StateNode::create(rewriter, op.getLoc(), "alloc_exit");
+    StateNode lastState = init;
+    for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+      rewriter.setInsertionPointAfter(lastState);
+      StateNode alloc_param =
+          StateNode::create(rewriter, op.getLoc(), "alloc_param");
 
-    rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
-    std::string sym = utils::getSizedType(type).getSymbols().front().str();
-    ArrayAttr initArr = rewriter.getStrArrayAttr({sym + ": ref"});
-    StringAttr trueCondition = rewriter.getStringAttr("1");
-    EdgeOp::create(rewriter, op.getLoc(), init, alloc_exit, initArr,
-                   trueCondition,
-                   getTransientValue(adaptor.getOperands().front()));
+      rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+
+      std::string sym = utils::getSizedType(type).getSymbols()[i].str();
+      ArrayAttr initArr = rewriter.getStrArrayAttr({sym + ": ref"});
+      StringAttr trueCondition = rewriter.getStringAttr("1");
+
+      EdgeOp::create(rewriter, op.getLoc(), lastState, alloc_param, initArr,
+                     trueCondition,
+                     getTransientValue(adaptor.getOperands()[i]));
+
+      lastState = alloc_param;
+    }
 
     if (markedToLink(*op))
-      linkToNextState(rewriter, op->getLoc(), alloc_exit);
+      linkToNextState(rewriter, op->getLoc(), lastState);
 
     rewriter.replaceOp(op, {alloc});
     return success();
@@ -638,6 +702,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   MLIRContext *ctxt = patterns.getContext();
 
   patterns.add<FuncToSDFG>(converter, ctxt);
+  patterns.add<CallToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
   patterns.add<EraseTerminators>(converter, ctxt);
 
@@ -670,7 +735,7 @@ void GenericToSDFGPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   populateGenericToSDFGConversionPatterns(patterns, converter);
 
-  if (applyPartialConversion(module, target, std::move(patterns)).failed())
+  if (applyFullConversion(module, target, std::move(patterns)).failed())
     signalPassFailure();
 }
 
