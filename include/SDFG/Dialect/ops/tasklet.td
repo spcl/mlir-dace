@@ -63,6 +63,9 @@ def SDFG_LibCallOp : SDFG_Op<"libcall", [
             return (*this)->getAttrOfType<SymbolRefAttr>("callee");
         }
 
+        static sdfg::LibCallOp create(PatternRewriter &rewriter, Location loc,
+                            TypeRange result, StringRef callee,
+                            ValueRange operands);
         std::string getInputName(unsigned idx);
         std::string getOutputName(unsigned idx);
     }];

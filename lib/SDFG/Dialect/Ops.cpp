@@ -1655,6 +1655,15 @@ sdfg::ReturnOp sdfg::ReturnOp::create(Location loc, mlir::ValueRange input) {
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
+LibCallOp LibCallOp::create(PatternRewriter &rewriter, Location loc,
+                            TypeRange result, StringRef callee,
+                            ValueRange operands) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, result, rewriter.getStringAttr(callee), operands);
+  return cast<LibCallOp>(rewriter.create(state));
+}
+
 ParseResult LibCallOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
