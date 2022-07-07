@@ -227,6 +227,7 @@ public:
   LogicalResult
   matchAndRewrite(func::CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Should be nested SDFGs or C++ tasklets
     std::string callee = op.getCallee().str();
 
     SDFGNode sdfg = getTopSDFG(op);
@@ -644,28 +645,46 @@ public:
 
     rewriter.setInsertionPointAfter(ifBranch);
 
-    Operation *lastOpThen = nullptr;
-    for (Operation &nop : op.thenBlock()->getOperations())
-      lastOpThen = rewriter.clone(nop);
+    bool hasThenBlock = op.thenBlock();
 
-    if (lastOpThen != nullptr)
-      lastOpThen->setAttr("linkToNext", rewriter.getBoolAttr(true));
+    if (hasThenBlock) {
+      op.thenBlock()->back().setAttr("linkToNext", rewriter.getBoolAttr(true));
+
+      Block *cont = rewriter.splitBlock(rewriter.getBlock(),
+                                        rewriter.getInsertionPoint());
+
+      rewriter.mergeBlocks(op.thenBlock(), rewriter.getBlock(), {});
+      rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
+    }
 
     StateNode jump = StateNode::create(rewriter, op.getLoc(), "if_jump");
+
+    if (!hasThenBlock) {
+      linkToLastState(rewriter, op.getLoc(), jump);
+    }
 
     rewriter.setInsertionPointAfter(jump);
     StateNode elseBranch = StateNode::create(rewriter, op.getLoc(), "if_else");
 
     rewriter.setInsertionPointAfter(elseBranch);
 
-    Operation *lastOpElse = nullptr;
-    for (Operation &nop : op.elseBlock()->getOperations())
-      lastOpElse = rewriter.clone(nop);
+    bool hasElseBlock = op.elseBlock();
 
-    if (lastOpElse != nullptr)
-      lastOpElse->setAttr("linkToNext", rewriter.getBoolAttr(true));
+    if (hasElseBlock) {
+      op.elseBlock()->back().setAttr("linkToNext", rewriter.getBoolAttr(true));
+
+      Block *cont = rewriter.splitBlock(rewriter.getBlock(),
+                                        rewriter.getInsertionPoint());
+
+      rewriter.mergeBlocks(op.elseBlock(), rewriter.getBlock(), {});
+      rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
+    }
 
     StateNode merge = StateNode::create(rewriter, op.getLoc(), "if_merge");
+
+    if (!hasElseBlock) {
+      linkToLastState(rewriter, op.getLoc(), merge);
+    }
 
     rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
 
