@@ -341,7 +341,7 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(LibCallOp &op, ScopeNode &scope) {
   Library lib(op.getLoc());
-  lib.setName(utils::generateName("Lib"));
+  lib.setName(utils::generateName(op.callee().str()));
   lib.setClasspath(op.callee());
   scope.addNode(lib);
 
