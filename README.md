@@ -3,10 +3,9 @@
 [![Translation Test](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml)
 
 # MLIR-DaCe
-Development repository for the Data-Centric MLIR dialect.
+MLIR-DaCe is a project aiming to provide a data-centric dialect in MLIR in order to combine control-centric and data-centric optimizations using the MLIR and DaCe frameworks.
 
 ## Building
-
 This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. To build and launch the tests, run
 ```sh
 mkdir build && cd build
