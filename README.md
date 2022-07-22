@@ -3,7 +3,9 @@
 [![Translation Test](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml)
 
 # MLIR-DaCe
-MLIR-DaCe is a project aiming to provide a data-centric dialect in MLIR in order to combine control-centric and data-centric optimizations using the MLIR and DaCe frameworks.
+MLIR-DaCe is a project aiming to bridge the gap between control-centric and data-centric intermediate representations.
+By bridging these two groups of IRs, it allows the combination of control-centric and data-centric optimizations in optimization pipelines.
+In order to achieve this, MLIR-DaCe provides a data-centric dialect in MLIR in order to connect the MLIR and DaCe frameworks.
 
 ## Building
 This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. To build and launch the tests, run
