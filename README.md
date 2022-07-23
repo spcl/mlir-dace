@@ -5,7 +5,7 @@
 # MLIR-DaCe
 MLIR-DaCe is a project aiming to bridge the gap between control-centric and data-centric intermediate representations.
 By bridging these two groups of IRs, it allows the combination of control-centric and data-centric optimizations in optimization pipelines.
-In order to achieve this, MLIR-DaCe provides a data-centric dialect in MLIR in order to connect the MLIR and DaCe frameworks.
+In order to achieve this, MLIR-DaCe provides a data-centric dialect in MLIR to connect the MLIR and DaCe frameworks.
 
 ## Building
 This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. To build and launch the tests, run
