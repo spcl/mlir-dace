@@ -35,6 +35,7 @@ public:
   MemrefToMemletConverter() {
     addConversion([](Type type) { return type; });
     addConversion(convertMemrefTypes);
+    addConversion(convertLLVMPtrTypes);
   }
 
   static Optional<Type> convertMemrefTypes(Type type) {
@@ -57,6 +58,32 @@ public:
                                        symbols, ints, shape);
 
       return ArrayType::get(mem.getContext(), sized);
+    }
+    return llvm::None;
+  }
+
+  static Optional<Type> convertLLVMPtrTypes(Type type) {
+    if (mlir::LLVM::LLVMPointerType ptrType =
+            type.dyn_cast<mlir::LLVM::LLVMPointerType>()) {
+      SmallVector<int64_t> ints;
+      SmallVector<StringAttr> symbols;
+      SmallVector<bool> shape;
+
+      Type elem = ptrType;
+
+      while (mlir::LLVM::LLVMPointerType elemPtr =
+                 elem.dyn_cast<mlir::LLVM::LLVMPointerType>()) {
+        StringAttr sym =
+            StringAttr::get(ptrType.getContext(), utils::generateName("s"));
+        symbols.push_back(sym);
+        shape.push_back(false);
+        elem = elemPtr.getElementType();
+      }
+
+      SizedType sized =
+          SizedType::get(ptrType.getContext(), elem, symbols, ints, shape);
+
+      return ArrayType::get(ptrType.getContext(), sized);
     }
     return llvm::None;
   }
@@ -712,6 +739,53 @@ public:
   }
 };
 
+class LLVMAllocaToSDFG : public OpConversionPattern<mlir::LLVM::AllocaOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::AllocaOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::AllocaOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SDFGNode sdfg = getTopSDFG(op);
+
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+
+    Type type = getTypeConverter()->convertType(op.getType());
+    AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type, "_alloc_tmp",
+                                    /*transient=*/true);
+
+    rewriter.restoreInsertionPoint(ip);
+    StateNode init = StateNode::create(rewriter, op.getLoc(), "alloc_init");
+    linkToLastState(rewriter, op.getLoc(), init);
+
+    StateNode lastState = init;
+    for (unsigned i = 0; i < op->getNumOperands(); ++i) {
+      rewriter.setInsertionPointAfter(lastState);
+      StateNode alloc_param =
+          StateNode::create(rewriter, op.getLoc(), "alloc_param");
+
+      rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+
+      std::string sym = utils::getSizedType(type).getSymbols()[i].str();
+      ArrayAttr initArr = rewriter.getStrArrayAttr({sym + ": ref"});
+      StringAttr trueCondition = rewriter.getStringAttr("1");
+
+      EdgeOp::create(rewriter, op.getLoc(), lastState, alloc_param, initArr,
+                     trueCondition,
+                     getTransientValue(adaptor.getOperands()[i]));
+
+      lastState = alloc_param;
+    }
+
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), lastState);
+
+    rewriter.replaceOp(op, {alloc});
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -733,6 +807,8 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
 
   patterns.add<SCFForToSDFG>(converter, ctxt);
   patterns.add<SCFIfToSDFG>(converter, ctxt);
+
+  patterns.add<LLVMAllocaToSDFG>(converter, ctxt);
 }
 
 namespace {
@@ -750,7 +826,7 @@ struct GenericToSDFGPass
 } // namespace
 
 // Gets the name of the first function that isn't called by any other function
-std::string getMainFunctionName(ModuleOp moduleOp) {
+llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
   for (func::FuncOp mainFuncOp : moduleOp.getOps<func::FuncOp>()) {
     // No need to check function declarations
     if (mainFuncOp.isDeclaration())
@@ -783,14 +859,16 @@ std::string getMainFunctionName(ModuleOp moduleOp) {
       return mainFuncOp.getName().str();
   }
 
-  return nullptr;
+  return llvm::None;
 }
 
 void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
   // TODO: Find a way to get func name via CLI instead of inferring
-  mainFuncName = getMainFunctionName(module);
+  llvm::Optional<std::string> mainFuncNameOpt = getMainFunctionName(module);
+  if (mainFuncNameOpt)
+    mainFuncName = *mainFuncNameOpt;
 
   // Clear all attributes
   for (NamedAttribute a : module->getAttrs())
