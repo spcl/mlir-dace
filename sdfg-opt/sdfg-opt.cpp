@@ -9,8 +9,6 @@
 #include "SDFG/Dialect/Dialect.h"
 
 int main(int argc, char **argv) {
-  mlir::registerAllPasses();
-
   // Register SDFG passes
   mlir::sdfg::conversion::registerGenericToSDFGPasses();
 

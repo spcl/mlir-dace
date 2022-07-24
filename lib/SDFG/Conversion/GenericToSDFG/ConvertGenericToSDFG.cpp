@@ -736,13 +736,61 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
 }
 
 namespace {
-struct GenericToSDFGPass : public GenericToSDFGPassBase<GenericToSDFGPass> {
+struct GenericToSDFGPass
+    : public sdfg::conversion::GenericToSDFGPassBase<GenericToSDFGPass> {
+  std::string mainFuncName;
+
+  GenericToSDFGPass() = default;
+
+  explicit GenericToSDFGPass(StringRef mainFuncName)
+      : mainFuncName(mainFuncName.str()) {}
+
   void runOnOperation() override;
 };
 } // namespace
 
+// Gets the name of the first function that isn't called by any other function
+std::string getMainFunctionName(ModuleOp moduleOp) {
+  for (func::FuncOp mainFuncOp : moduleOp.getOps<func::FuncOp>()) {
+    // No need to check function declarations
+    if (mainFuncOp.isDeclaration())
+      continue;
+
+    bool foundCallInOtherFunc = false;
+
+    // Check against every other function
+    for (func::FuncOp funcOp : moduleOp.getOps<func::FuncOp>()) {
+      // No need to check function against itself
+      if (funcOp.getName() == mainFuncOp.getName())
+        continue;
+      // No need to check function declarations
+      if (funcOp.isDeclaration())
+        continue;
+
+      // Check every callOp for a call to the main function
+      for (func::CallOp callOp : funcOp.getOps<func::CallOp>()) {
+        if (callOp.getCallee() == mainFuncOp.getName()) {
+          foundCallInOtherFunc = true;
+          break;
+        }
+      }
+
+      if (foundCallInOtherFunc)
+        break;
+    }
+
+    if (!foundCallInOtherFunc)
+      return mainFuncOp.getName().str();
+  }
+
+  return nullptr;
+}
+
 void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
+
+  // TODO: Find a way to get func name via CLI instead of inferring
+  mainFuncName = getMainFunctionName(module);
 
   // Clear all attributes
   for (NamedAttribute a : module->getAttrs())
@@ -758,6 +806,7 @@ void GenericToSDFGPass::runOnOperation() {
     signalPassFailure();
 }
 
-std::unique_ptr<Pass> conversion::createGenericToSDFGPass() {
-  return std::make_unique<GenericToSDFGPass>();
+std::unique_ptr<Pass>
+conversion::createGenericToSDFGPass(StringRef getMainFuncName) {
+  return std::make_unique<GenericToSDFGPass>(getMainFuncName);
 }
