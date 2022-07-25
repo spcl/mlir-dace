@@ -141,31 +141,6 @@ def SDFG_CopyOp : SDFG_Op<"copy", [
 }
 
 //===----------------------------------------------------------------------===//
-// MemletCastOp
-//===----------------------------------------------------------------------===//
-
-def SDFG_MemletCastOp : SDFG_Op<"memlet_cast", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
-]> {
-    let summary = "memlet casting operation";
-    let description = [{
-        Casts a memlet from one view to another.
-        For example:
-
-        ```mlir
-        sdfg.state {
-            ...
-            %B = sdfg.memlet_cast %A : !sdfg.memlet<2x16xi32> -> !sdfg.memlet<32xi32>
-            ...
-        }
-        ```
-    }];
-
-    let arguments = (ins SDFG_ArrayType:$src);
-    let results = (outs SDFG_ArrayType:$res);
-}
-
-//===----------------------------------------------------------------------===//
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 

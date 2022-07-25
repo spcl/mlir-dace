@@ -1299,55 +1299,6 @@ void CopyOp::print(OpAsmPrinter &p) {
 LogicalResult CopyOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
-// MemletCastOp
-//===----------------------------------------------------------------------===//
-
-ParseResult MemletCastOp::parse(OpAsmParser &parser, OperationState &result) {
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-
-  OpAsmParser::UnresolvedOperand memletOperand;
-  if (parser.parseOperand(memletOperand))
-    return failure();
-
-  Type srcType;
-  if (parser.parseColonType(srcType))
-    return failure();
-
-  if (parser.parseArrow())
-    return failure();
-
-  Type destType;
-  if (parser.parseType(destType))
-    return failure();
-  result.addTypes(destType);
-
-  if (parser.resolveOperands(memletOperand, srcType, result.operands))
-    return failure();
-
-  return success();
-}
-
-void MemletCastOp::print(OpAsmPrinter &p) {
-  p.printOptionalAttrDict((*this)->getAttrs());
-  p << ' ' << src();
-  p << " : ";
-  p << ArrayRef<Type>(src().getType());
-  p << " -> ";
-  p << getOperation()->getResultTypes();
-}
-
-LogicalResult MemletCastOp::verify() {
-  size_t src_size = utils::getSizedType(src().getType()).getRank();
-  size_t res_size = utils::getSizedType(res().getType()).getRank();
-
-  if (src_size != res_size)
-    return emitOpError("incorrect rank for memlet_cast");
-
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 
