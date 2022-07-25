@@ -1,6 +1,7 @@
 [![LIT Test](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml)
 [![Parse Test](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml)
 [![Translation Test](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml)
+[![Conversion Test](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml)
 
 # MLIR-DaCe
 MLIR-DaCe is a project aiming to bridge the gap between control-centric and data-centric intermediate representations.
@@ -12,7 +13,7 @@ This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and install
 ```sh
 mkdir build && cd build
 cmake -G Ninja .. -DMLIR_DIR=$PREFIX/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=$BUILD_DIR/bin/llvm-lit
-cmake --build . --target check-sdir-opt
+cmake --build . --target check-sdfg-opt
 ```
 To build the documentation from the TableGen description of the dialect operations, run
 ```sh
