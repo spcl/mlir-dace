@@ -183,7 +183,7 @@ Value getTransientValue(Value val) {
 }
 
 //===----------------------------------------------------------------------===//
-// Patterns
+// Func Patterns
 //===----------------------------------------------------------------------===//
 
 class FuncToSDFG : public OpConversionPattern<func::FuncOp> {
@@ -309,6 +309,57 @@ public:
   }
 };
 
+class EraseTerminators : public ConversionPattern {
+public:
+  EraseTerminators(TypeConverter &converter, MLIRContext *context)
+      : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
+      StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
+      linkToLastState(rewriter, op->getLoc(), state);
+      if (markedToLink(*op))
+        linkToNextState(rewriter, op->getLoc(), state);
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    if (isa<func::ReturnOp>(op) && !isa<func::FuncOp>(op->getParentOp())) {
+      StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
+      SDFGNode sdfg = getTopSDFG(state);
+
+      SmallVector<Value> loadedOps =
+          createLoads(rewriter, op->getLoc(), operands);
+
+      for (unsigned i = 0; i < loadedOps.size(); ++i) {
+        if (loadedOps[i].getType().isa<ArrayType>()) {
+          CopyOp::create(rewriter, op->getLoc(), loadedOps[i],
+                         sdfg.body().getArgument(sdfg.num_args() + i));
+        } else {
+          StoreOp::create(rewriter, op->getLoc(), loadedOps[i],
+                          sdfg.body().getArgument(sdfg.num_args() + i),
+                          ValueRange());
+        }
+      }
+
+      linkToLastState(rewriter, op->getLoc(), state);
+      if (markedToLink(*op))
+        linkToNextState(rewriter, op->getLoc(), state);
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Arith & Math Patterns
+//===----------------------------------------------------------------------===//
+
 class OpToTasklet : public ConversionPattern {
 public:
   OpToTasklet(TypeConverter &converter, MLIRContext *context)
@@ -378,47 +429,9 @@ public:
   }
 };
 
-class EraseTerminators : public ConversionPattern {
-public:
-  EraseTerminators(TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
-
-  LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-
-    if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
-      StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
-      linkToLastState(rewriter, op->getLoc(), state);
-      if (markedToLink(*op))
-        linkToNextState(rewriter, op->getLoc(), state);
-      rewriter.eraseOp(op);
-      return success();
-    }
-
-    if (isa<func::ReturnOp>(op) && !isa<func::FuncOp>(op->getParentOp())) {
-      StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
-      SDFGNode sdfg = getTopSDFG(state);
-
-      SmallVector<Value> loadedOps =
-          createLoads(rewriter, op->getLoc(), operands);
-
-      for (unsigned i = 0; i < loadedOps.size(); ++i) {
-        StoreOp::create(rewriter, op->getLoc(), loadedOps[i],
-                        sdfg.body().getArgument(sdfg.num_args() + i),
-                        ValueRange());
-      }
-
-      linkToLastState(rewriter, op->getLoc(), state);
-      if (markedToLink(*op))
-        linkToNextState(rewriter, op->getLoc(), state);
-      rewriter.eraseOp(op);
-      return success();
-    }
-
-    return failure();
-  }
-};
+//===----------------------------------------------------------------------===//
+// Memref Patterns
+//===----------------------------------------------------------------------===//
 
 class MemrefLoadToSDFG : public OpConversionPattern<memref::LoadOp> {
 public:
@@ -570,6 +583,10 @@ public:
     return success();
   }
 };
+
+//===----------------------------------------------------------------------===//
+// SCF Patterns
+//===----------------------------------------------------------------------===//
 
 class SCFForToSDFG : public OpConversionPattern<scf::ForOp> {
 public:
@@ -739,6 +756,10 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+// LLVM Patterns
+//===----------------------------------------------------------------------===//
+
 class LLVMAllocaToSDFG : public OpConversionPattern<mlir::LLVM::AllocaOp> {
 public:
   using OpConversionPattern<mlir::LLVM::AllocaOp>::OpConversionPattern;
@@ -786,6 +807,25 @@ public:
   }
 };
 
+class LLVMBitcastToSDFG : public OpConversionPattern<mlir::LLVM::BitcastOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::BitcastOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::BitcastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SDFGNode sdfg = getTopSDFG(op);
+    rewriter.setInsertionPoint(sdfg.getFirstState());
+
+    Type type = getTypeConverter()->convertType(op.getType());
+    ViewCastOp viewCast =
+        ViewCastOp::create(rewriter, op.getLoc(), adaptor.getArg(), type);
+
+    rewriter.replaceOp(op, {viewCast});
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -809,6 +849,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   patterns.add<SCFIfToSDFG>(converter, ctxt);
 
   patterns.add<LLVMAllocaToSDFG>(converter, ctxt);
+  patterns.add<LLVMBitcastToSDFG>(converter, ctxt);
 }
 
 namespace {

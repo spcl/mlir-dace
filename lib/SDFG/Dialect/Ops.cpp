@@ -1261,6 +1261,18 @@ bool StoreOp::isIndirect() { return !indices().empty(); }
 // CopyOp
 //===----------------------------------------------------------------------===//
 
+CopyOp CopyOp::create(PatternRewriter &rewriter, Location loc, Value src,
+                      Value dst) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  // Makes sure that src and destination type match (reduces symbols)
+  dst.setType(src.getType());
+
+  build(builder, state, src, dst);
+  return cast<CopyOp>(rewriter.create(state));
+}
+
 ParseResult CopyOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1301,6 +1313,14 @@ LogicalResult CopyOp::verify() { return success(); }
 //===----------------------------------------------------------------------===//
 // ViewCastOp
 //===----------------------------------------------------------------------===//
+
+ViewCastOp ViewCastOp::create(PatternRewriter &rewriter, Location loc,
+                              Value array, Type type) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, type, array);
+  return cast<ViewCastOp>(rewriter.create(state));
+}
 
 ParseResult ViewCastOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

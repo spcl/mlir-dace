@@ -138,6 +138,10 @@ def SDFG_CopyOp : SDFG_Op<"copy", [
     }];
 
     let arguments = (ins SDFG_ArrayType:$src, SDFG_ArrayType:$dest);
+
+    let extraClassDeclaration = [{
+        static CopyOp create(PatternRewriter &rewriter, Location loc, Value src, Value dst);
+    }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -145,7 +149,7 @@ def SDFG_CopyOp : SDFG_Op<"copy", [
 //===----------------------------------------------------------------------===//
 
 def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
+    ParentOneOf<["SDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
     let summary = "view node operation";
     let description = [{
@@ -163,6 +167,10 @@ def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
 
     let arguments = (ins SDFG_ArrayType:$src);
     let results = (outs SDFG_ArrayType:$res);
+
+    let extraClassDeclaration = [{
+        static ViewCastOp create(PatternRewriter &rewriter, Location loc, Value array, Type type);
+    }];
 }
 
 //===----------------------------------------------------------------------===//
