@@ -1387,9 +1387,11 @@ SubviewOp SubviewOp::create(PatternRewriter &rewriter, Location loc, Type res,
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
 
-  state.addAttribute("offsets_numList", {});
-  state.addAttribute("sizes_numList", {});
-  state.addAttribute("strides_numList", {});
+  ArrayAttr numArr = rewriter.getArrayAttr({});
+
+  state.addAttribute("offsets_numList", numArr);
+  state.addAttribute("sizes_numList", numArr);
+  state.addAttribute("strides_numList", numArr);
 
   build(builder, state, res, src, offsets, sizes, strides);
   return cast<SubviewOp>(rewriter.create(state));

@@ -178,7 +178,7 @@ def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
 //===----------------------------------------------------------------------===//
 
 def SDFG_SubviewOp : SDFG_Op<"subview", [
-    ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
+    ParentOneOf<["SDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
     let summary = "Subview operation";
     let description = [{
@@ -189,20 +189,25 @@ def SDFG_SubviewOp : SDFG_Op<"subview", [
         ```mlir
         sdfg.state {
             ...
-            %B = sdfg.subview %A[3, 4, 2][1, 6, 3][1, 1, 1] : !sdfg.memlet<8x16x4xi32> -> !sdfg.memlet<6x3xi32>
+            %B = sdfg.subview %A[3, 4, 2][1, 6, 3][1, 1, 1] : !sdfg.array<8x16x4xi32> -> !sdfg.array<6x3xi32>
             ...
         }
         ```
     }];
 
     let arguments = (ins 
-        Variadic<Index>:$ranges,
         SDFG_ArrayType:$src,
         ArrayAttr:$offsets,
         ArrayAttr:$sizes,
         ArrayAttr:$strides
     );
     let results = (outs SDFG_ArrayType:$res);
+
+    let extraClassDeclaration = [{
+        static SubviewOp create(PatternRewriter &rewriter, Location loc, Type res,
+                                 Value src, ArrayAttr offsets, ArrayAttr sizes,
+                                 ArrayAttr strides) ;
+    }];
 }
 
 #endif // SDFG_MemletOps
