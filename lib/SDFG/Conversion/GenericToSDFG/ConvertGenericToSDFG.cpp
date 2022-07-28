@@ -903,6 +903,35 @@ public:
   }
 };
 
+class LLVMStoreToSDFG : public OpConversionPattern<mlir::LLVM::StoreOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::StoreOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::StoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Array and indices have been set by LLVMGEPToSDFG
+
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "store");
+
+    Value val = createLoad(rewriter, op.getLoc(), adaptor.getValue());
+    Value array = createLoad(rewriter, op.getLoc(), adaptor.getAddr());
+
+    SmallVector<Value> indices =
+        adaptor.getOperands().slice(2, op->getNumOperands() - 2);
+    indices = createLoads(rewriter, op.getLoc(), indices);
+
+    StoreOp::create(rewriter, op.getLoc(), val, array, indices);
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -929,6 +958,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   patterns.add<LLVMBitcastToSDFG>(converter, ctxt);
   patterns.add<LLVMGEPToSDFG>(converter, ctxt);
   patterns.add<LLVMLoadToSDFG>(converter, ctxt);
+  patterns.add<LLVMStoreToSDFG>(converter, ctxt);
 }
 
 namespace {
