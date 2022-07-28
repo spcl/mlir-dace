@@ -826,6 +826,83 @@ public:
   }
 };
 
+class LLVMGEPToSDFG : public OpConversionPattern<mlir::LLVM::GEPOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::GEPOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::GEPOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value base = op.getBase();
+    OperandRange indices = op.getIndices();
+    SmallVector<Value> castedIndices = {};
+
+    for (Value idx : indices) {
+      OpBuilder builder(op.getLoc()->getContext());
+      OperationState state(op.getLoc(), arith::IndexCastOp::getOperationName());
+
+      arith::IndexCastOp::build(builder, state, rewriter.getIndexType(), idx);
+      castedIndices.push_back(
+          cast<arith::IndexCastOp>(rewriter.create(state)).getResult());
+    }
+
+    for (Operation *user : op.getRes().getUsers()) {
+      user->insertOperands(user->getNumOperands(), castedIndices);
+    }
+
+    op.getRes().replaceAllUsesWith(base);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class LLVMLoadToSDFG : public OpConversionPattern<mlir::LLVM::LoadOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::LoadOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::LoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Array and indices have been set by LLVMGEPToSDFG
+
+    Type elemT = utils::getSizedType(op.getAddr().getType().cast<ArrayType>())
+                     .getElementType();
+    Type type = getTypeConverter()->convertType(elemT);
+    SizedType sized =
+        SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
+    Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
+
+    SDFGNode sdfg = getTopSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT, "_load_tmp",
+                                    /*transient=*/true);
+
+    rewriter.restoreInsertionPoint(ip);
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "load");
+
+    Value array = createLoad(rewriter, op.getLoc(), adaptor.getAddr());
+
+    SmallVector<Value> indices =
+        adaptor.getOperands().slice(1, op->getNumOperands() - 1);
+    indices = createLoads(rewriter, op.getLoc(), indices);
+
+    LoadOp load = LoadOp::create(rewriter, op.getLoc(), type, array, indices);
+    StoreOp::create(rewriter, op->getLoc(), load, alloc, ValueRange());
+
+    LoadOp newLoad =
+        LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
+    rewriter.replaceOp(op, {newLoad});
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -850,6 +927,8 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
 
   patterns.add<LLVMAllocaToSDFG>(converter, ctxt);
   patterns.add<LLVMBitcastToSDFG>(converter, ctxt);
+  patterns.add<LLVMGEPToSDFG>(converter, ctxt);
+  patterns.add<LLVMLoadToSDFG>(converter, ctxt);
 }
 
 namespace {
