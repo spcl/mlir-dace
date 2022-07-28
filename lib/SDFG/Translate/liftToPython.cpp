@@ -16,10 +16,21 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + nameArg0 + " + " + nameArg1;
   }
 
+  if (isa<arith::SubFOp>(op) || isa<arith::SubIOp>(op)) {
+    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    return nameOut + " = " + nameArg0 + " - " + nameArg1;
+  }
+
   if (isa<arith::MulFOp>(op) || isa<arith::MulIOp>(op)) {
     std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
     std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
     return nameOut + " = " + nameArg0 + " * " + nameArg1;
+  }
+
+  if (isa<arith::NegFOp>(op)) {
+    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
+    return nameOut + " = -" + nameArg0;
   }
 
   if (arith::IndexCastOp indexCast = dyn_cast<arith::IndexCastOp>(op)) {
