@@ -116,12 +116,20 @@ static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
 // InlineSymbol
 //===----------------------------------------------------------------------===//
 
+// There are 3 possible values that can be used as a number: symbols, integers
+// and operands. Operands are stored as regular operands. Symbols as stringAttr
+// and integers as int32 Attr. In order to encode the correct order of values
+// we use an auxiliary attr called [attrName]_numList.
+// The numList contains int32 Attrs with the following encoding:
+// Positive int n: nth operand
+// Negative int n: -nth - 1 Attribute (symbol or integer) in [attrName]
 static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
                                    StringRef attrName) {
   SmallVector<OpAsmParser::UnresolvedOperand> opList;
   SmallVector<Attribute> attrList;
   SmallVector<Attribute> numList;
   int opIdx = result.operands.size();
+  int attrIdx = 1;
 
   do {
     if (parser.parseOptionalKeyword("sym").succeeded()) {
@@ -133,7 +141,8 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
         return failure();
 
       attrList.push_back(stringAttr);
-      numList.push_back(parser.getBuilder().getI32IntegerAttr(-1));
+      numList.push_back(parser.getBuilder().getI32IntegerAttr(-attrIdx));
+      attrIdx++;
       continue;
     }
 
@@ -142,7 +151,8 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
     if (intOPR.hasValue() && intOPR.getValue().succeeded()) {
       Attribute intAttr = parser.getBuilder().getI32IntegerAttr(num);
       attrList.push_back(intAttr);
-      numList.push_back(parser.getBuilder().getI32IntegerAttr(-1));
+      numList.push_back(parser.getBuilder().getI32IntegerAttr(-attrIdx));
+      attrIdx++;
       continue;
     }
 
@@ -178,23 +188,23 @@ static void printNumberList(OpAsmPrinter &p, Operation *op,
   ArrayAttr numList =
       op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
 
-  for (unsigned i = 0, attri = 0; i < numList.size(); ++i) {
+  for (unsigned i = 0; i < numList.size(); ++i) {
     Attribute numAttr = numList[i];
     IntegerAttr num = numAttr.cast<IntegerAttr>();
     if (i > 0)
       p << ", ";
 
     if (num.getValue().isNegative()) {
-      Attribute attr = attrList[attri++];
+      Attribute attr = attrList[-num.getInt() - 1];
 
       if (attr.isa<StringAttr>()) {
         p << "sym(" << attr << ")";
-      } else
+      } else {
         p.printAttributeWithoutType(attr);
+      }
 
     } else {
-      unsigned idx = num.getInt();
-      Value val = op->getOperand(idx);
+      Value val = op->getOperand(num.getInt());
       p.printOperand(val);
     }
   }
@@ -1370,6 +1380,20 @@ LogicalResult ViewCastOp::verify() {
 //===----------------------------------------------------------------------===//
 // SubviewOp
 //===----------------------------------------------------------------------===//
+
+SubviewOp SubviewOp::create(PatternRewriter &rewriter, Location loc, Type res,
+                            Value src, ArrayAttr offsets, ArrayAttr sizes,
+                            ArrayAttr strides) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  state.addAttribute("offsets_numList", {});
+  state.addAttribute("sizes_numList", {});
+  state.addAttribute("strides_numList", {});
+
+  build(builder, state, res, src, offsets, sizes, strides);
+  return cast<SubviewOp>(rewriter.create(state));
+}
 
 ParseResult SubviewOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))

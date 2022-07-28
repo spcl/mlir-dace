@@ -622,12 +622,12 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 
   ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
   ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
-  unsigned symNumCounter = 0;
 
   if (!op.isIndirect()) {
     for (unsigned i = 0; i < numList.size(); ++i) {
+      IntegerAttr num = numList[i].cast<IntegerAttr>();
       std::string idx =
-          utils::attributeToString(symNumList[symNumCounter++], *op);
+          utils::attributeToString(symNumList[-num.getInt() - 1], *op);
       Range range(idx, idx, "1", "1");
       accOut.addRange(range);
     }
@@ -669,7 +669,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
       IntegerAttr num = numList[i].cast<IntegerAttr>();
       if (num.getInt() < 0) {
         std::string idx =
-            utils::attributeToString(symNumList[symNumCounter++], *op);
+            utils::attributeToString(symNumList[-num.getInt() - 1], *op);
         Range range(idx, idx, "1", "1");
         accOut.addRange(range);
       } else {
@@ -710,7 +710,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     IntegerAttr num = numList[i].cast<IntegerAttr>();
     if (num.getInt() < 0) {
       accessCode.append(
-          utils::attributeToString(symNumList[symNumCounter++], *op));
+          utils::attributeToString(symNumList[-num.getInt() - 1], *op));
     } else {
       Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
@@ -741,15 +741,15 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 
   ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
   ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
-  unsigned symNumCounter = 0;
 
   if (!op.isIndirect()) {
     Connector connector = scope.lookup(op.arr());
     connector.setData(name);
 
     for (unsigned i = 0; i < numList.size(); ++i) {
+      IntegerAttr num = numList[i].cast<IntegerAttr>();
       std::string idx =
-          utils::attributeToString(symNumList[symNumCounter++], *op);
+          utils::attributeToString(symNumList[-num.getInt() - 1], *op);
       Range range(idx, idx, "1", "1");
       connector.addRange(range);
     }
@@ -793,7 +793,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
       IntegerAttr num = numList[i].cast<IntegerAttr>();
       if (num.getInt() < 0) {
         std::string idx =
-            utils::attributeToString(symNumList[symNumCounter++], *op);
+            utils::attributeToString(symNumList[-num.getInt() - 1], *op);
         Range range(idx, idx, "1", "1");
         connector.addRange(range);
       } else {
@@ -829,7 +829,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
     IntegerAttr num = numList[i].cast<IntegerAttr>();
     if (num.getInt() < 0) {
       accessCode.append(
-          utils::attributeToString(symNumList[symNumCounter++], *op));
+          utils::attributeToString(symNumList[-num.getInt() - 1], *op));
     } else {
       Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
