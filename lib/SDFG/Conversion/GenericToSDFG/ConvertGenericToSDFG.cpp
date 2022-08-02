@@ -605,14 +605,13 @@ public:
     rewriter.restoreInsertionPoint(ip);
 
     StateNode init = StateNode::create(rewriter, op.getLoc(), "for_init");
-    SymOp idxSym = SymOp::create(rewriter, op.getLoc(),
-                                 op.getInductionVar().getType(), idxName);
-    op.getInductionVar().replaceAllUsesWith(idxSym);
-
     linkToLastState(rewriter, op.getLoc(), init);
 
     rewriter.setInsertionPointAfter(init);
     StateNode guard = StateNode::create(rewriter, op.getLoc(), "for_guard");
+    SymOp idxSym = SymOp::create(rewriter, op.getLoc(),
+                                 op.getInductionVar().getType(), idxName);
+    op.getInductionVar().replaceAllUsesWith(idxSym);
 
     rewriter.setInsertionPointAfter(guard);
     StateNode body = StateNode::create(rewriter, op.getLoc(), "for_body");
