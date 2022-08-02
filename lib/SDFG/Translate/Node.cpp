@@ -12,6 +12,9 @@ DType typeToDtype(Type t) {
   if (t.isInteger(1))
     return DType::boolean;
 
+  if (t.isInteger(8))
+    return DType::int8;
+
   if (t.isInteger(32))
     return DType::int32;
 
@@ -41,6 +44,8 @@ std::string dtypeToString(DType t) {
   switch (t) {
   case DType::boolean:
     return "bool";
+  case DType::int8:
+    return "int8";
   case DType::int32:
     return "int32";
   case DType::int64:

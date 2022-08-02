@@ -69,7 +69,7 @@ public:
 // DataClasses
 //===----------------------------------------------------------------------===//
 
-enum class DType { null, boolean, int32, int64, float32, float64 };
+enum class DType { null, boolean, int8, int32, int64, float32, float64 };
 enum class NType { SDFG, State, Access, MapEntry, ConsumeEntry, Other };
 enum class CodeLanguage { Python, MLIR };
 
