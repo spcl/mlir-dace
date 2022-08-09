@@ -130,6 +130,15 @@ SDFGNode getTopSDFG(Operation *op) {
   return getTopSDFG(parent);
 }
 
+ModuleOp getTopModuleOp(Operation *op) {
+  Operation *parent = op->getParentOp();
+
+  if (isa<ModuleOp>(parent))
+    return cast<ModuleOp>(parent);
+
+  return getTopModuleOp(parent);
+}
+
 void linkToLastState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
   SDFGNode sdfg = getTopSDFG(state);
@@ -199,14 +208,38 @@ public:
       return success();
     }
 
-    SmallVector<Type> args;
-    for (unsigned i = 0; i < op.getNumArguments(); i++) {
+    // TODO: Should be passed by a subflag
+    if (!op.getName().equals("main")) {
+      rewriter.eraseOp(op);
+      return success();
+    }
+
+    if (op.getName().equals("main")) {
+      op.eraseArgument(0);
+      op.eraseArgument(0);
+    }
+
+    if (op.getName().equals("main"))
+      for (func::CallOp callOp : op.getBody().getOps<func::CallOp>()) {
+        if (callOp.getCallee().equals("print_array")) {
+          Value array = callOp.getOperand(2);
+          op.setType(rewriter.getFunctionType({}, {array.getType()}));
+
+          for (func::ReturnOp returnOp :
+               op.getBody().getOps<func::ReturnOp>()) {
+            returnOp.setOperand(0, array);
+          }
+        }
+      }
+
+    SmallVector<Type> args = {};
+    for (unsigned i = 0; i < op.getNumArguments(); ++i) {
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op.getArgumentTypes()[i]);
       args.push_back(nt);
     }
 
-    for (unsigned i = 0; i < op.getNumResults(); i++) {
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
       MemrefToMemletConverter memo;
       Type nt = memo.convertType(op.getResultTypes()[i]);
 
@@ -254,57 +287,41 @@ public:
   LogicalResult
   matchAndRewrite(func::CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Should be nested SDFGs or C++ tasklets
+    rewriter.eraseOp(op);
+    return success();
+
+    // TODO: Should be nested SDFGs or tasklets
     std::string callee = op.getCallee().str();
+    ModuleOp mod = getTopModuleOp(op);
 
-    SDFGNode sdfg = getTopSDFG(op);
-    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
+    StateNode callState = StateNode::create(rewriter, op.getLoc(), callee);
 
-    std::vector<AllocOp> allocs = {};
+    SmallVector<Value> operands = adaptor.getOperands();
+    SmallVector<Value> loadedOps =
+        createLoads(rewriter, op->getLoc(), operands);
 
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      MemrefToMemletConverter memo;
-      Type newType = memo.convertType(op.getResultTypes()[i]);
-      SizedType sized =
-          SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
-      newType = ArrayType::get(op->getLoc().getContext(), sized);
+    TaskletNode task = TaskletNode::create(rewriter, op.getLoc(), operands,
+                                           op.getResultTypes());
+    BlockAndValueMapping mapping;
+    mapping.map(funcOp.getBody().getArguments(), task.body().getArguments());
+    rewriter.updateRootInPlace(
+        task, [&] { funcOp.getBody().cloneInto(&task.body(), mapping); });
 
-      AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), newType,
-                                      "_" + callee + std::to_string(i) + "_tmp",
-                                      /*transient=*/true);
-      allocs.push_back(alloc);
-    }
+    rewriter.mergeBlocks(&task.body().getBlocks().back(),
+                         &task.body().getBlocks().front(), {});
 
-    rewriter.restoreInsertionPoint(ip);
+    // TODO: Support multiple return values
+    func::ReturnOp returnOp = *task.getOps<func::ReturnOp>().begin();
+    sdfg::ReturnOp::create(rewriter, op.getLoc(), returnOp->getOperands());
+    rewriter.eraseOp(returnOp);
+    rewriter.eraseOp(funcOp);
 
-    StateNode state = StateNode::create(rewriter, op.getLoc(), "_" + callee);
-
-    std::vector<Value> args = {};
-    for (Value v : adaptor.getOperands())
-      args.push_back(v);
-
-    SmallVector<Value> loadedArgs = createLoads(rewriter, op.getLoc(), args);
-
-    LibCallOp libcall = LibCallOp::create(
-        rewriter, op.getLoc(), op.getResultTypes(), callee, loadedArgs);
-
-    std::vector<Value> loads = {};
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      StoreOp::create(rewriter, op->getLoc(), libcall.getResult(i), allocs[i],
-                      ValueRange());
-
-      LoadOp load =
-          LoadOp::create(rewriter, op->getLoc(), allocs[i], ValueRange());
-      loads.push_back(load.getResult());
-    }
-
-    rewriter.replaceOp(op, loads);
-
-    linkToLastState(rewriter, op->getLoc(), state);
+    linkToLastState(rewriter, op.getLoc(), callState);
     if (markedToLink(*op))
-      linkToNextState(rewriter, op->getLoc(), state);
+      linkToNextState(rewriter, op->getLoc(), callState);
 
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -411,6 +428,7 @@ public:
 
       rewriter.setInsertionPointAfter(task);
 
+      // TODO: Store all results
       StoreOp::create(rewriter, op->getLoc(), task.getResult(0), alloc,
                       ValueRange());
 
@@ -580,6 +598,18 @@ public:
       linkToNextState(rewriter, op->getLoc(), lastState);
 
     rewriter.replaceOp(op, {alloc});
+    return success();
+  }
+};
+
+class MemrefDeallocToSDFG : public OpConversionPattern<memref::DeallocOp> {
+public:
+  using OpConversionPattern<memref::DeallocOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::DeallocOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -931,6 +961,30 @@ public:
   }
 };
 
+class LLVMGlobalToSDFG : public OpConversionPattern<mlir::LLVM::GlobalOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::GlobalOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::GlobalOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class LLVMFuncToSDFG : public OpConversionPattern<mlir::LLVM::LLVMFuncOp> {
+public:
+  using OpConversionPattern<mlir::LLVM::LLVMFuncOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(mlir::LLVM::LLVMFuncOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -949,6 +1003,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   patterns.add<MemrefGlobalToSDFG>(converter, ctxt);
   patterns.add<MemrefGetGlobalToSDFG>(converter, ctxt);
   patterns.add<MemrefAllocToSDFG>(converter, ctxt);
+  patterns.add<MemrefDeallocToSDFG>(converter, ctxt);
 
   patterns.add<SCFForToSDFG>(converter, ctxt);
   patterns.add<SCFIfToSDFG>(converter, ctxt);
@@ -958,6 +1013,8 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   patterns.add<LLVMGEPToSDFG>(converter, ctxt);
   patterns.add<LLVMLoadToSDFG>(converter, ctxt);
   patterns.add<LLVMStoreToSDFG>(converter, ctxt);
+  patterns.add<LLVMGlobalToSDFG>(converter, ctxt);
+  patterns.add<LLVMFuncToSDFG>(converter, ctxt);
 }
 
 namespace {
