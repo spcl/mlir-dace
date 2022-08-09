@@ -28,13 +28,27 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + nameArg0 + " * " + nameArg1;
   }
 
-  if (isa<arith::NegFOp>(op)) {
-    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
-    return nameOut + " = -" + nameArg0;
+  if (arith::DivFOp divFOp = dyn_cast<arith::DivFOp>(op)) {
+    return nameOut + " = " + utils::valueToString(divFOp.getLhs(), op) + " / " +
+           utils::valueToString(divFOp.getRhs(), op);
+  }
+
+  if (arith::NegFOp negFOp = dyn_cast<arith::NegFOp>(op)) {
+    return nameOut + " = -" + utils::valueToString(negFOp.getOperand(), op);
+  }
+
+  if (arith::RemSIOp remSIOp = dyn_cast<arith::RemSIOp>(op)) {
+    return nameOut + " = " + utils::valueToString(remSIOp.getLhs(), op) +
+           " % " + utils::valueToString(remSIOp.getRhs(), op);
   }
 
   if (arith::IndexCastOp indexCast = dyn_cast<arith::IndexCastOp>(op)) {
     return nameOut + " = " + utils::valueToString(indexCast.getIn(), op);
+  }
+
+  if (arith::SIToFPOp sIToFPOp = dyn_cast<arith::SIToFPOp>(op)) {
+    return nameOut + " = float(" + utils::valueToString(sIToFPOp.getIn(), op) +
+           ")";
   }
 
   if (arith::CmpIOp cmp = dyn_cast<arith::CmpIOp>(op)) {
