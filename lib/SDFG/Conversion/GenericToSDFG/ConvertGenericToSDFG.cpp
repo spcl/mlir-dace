@@ -214,12 +214,11 @@ public:
       return success();
     }
 
+    // For PolybenchC
     if (op.getName().equals("main")) {
       op.eraseArgument(0);
       op.eraseArgument(0);
-    }
 
-    if (op.getName().equals("main"))
       for (func::CallOp callOp : op.getBody().getOps<func::CallOp>()) {
         if (callOp.getCallee().equals("print_array")) {
           Value array = callOp.getOperand(2);
@@ -231,6 +230,7 @@ public:
           }
         }
       }
+    }
 
     SmallVector<Type> args = {};
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
@@ -291,38 +291,38 @@ public:
     return success();
 
     // TODO: Should be nested SDFGs or tasklets
-    std::string callee = op.getCallee().str();
-    ModuleOp mod = getTopModuleOp(op);
+    // std::string callee = op.getCallee().str();
+    // ModuleOp mod = getTopModuleOp(op);
 
-    func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
-    StateNode callState = StateNode::create(rewriter, op.getLoc(), callee);
+    // func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
+    // StateNode callState = StateNode::create(rewriter, op.getLoc(), callee);
 
-    SmallVector<Value> operands = adaptor.getOperands();
-    SmallVector<Value> loadedOps =
-        createLoads(rewriter, op->getLoc(), operands);
+    // SmallVector<Value> operands = adaptor.getOperands();
+    // SmallVector<Value> loadedOps =
+    //     createLoads(rewriter, op->getLoc(), operands);
 
-    TaskletNode task = TaskletNode::create(rewriter, op.getLoc(), operands,
-                                           op.getResultTypes());
-    BlockAndValueMapping mapping;
-    mapping.map(funcOp.getBody().getArguments(), task.body().getArguments());
-    rewriter.updateRootInPlace(
-        task, [&] { funcOp.getBody().cloneInto(&task.body(), mapping); });
+    // TaskletNode task = TaskletNode::create(rewriter, op.getLoc(), operands,
+    //                                        op.getResultTypes());
+    // BlockAndValueMapping mapping;
+    // mapping.map(funcOp.getBody().getArguments(), task.body().getArguments());
+    // rewriter.updateRootInPlace(
+    //     task, [&] { funcOp.getBody().cloneInto(&task.body(), mapping); });
 
-    rewriter.mergeBlocks(&task.body().getBlocks().back(),
-                         &task.body().getBlocks().front(), {});
+    // rewriter.mergeBlocks(&task.body().getBlocks().back(),
+    //                      &task.body().getBlocks().front(), {});
 
-    // TODO: Support multiple return values
-    func::ReturnOp returnOp = *task.getOps<func::ReturnOp>().begin();
-    sdfg::ReturnOp::create(rewriter, op.getLoc(), returnOp->getOperands());
-    rewriter.eraseOp(returnOp);
-    rewriter.eraseOp(funcOp);
+    // // TODO: Support multiple return values
+    // func::ReturnOp returnOp = *task.getOps<func::ReturnOp>().begin();
+    // sdfg::ReturnOp::create(rewriter, op.getLoc(), returnOp->getOperands());
+    // rewriter.eraseOp(returnOp);
+    // rewriter.eraseOp(funcOp);
 
-    linkToLastState(rewriter, op.getLoc(), callState);
-    if (markedToLink(*op))
-      linkToNextState(rewriter, op->getLoc(), callState);
+    // linkToLastState(rewriter, op.getLoc(), callState);
+    // if (markedToLink(*op))
+    //   linkToNextState(rewriter, op->getLoc(), callState);
 
-    rewriter.eraseOp(op);
-    return success();
+    // rewriter.eraseOp(op);
+    // return success();
   }
 };
 
