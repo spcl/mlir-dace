@@ -29,5 +29,6 @@ void mlir::sdfg::translation::registerToSDFGTranslation() {
         registry.insert<mlir::sdfg::SDFGDialect>();
         registry.insert<mlir::func::FuncDialect>();
         registry.insert<mlir::arith::ArithmeticDialect>();
+        registry.insert<mlir::LLVM::LLVMDialect>();
       });
 }

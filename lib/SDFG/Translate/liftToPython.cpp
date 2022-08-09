@@ -111,6 +111,10 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + val;
   }
 
+  if (isa<mlir::LLVM::UndefOp>(op)) {
+    return nameOut + " = -1";
+  }
+
   if (SymOp sym = dyn_cast<SymOp>(op)) {
     return nameOut + " = " + sym.expr().str();
   }
