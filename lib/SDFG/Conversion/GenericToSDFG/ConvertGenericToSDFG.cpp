@@ -219,16 +219,24 @@ public:
       op.eraseArgument(0);
       op.eraseArgument(0);
 
+      SmallVector<Value> arrays = {};
+      SmallVector<Type> arrayTypes = {};
+
       for (func::CallOp callOp : op.getBody().getOps<func::CallOp>()) {
         if (callOp.getCallee().equals("print_array")) {
-          Value array = callOp.getOperand(2);
-          op.setType(rewriter.getFunctionType({}, {array.getType()}));
-
-          for (func::ReturnOp returnOp :
-               op.getBody().getOps<func::ReturnOp>()) {
-            returnOp.setOperand(0, array);
+          for (Value operand : callOp.getOperands()) {
+            if (operand.getType().isa<MemRefType>()) {
+              arrays.push_back(operand);
+              arrayTypes.push_back(operand.getType());
+            }
           }
         }
+      }
+
+      op.setType(rewriter.getFunctionType({}, arrayTypes));
+
+      for (func::ReturnOp returnOp : op.getBody().getOps<func::ReturnOp>()) {
+        returnOp->setOperands(arrays);
       }
     }
 
