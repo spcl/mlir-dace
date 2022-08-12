@@ -216,8 +216,10 @@ public:
 
     // For PolybenchC
     if (op.getName().equals("main")) {
-      op.eraseArgument(0);
-      op.eraseArgument(0);
+      if (op.getNumArguments() == 2) {
+        op.eraseArgument(0);
+        op.eraseArgument(0);
+      }
 
       SmallVector<Value> arrays = {};
       SmallVector<Type> arrayTypes = {};
@@ -345,9 +347,18 @@ public:
 
     if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
+
+      // NOTE: Set by SCFIfToSDFG
+      if (op->getNumOperands() > 1) {
+        Value val = createLoad(rewriter, op->getLoc(), operands[0]);
+        Value memref = createLoad(rewriter, op->getLoc(), operands[1]);
+        StoreOp::create(rewriter, op->getLoc(), val, memref, {});
+      }
+
       linkToLastState(rewriter, op->getLoc(), state);
       if (markedToLink(*op))
         linkToNextState(rewriter, op->getLoc(), state);
+
       rewriter.eraseOp(op);
       return success();
     }
@@ -721,23 +732,60 @@ public:
     rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
     ArrayAttr emptyArr = rewriter.getStrArrayAttr({});
     StringAttr emptyStr = rewriter.getStringAttr("1");
-    ArrayAttr initArr = rewriter.getStrArrayAttr({idxName + ": ref"});
 
-    EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
-                   getTransientValue(adaptor.getLowerBound()));
+    if (adaptor.getLowerBound().getDefiningOp() != nullptr &&
+        isa<SymOp>(adaptor.getLowerBound().getDefiningOp())) {
+      SymOp symOp = cast<SymOp>(adaptor.getLowerBound().getDefiningOp());
+      std::string assignment = idxName + ": " + symOp.expr().str();
+      ArrayAttr initArr = rewriter.getStrArrayAttr({assignment});
+      EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
+                     nullptr);
+    } else {
+      ArrayAttr initArr = rewriter.getStrArrayAttr({idxName + ": ref"});
+      EdgeOp::create(rewriter, op.getLoc(), init, guard, initArr, emptyStr,
+                     getTransientValue(adaptor.getLowerBound()));
+    }
 
-    StringAttr guardStr = rewriter.getStringAttr(idxName + " < ref");
-    EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
-                   getTransientValue(adaptor.getUpperBound()));
+    if (adaptor.getUpperBound().getDefiningOp() != nullptr &&
+        isa<SymOp>(adaptor.getUpperBound().getDefiningOp())) {
+      SymOp symOp = cast<SymOp>(adaptor.getUpperBound().getDefiningOp());
+      StringAttr guardStr =
+          rewriter.getStringAttr(idxName + " < " + symOp.expr());
+      EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
+                     nullptr);
+    } else {
+      StringAttr guardStr = rewriter.getStringAttr(idxName + " < ref");
+      EdgeOp::create(rewriter, op.getLoc(), guard, body, emptyArr, guardStr,
+                     getTransientValue(adaptor.getUpperBound()));
+    }
 
-    ArrayAttr returnArr =
-        rewriter.getStrArrayAttr({idxName + ": " + idxName + " + ref"});
-    EdgeOp::create(rewriter, op.getLoc(), returnState, guard, returnArr,
-                   emptyStr, getTransientValue(adaptor.getStep()));
+    if (adaptor.getStep().getDefiningOp() != nullptr &&
+        isa<SymOp>(adaptor.getStep().getDefiningOp())) {
+      SymOp symOp = cast<SymOp>(adaptor.getStep().getDefiningOp());
+      std::string assignment =
+          idxName + ": " + idxName + " + " + symOp.expr().str();
+      ArrayAttr returnArr = rewriter.getStrArrayAttr({assignment});
+      EdgeOp::create(rewriter, op.getLoc(), returnState, guard, returnArr,
+                     emptyStr, nullptr);
+    } else {
+      ArrayAttr returnArr =
+          rewriter.getStrArrayAttr({idxName + ": " + idxName + " + ref"});
+      EdgeOp::create(rewriter, op.getLoc(), returnState, guard, returnArr,
+                     emptyStr, getTransientValue(adaptor.getStep()));
+    }
 
-    StringAttr exitStr = rewriter.getStringAttr("not(" + idxName + " < ref)");
-    EdgeOp::create(rewriter, op.getLoc(), guard, exitState, emptyArr, exitStr,
-                   getTransientValue(adaptor.getUpperBound()));
+    if (adaptor.getUpperBound().getDefiningOp() != nullptr &&
+        isa<SymOp>(adaptor.getUpperBound().getDefiningOp())) {
+      SymOp symOp = cast<SymOp>(adaptor.getUpperBound().getDefiningOp());
+      StringAttr exitStr =
+          rewriter.getStringAttr("not(" + idxName + " < " + symOp.expr() + ")");
+      EdgeOp::create(rewriter, op.getLoc(), guard, exitState, emptyArr, exitStr,
+                     nullptr);
+    } else {
+      StringAttr exitStr = rewriter.getStringAttr("not(" + idxName + " < ref)");
+      EdgeOp::create(rewriter, op.getLoc(), guard, exitState, emptyArr, exitStr,
+                     getTransientValue(adaptor.getUpperBound()));
+    }
 
     if (markedToLink(*op))
       linkToNextState(rewriter, op->getLoc(), exitState);
@@ -760,6 +808,25 @@ public:
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
     AllocSymbolOp::create(rewriter, op.getLoc(), condName);
+
+    if (op.getNumResults() > 0) {
+      // TODO: Alloc all
+      MemrefToMemletConverter memo;
+
+      Type nt = memo.convertType(op.getResultTypes()[0]);
+      SizedType sized =
+          SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
+      nt = ArrayType::get(op->getLoc().getContext(), sized);
+
+      AllocOp alloc =
+          AllocOp::create(rewriter, op->getLoc(), nt, "_" + condName + "_yield",
+                          /*transient=*/true);
+
+      op.thenYield()->insertOperands(1, {alloc});
+      op.elseYield()->insertOperands(1, {alloc});
+
+      op.getResult(0).replaceAllUsesWith(alloc);
+    }
 
     rewriter.restoreInsertionPoint(ip);
     StateNode init = StateNode::create(rewriter, op.getLoc(), "if_init");
