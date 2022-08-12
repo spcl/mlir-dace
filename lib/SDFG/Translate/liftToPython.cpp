@@ -9,6 +9,9 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   std::string nameOut = op.getNumResults() == 1
                             ? utils::valueToString(op.getResult(0), op)
                             : "Not Supported";
+  //===--------------------------------------------------------------------===//
+  // Arith
+  //===--------------------------------------------------------------------===//
 
   if (isa<arith::AddFOp>(op) || isa<arith::AddIOp>(op)) {
     std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
@@ -51,44 +54,93 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            ")";
   }
 
-  if (arith::CmpIOp cmp = dyn_cast<arith::CmpIOp>(op)) {
-    std::string lhs = utils::valueToString(cmp.getLhs(), op);
-    std::string rhs = utils::valueToString(cmp.getRhs(), op);
-
+  if (isa<arith::CmpIOp>(op) || isa<arith::CmpFOp>(op)) {
+    Value lhsValue;
+    Value rhsValue;
     std::string predicate = "";
 
-    switch (cmp.getPredicate()) {
-    case arith::CmpIPredicate::eq:
-      predicate = "==";
-      break;
+    if (isa<arith::CmpIOp>(op)) {
+      arith::CmpIOp cmp = dyn_cast<arith::CmpIOp>(op);
+      lhsValue = cmp.getLhs();
+      rhsValue = cmp.getRhs();
 
-    case arith::CmpIPredicate::ne:
-      predicate = "!=";
-      break;
+      switch (cmp.getPredicate()) {
+      case arith::CmpIPredicate::eq:
+        predicate = "==";
+        break;
 
-    case arith::CmpIPredicate::sge:
-    case arith::CmpIPredicate::uge:
-      predicate = ">=";
-      break;
+      case arith::CmpIPredicate::ne:
+        predicate = "!=";
+        break;
 
-    case arith::CmpIPredicate::sgt:
-    case arith::CmpIPredicate::ugt:
-      predicate = ">";
-      break;
+      case arith::CmpIPredicate::sge:
+      case arith::CmpIPredicate::uge:
+        predicate = ">=";
+        break;
 
-    case arith::CmpIPredicate::sle:
-    case arith::CmpIPredicate::ule:
-      predicate = "<=";
-      break;
+      case arith::CmpIPredicate::sgt:
+      case arith::CmpIPredicate::ugt:
+        predicate = ">";
+        break;
 
-    case arith::CmpIPredicate::slt:
-    case arith::CmpIPredicate::ult:
-      predicate = "<";
-      break;
+      case arith::CmpIPredicate::sle:
+      case arith::CmpIPredicate::ule:
+        predicate = "<=";
+        break;
 
-    default:
-      break;
+      case arith::CmpIPredicate::slt:
+      case arith::CmpIPredicate::ult:
+        predicate = "<";
+        break;
+
+      default:
+        break;
+      }
     }
+
+    else {
+      arith::CmpFOp cmp = dyn_cast<arith::CmpFOp>(op);
+      lhsValue = cmp.getLhs();
+      rhsValue = cmp.getRhs();
+
+      switch (cmp.getPredicate()) {
+      case arith::CmpFPredicate::OEQ:
+      case arith::CmpFPredicate::UEQ:
+        predicate = "==";
+        break;
+
+      case arith::CmpFPredicate::ONE:
+      case arith::CmpFPredicate::UNE:
+        predicate = "!=";
+        break;
+
+      case arith::CmpFPredicate::OGE:
+      case arith::CmpFPredicate::UGE:
+        predicate = ">=";
+        break;
+
+      case arith::CmpFPredicate::OGT:
+      case arith::CmpFPredicate::UGT:
+        predicate = ">";
+        break;
+
+      case arith::CmpFPredicate::OLE:
+      case arith::CmpFPredicate::ULE:
+        predicate = "<=";
+        break;
+
+      case arith::CmpFPredicate::OLT:
+      case arith::CmpFPredicate::ULT:
+        predicate = "<";
+        break;
+
+      default:
+        break;
+      }
+    }
+
+    std::string lhs = utils::valueToString(lhsValue, op);
+    std::string rhs = utils::valueToString(rhsValue, op);
 
     return nameOut + " = " + lhs + " " + predicate + " " + rhs;
   }
@@ -111,9 +163,32 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + val;
   }
 
+  if (arith::SelectOp selectOp = dyn_cast<arith::SelectOp>(op)) {
+    return nameOut + " = " + utils::valueToString(selectOp.getTrueValue(), op) +
+           " if " + utils::valueToString(selectOp.getCondition(), op) +
+           " else " + utils::valueToString(selectOp.getFalseValue(), op);
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Math
+  //===--------------------------------------------------------------------===//
+
+  if (math::SqrtOp sqrtOp = dyn_cast<math::SqrtOp>(op)) {
+    return nameOut + " = math.sqrt(" +
+           utils::valueToString(sqrtOp.getOperand(), op) + ")";
+  }
+
+  //===--------------------------------------------------------------------===//
+  // LLVM
+  //===--------------------------------------------------------------------===//
+
   if (isa<mlir::LLVM::UndefOp>(op)) {
     return nameOut + " = -1";
   }
+
+  //===--------------------------------------------------------------------===//
+  // SDFG
+  //===--------------------------------------------------------------------===//
 
   if (SymOp sym = dyn_cast<SymOp>(op)) {
     return nameOut + " = " + sym.expr().str();
@@ -168,6 +243,10 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
 
     return code;
   }
+
+  //===--------------------------------------------------------------------===//
+  // Func
+  //===--------------------------------------------------------------------===//
 
   if (isa<func::ReturnOp>(op)) {
     std::string code = "";
