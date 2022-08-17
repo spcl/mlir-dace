@@ -330,6 +330,26 @@ StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
 // NestedSDFGNode
 //===----------------------------------------------------------------------===//
 
+NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, 0, {});
+}
+
+NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc,
+                                      unsigned num_args, ValueRange args) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+
+  build(builder, state, utils::generateID(), nullptr, num_args, args);
+  NestedSDFGNode sdfg = cast<NestedSDFGNode>(rewriter.create(state));
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < args.size(); ++i)
+    locs.push_back(args[i].getLoc());
+
+  rewriter.createBlock(&sdfg.getRegion(), {}, args.getTypes(), locs);
+  return sdfg;
+}
+
 ParseResult NestedSDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();

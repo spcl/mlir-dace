@@ -67,6 +67,8 @@ def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
+        static NestedSDFGNode create(PatternRewriter &rewriter, Location location, unsigned num_args, ValueRange args);
+        static NestedSDFGNode create(PatternRewriter &rewriter, Location location);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
     }];

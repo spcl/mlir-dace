@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 def SDFG_AllocOp : SDFG_Op<"alloc", [
-    ParentOneOf<["SDFGNode", "StateNode"]>
+    ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode"]>
 ]> {
     let summary = "Array allocation operation";
     let description = [{
@@ -149,7 +149,7 @@ def SDFG_CopyOp : SDFG_Op<"copy", [
 //===----------------------------------------------------------------------===//
 
 def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
-    ParentOneOf<["SDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
+    ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
     let summary = "view node operation";
     let description = [{
@@ -178,7 +178,7 @@ def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
 //===----------------------------------------------------------------------===//
 
 def SDFG_SubviewOp : SDFG_Op<"subview", [
-    ParentOneOf<["SDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
+    ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
     let summary = "Subview operation";
     let description = [{

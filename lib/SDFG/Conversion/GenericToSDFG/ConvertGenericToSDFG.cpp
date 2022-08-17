@@ -121,13 +121,40 @@ Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
   return createLoads(rewriter, loc, loadedOps)[0];
 }
 
-SDFGNode getTopSDFG(Operation *op) {
+Operation *getParentSDFG(Operation *op) {
   Operation *parent = op->getParentOp();
 
   if (isa<SDFGNode>(parent))
-    return cast<SDFGNode>(parent);
+    return parent;
 
-  return getTopSDFG(parent);
+  if (isa<NestedSDFGNode>(parent))
+    return parent;
+
+  return getParentSDFG(parent);
+}
+
+uint32_t getSDFGNumArgs(Operation *op) {
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
+    return sdfg.num_args();
+  }
+
+  if (NestedSDFGNode sdfg = dyn_cast<NestedSDFGNode>(op)) {
+    return sdfg.num_args();
+  }
+
+  return -1;
+}
+
+StateNode getFirstState(Operation *op) {
+  if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
+    return sdfg.getFirstState();
+  }
+
+  if (NestedSDFGNode sdfg = dyn_cast<NestedSDFGNode>(op)) {
+    return sdfg.getFirstState();
+  }
+
+  return nullptr;
 }
 
 ModuleOp getTopModuleOp(Operation *op) {
@@ -141,13 +168,13 @@ ModuleOp getTopModuleOp(Operation *op) {
 
 void linkToLastState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
-  SDFGNode sdfg = getTopSDFG(state);
+  Operation *sdfg = getParentSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-  rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+  rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
 
   StateNode prev;
 
-  for (StateNode sn : sdfg.body().getOps<StateNode>()) {
+  for (StateNode sn : sdfg->getRegion(0).getOps<StateNode>()) {
     if (sn == state) {
       EdgeOp::create(rewriter, loc, prev, state);
       break;
@@ -159,12 +186,12 @@ void linkToLastState(PatternRewriter &rewriter, Location loc,
 
 void linkToNextState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
-  SDFGNode sdfg = getTopSDFG(state);
+  Operation *sdfg = getParentSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-  rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+  rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
 
   bool visitedState = false;
-  for (StateNode sn : sdfg.body().getOps<StateNode>()) {
+  for (StateNode sn : sdfg->getRegion(0).getOps<StateNode>()) {
     if (visitedState) {
       EdgeOp::create(rewriter, loc, state, sn);
       break;
@@ -282,8 +309,8 @@ public:
         sdfg.body().getArguments().take_front(sdfg.num_args()));
 
     // hasValue() is inaccessable
-    if (rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
-            .getPointer() == nullptr)
+    if (!rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
+             .getPointer())
       return failure();
 
     return success();
@@ -297,42 +324,55 @@ public:
   LogicalResult
   matchAndRewrite(func::CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Support external calls
+    // TODO: Support return values
+    std::string callee = op.getCallee().str();
+    ModuleOp mod = getTopModuleOp(op);
+
+    func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
+    StateNode callState = StateNode::create(rewriter, op.getLoc(), callee);
+
+    SmallVector<Value> operands = adaptor.getOperands();
+    SmallVector<Value> loadedOps =
+        createLoads(rewriter, op->getLoc(), operands);
+
+    ValueRange rang = ValueRange(loadedOps);
+
+    NestedSDFGNode nestedSDFG =
+        NestedSDFGNode::create(rewriter, op.getLoc(), 0, rang);
+    StateNode initState =
+        StateNode::create(rewriter, op.getLoc(), callee + "_init");
+
+    rewriter.updateRootInPlace(nestedSDFG, [&] {
+      nestedSDFG.entryAttr(
+          SymbolRefAttr::get(op.getLoc().getContext(), initState.sym_name()));
+    });
+
+    for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
+      funcOp.getArgument(i).replaceAllUsesWith(
+          nestedSDFG.body().getArgument(i));
+    }
+
+    rewriter.inlineRegionBefore(funcOp.getBody(), nestedSDFG.body(),
+                                nestedSDFG.body().end());
+
+    rewriter.mergeBlocks(&nestedSDFG.body().getBlocks().back(),
+                         &nestedSDFG.body().getBlocks().front(),
+                         nestedSDFG.body().getArguments());
+
+    // hasValue() is inaccessable
+    if (!rewriter.convertRegionTypes(&nestedSDFG.body(), *getTypeConverter())
+             .getPointer())
+      return failure();
+
+    rewriter.eraseOp(funcOp);
+
+    linkToLastState(rewriter, op.getLoc(), callState);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), callState);
+
     rewriter.eraseOp(op);
     return success();
-
-    // TODO: Should be nested SDFGs or tasklets
-    // std::string callee = op.getCallee().str();
-    // ModuleOp mod = getTopModuleOp(op);
-
-    // func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
-    // StateNode callState = StateNode::create(rewriter, op.getLoc(), callee);
-
-    // SmallVector<Value> operands = adaptor.getOperands();
-    // SmallVector<Value> loadedOps =
-    //     createLoads(rewriter, op->getLoc(), operands);
-
-    // TaskletNode task = TaskletNode::create(rewriter, op.getLoc(), operands,
-    //                                        op.getResultTypes());
-    // BlockAndValueMapping mapping;
-    // mapping.map(funcOp.getBody().getArguments(), task.body().getArguments());
-    // rewriter.updateRootInPlace(
-    //     task, [&] { funcOp.getBody().cloneInto(&task.body(), mapping); });
-
-    // rewriter.mergeBlocks(&task.body().getBlocks().back(),
-    //                      &task.body().getBlocks().front(), {});
-
-    // // TODO: Support multiple return values
-    // func::ReturnOp returnOp = *task.getOps<func::ReturnOp>().begin();
-    // sdfg::ReturnOp::create(rewriter, op.getLoc(), returnOp->getOperands());
-    // rewriter.eraseOp(returnOp);
-    // rewriter.eraseOp(funcOp);
-
-    // linkToLastState(rewriter, op.getLoc(), callState);
-    // if (markedToLink(*op))
-    //   linkToNextState(rewriter, op->getLoc(), callState);
-
-    // rewriter.eraseOp(op);
-    // return success();
   }
 };
 
@@ -365,19 +405,21 @@ public:
 
     if (isa<func::ReturnOp>(op) && !isa<func::FuncOp>(op->getParentOp())) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
-      SDFGNode sdfg = getTopSDFG(state);
+      Operation *sdfg = getParentSDFG(state);
 
       SmallVector<Value> loadedOps =
           createLoads(rewriter, op->getLoc(), operands);
 
       for (unsigned i = 0; i < loadedOps.size(); ++i) {
         if (loadedOps[i].getType().isa<ArrayType>()) {
-          CopyOp::create(rewriter, op->getLoc(), loadedOps[i],
-                         sdfg.body().getArgument(sdfg.num_args() + i));
+          CopyOp::create(
+              rewriter, op->getLoc(), loadedOps[i],
+              sdfg->getRegion(0).getArgument(getSDFGNumArgs(sdfg) + i));
         } else {
-          StoreOp::create(rewriter, op->getLoc(), loadedOps[i],
-                          sdfg.body().getArgument(sdfg.num_args() + i),
-                          ValueRange());
+          StoreOp::create(
+              rewriter, op->getLoc(), loadedOps[i],
+              sdfg->getRegion(0).getArgument(getSDFGNumArgs(sdfg) + i),
+              ValueRange());
         }
       }
 
@@ -420,9 +462,10 @@ public:
           SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
       nt = ArrayType::get(op->getLoc().getContext(), sized);
 
-      SDFGNode sdfg = getTopSDFG(state);
+      Operation *sdfg = getParentSDFG(state);
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-      rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+      rewriter.setInsertionPointToStart(
+          &sdfg->getRegion(0).getBlocks().front());
       AllocOp alloc =
           AllocOp::create(rewriter, op->getLoc(), nt, "_" + name + "_tmp",
                           /*transient=*/true);
@@ -483,9 +526,9 @@ public:
         SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
     Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
 
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT, "_load_tmp",
                                     /*transient=*/true);
 
@@ -556,10 +599,10 @@ public:
   LogicalResult
   matchAndRewrite(memref::GetGlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
 
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
 
     Type type = getTypeConverter()->convertType(op.getType());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type,
@@ -581,10 +624,10 @@ public:
   LogicalResult
   matchAndRewrite(memref::AllocOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
 
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
 
     Type type = getTypeConverter()->convertType(op.getType());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type, "_alloc_tmp",
@@ -600,7 +643,7 @@ public:
       StateNode alloc_param =
           StateNode::create(rewriter, op.getLoc(), "alloc_param");
 
-      rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+      rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
 
       std::string sym = utils::getSizedType(type).getSymbols()[i].str();
       ArrayAttr initArr = rewriter.getStrArrayAttr({sym + ": ref"});
@@ -628,10 +671,10 @@ public:
   LogicalResult
   matchAndRewrite(memref::AllocaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
 
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
 
     Type type = getTypeConverter()->convertType(op.getType());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type, "_alloca_tmp",
@@ -647,7 +690,7 @@ public:
       StateNode alloc_param =
           StateNode::create(rewriter, op.getLoc(), "alloca_param");
 
-      rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+      rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
 
       std::string sym = utils::getSizedType(type).getSymbols()[i].str();
       ArrayAttr initArr = rewriter.getStrArrayAttr({sym + ": ref"});
@@ -693,9 +736,9 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     std::string idxName = utils::generateName("for_idx");
 
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
 
     rewriter.restoreInsertionPoint(ip);
@@ -729,7 +772,7 @@ public:
     rewriter.setInsertionPointAfter(op);
     StateNode exitState = StateNode::create(rewriter, op.getLoc(), "for_exit");
 
-    rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
     ArrayAttr emptyArr = rewriter.getStrArrayAttr({});
     StringAttr emptyStr = rewriter.getStringAttr("1");
 
@@ -804,9 +847,9 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     std::string condName = utils::generateName("if_cond");
 
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocSymbolOp::create(rewriter, op.getLoc(), condName);
 
     if (op.getNumResults() > 0) {
@@ -881,7 +924,7 @@ public:
       linkToLastState(rewriter, op.getLoc(), merge);
     }
 
-    rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
 
     ArrayAttr initArr = rewriter.getStrArrayAttr({condName + ": ref"});
     StringAttr trueCondition = rewriter.getStringAttr("1");
@@ -918,10 +961,10 @@ public:
   LogicalResult
   matchAndRewrite(mlir::LLVM::AllocaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
 
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
 
     Type type = getTypeConverter()->convertType(op.getType());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), type, "_alloc_tmp",
@@ -937,7 +980,7 @@ public:
       StateNode alloc_param =
           StateNode::create(rewriter, op.getLoc(), "alloc_param");
 
-      rewriter.setInsertionPointToEnd(&sdfg.body().getBlocks().front());
+      rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
 
       std::string sym = utils::getSizedType(type).getSymbols()[i].str();
       ArrayAttr initArr = rewriter.getStrArrayAttr({sym + ": ref"});
@@ -965,8 +1008,8 @@ public:
   LogicalResult
   matchAndRewrite(mlir::LLVM::BitcastOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SDFGNode sdfg = getTopSDFG(op);
-    rewriter.setInsertionPoint(sdfg.getFirstState());
+    Operation *sdfg = getParentSDFG(op);
+    rewriter.setInsertionPoint(getFirstState(sdfg));
 
     Type type = getTypeConverter()->convertType(op.getType());
     ViewCastOp viewCast =
@@ -1024,9 +1067,9 @@ public:
         SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
     Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
 
-    SDFGNode sdfg = getTopSDFG(op);
+    Operation *sdfg = getParentSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT, "_load_tmp",
                                     /*transient=*/true);
 
@@ -1122,9 +1165,9 @@ public:
     SizedType sized = SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
     nt = ArrayType::get(op->getLoc().getContext(), sized);
 
-    SDFGNode sdfg = getTopSDFG(state);
+    Operation *sdfg = getParentSDFG(state);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(&sdfg.body().getBlocks().front());
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocOp alloc =
         AllocOp::create(rewriter, op->getLoc(), nt, "_" + name + "_tmp",
                         /*transient=*/true);

@@ -6,7 +6,7 @@
 //===----------------------------------------------------------------------===//
 
 def SDFG_AllocSymbolOp : SDFG_Op<"alloc_symbol", [
-	ParentOneOf<["SDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
+	ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
     let summary = "symbol creation operation";
     let description = [{
@@ -34,7 +34,9 @@ def SDFG_AllocSymbolOp : SDFG_Op<"alloc_symbol", [
 // SymOp
 //===----------------------------------------------------------------------===//
 
-def SDFG_SymOp : SDFG_Op<"sym">{
+def SDFG_SymOp : SDFG_Op<"sym",[
+	ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
+]>{
     let summary = "symbolic expression operation";
     let description = [{
         Describes an arithmetic symbolic expression.
