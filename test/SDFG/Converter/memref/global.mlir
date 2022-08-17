@@ -1,7 +1,7 @@
 // RUN: sdfg-opt --convert-to-sdfg %s
 memref.global @arr : memref<900xi32>
 
-func.func private @kernel(%1: index){
+func.func private @main(%1: index){
   %22 = memref.get_global @arr : memref<900xi32>
   %8 = memref.load %22[%1] : memref<900xi32>
   %c2 = arith.addi %8, %8 : i32

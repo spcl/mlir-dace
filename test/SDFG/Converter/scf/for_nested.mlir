@@ -1,5 +1,5 @@
 // RUN: sdfg-opt --convert-to-sdfg %s
-func.func private @kernel_2mm(%arg0: i32, %arg6: memref<?x900xi32>, %arg7: memref<?x?xi32>) {
+func.func private @main(%arg0: i32, %arg6: memref<?x900xi32>, %arg7: memref<?x?xi32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   scf.for %arg11 = %c0 to %c1 step %c1 {

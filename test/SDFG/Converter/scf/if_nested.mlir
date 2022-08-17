@@ -1,5 +1,5 @@
 // RUN: sdfg-opt --convert-to-sdfg %s
-func.func private @kernel(%arg0: i32, %arg1: i32) {
+func.func private @main(%arg0: i32, %arg1: i32) {
   %0 = arith.cmpi ne, %arg0, %arg1 : i32
   %1 = arith.cmpi eq, %arg0, %arg1 : i32
   scf.if %0 {

@@ -1,5 +1,5 @@
 // RUN: sdfg-opt --convert-to-sdfg %s
-func.func private @kernel(){
+func.func private @main(){
   %c0 = arith.constant 0 : index
   %arg6 = memref.alloc(%c0, %c0, %c0) : memref<?x?x?xi32>
   %8 = memref.load %arg6[%c0, %c0, %c0] : memref<?x?x?xi32>
