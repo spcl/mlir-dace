@@ -2,13 +2,17 @@
 
 namespace mlir::sdfg::utils {
 
-// Returns the parent SDFG node or nullptr if a parent does not exist
-SDFGNode getParentSDFG(Operation &op) {
+// Returns the parent SDFG node, NestedSDFG node or nullptr if a parent does not
+// exist
+Operation *getParentSDFG(Operation &op) {
   Operation *parent = op.getParentOp();
 
   while (parent != nullptr) {
-    if (SDFGNode sdfg = dyn_cast<SDFGNode>(parent))
-      return sdfg;
+    if (isa<SDFGNode>(parent))
+      return parent;
+
+    if (isa<NestedSDFGNode>(parent))
+      return parent;
 
     parent = parent->getParentOp();
   }
@@ -21,7 +25,7 @@ StateNode getParentState(Operation &op, bool ignoreSDFGs) {
   Operation *parent = op.getParentOp();
 
   while (parent != nullptr) {
-    if (!ignoreSDFGs && isa<SDFGNode>(parent))
+    if (!ignoreSDFGs && (isa<SDFGNode>(parent) || isa<NestedSDFGNode>(parent)))
       return nullptr;
 
     if (StateNode state = dyn_cast<StateNode>(parent))

@@ -230,9 +230,16 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
-  SDFGNode sdfgNode = utils::getParentSDFG(*op);
-  StateNode srcNode = sdfgNode.getStateBySymRef(op.src());
-  StateNode destNode = sdfgNode.getStateBySymRef(op.dest());
+  Operation *sdfgNode = utils::getParentSDFG(*op);
+
+  StateNode srcNode =
+      isa<SDFGNode>(sdfgNode)
+          ? cast<SDFGNode>(sdfgNode).getStateBySymRef(op.src())
+          : cast<NestedSDFGNode>(sdfgNode).getStateBySymRef(op.src());
+  StateNode destNode =
+      isa<SDFGNode>(sdfgNode)
+          ? cast<SDFGNode>(sdfgNode).getStateBySymRef(op.dest())
+          : cast<NestedSDFGNode>(sdfgNode).getStateBySymRef(op.dest());
 
   State src = sdfg.lookup(srcNode.sym_name());
   State dest = sdfg.lookup(destNode.sym_name());

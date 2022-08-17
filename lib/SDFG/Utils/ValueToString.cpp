@@ -12,10 +12,10 @@ std::string valueToString(Value value) {
 }
 
 std::string valueToString(Value value, Operation &op) {
-  SDFGNode sdfg;
+  Operation *sdfg;
 
-  if (SDFGNode sdfgNode = dyn_cast<SDFGNode>(op))
-    sdfg = sdfgNode;
+  if (isa<SDFGNode>(op))
+    sdfg = &op;
   else
     sdfg = utils::getParentSDFG(op);
 
