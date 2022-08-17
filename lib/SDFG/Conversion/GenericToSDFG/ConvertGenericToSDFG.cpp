@@ -243,16 +243,18 @@ public:
 
     // For PolybenchC
     if (op.getName().equals("main")) {
-      if (op.getNumArguments() == 2) {
-        op.eraseArgument(0);
-        op.eraseArgument(0);
-      }
+      for (int i = op.getNumArguments() - 1; i >= 0; --i)
+        if (op.getArgument(i).getUses().empty())
+          op.eraseArgument(i);
 
       SmallVector<Value> arrays = {};
       SmallVector<Type> arrayTypes = {};
+      bool hasPrinter = false;
 
       for (func::CallOp callOp : op.getBody().getOps<func::CallOp>()) {
         if (callOp.getCallee().equals("print_array")) {
+          hasPrinter = true;
+
           for (Value operand : callOp.getOperands()) {
             if (operand.getType().isa<MemRefType>()) {
               arrays.push_back(operand);
@@ -262,10 +264,12 @@ public:
         }
       }
 
-      op.setType(rewriter.getFunctionType({}, arrayTypes));
+      if (hasPrinter) {
+        op.setType(rewriter.getFunctionType({}, arrayTypes));
 
-      for (func::ReturnOp returnOp : op.getBody().getOps<func::ReturnOp>()) {
-        returnOp->setOperands(arrays);
+        for (func::ReturnOp returnOp : op.getBody().getOps<func::ReturnOp>()) {
+          returnOp->setOperands(arrays);
+        }
       }
     }
 
@@ -324,12 +328,20 @@ public:
   LogicalResult
   matchAndRewrite(func::CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+
     // TODO: Support external calls
     // TODO: Support return values
     std::string callee = op.getCallee().str();
     ModuleOp mod = getTopModuleOp(op);
-
     func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
+
+    // For PolybenchC
+    if (callee == "print_array") {
+      rewriter.eraseOp(op);
+      rewriter.eraseOp(funcOp);
+      return success();
+    }
+
     StateNode callState = StateNode::create(rewriter, op.getLoc(), callee);
 
     SmallVector<Value> operands = adaptor.getOperands();
