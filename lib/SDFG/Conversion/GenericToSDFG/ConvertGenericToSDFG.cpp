@@ -348,10 +348,19 @@ public:
     SmallVector<Value> loadedOps =
         createLoads(rewriter, op->getLoc(), operands);
 
-    ValueRange rang = ValueRange(loadedOps);
+    // TODO: Write a proper reordering. Primitives then Memrefs
+    unsigned firstMemref = 0;
+    for (unsigned i = 0; i < loadedOps.size(); ++i) {
+      if (loadedOps[i].getType().isa<MemRefType>() ||
+          loadedOps[i].getType().isa<ArrayType>() ||
+          loadedOps[i].getType().isa<StreamType>()) {
+        firstMemref = i;
+        break;
+      }
+    }
 
-    NestedSDFGNode nestedSDFG =
-        NestedSDFGNode::create(rewriter, op.getLoc(), 0, rang);
+    NestedSDFGNode nestedSDFG = NestedSDFGNode::create(
+        rewriter, op.getLoc(), firstMemref, ValueRange(loadedOps));
     StateNode initState =
         StateNode::create(rewriter, op.getLoc(), callee + "_init");
 

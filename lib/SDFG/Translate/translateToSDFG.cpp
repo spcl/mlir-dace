@@ -41,7 +41,7 @@ void insertTransientArray(Location location, translation::Connector connector,
   access.addInConnector(accIn);
   access.addOutConnector(accOut);
 
-  MultiEdge edge(connector, accIn);
+  MultiEdge edge(location, connector, accIn);
   scope.addEdge(edge);
 
   scope.mapConnector(value, accOut);
@@ -244,7 +244,7 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
   State src = sdfg.lookup(srcNode.sym_name());
   State dest = sdfg.lookup(destNode.sym_name());
 
-  InterstateEdge edge(src, dest);
+  InterstateEdge edge(op.getLoc(), src, dest);
   sdfg.addEdge(edge);
 
   std::string refname = "";
@@ -320,7 +320,7 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
     Connector connector(tasklet, op.getInputName(i));
     tasklet.addInConnector(connector);
 
-    MultiEdge edge(scope.lookup(op.getOperand(i)), connector);
+    MultiEdge edge(op.getLoc(), scope.lookup(op.getOperand(i)), connector);
     scope.addEdge(edge);
   }
 
@@ -356,7 +356,7 @@ LogicalResult translation::collect(LibCallOp &op, ScopeNode &scope) {
     Connector connector(lib, op.getInputName(i));
     lib.addInConnector(connector);
 
-    MultiEdge edge(scope.lookup(op.getOperand(i)), connector);
+    MultiEdge edge(op.getLoc(), scope.lookup(op.getOperand(i)), connector);
     scope.addEdge(edge);
   }
 
@@ -390,7 +390,7 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
         utils::valueToString(op.body().getArgument(i), *op.getOperation()));
     nestedSDFG.addInConnector(connector);
 
-    MultiEdge edge(scope.lookup(op.getOperand(i)), connector);
+    MultiEdge edge(op.getLoc(), scope.lookup(op.getOperand(i)), connector);
     scope.addEdge(edge);
   }
 
@@ -402,17 +402,21 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
     nestedSDFG.addOutConnector(connector);
     nestedSDFG.addInConnector(connector);
 
-    MultiEdge edge_in(scope.lookup(op.getOperand(i)), connector);
+    MultiEdge edge_in(op.getLoc(), scope.lookup(op.getOperand(i)), connector);
     scope.addEdge(edge_in);
 
+    std::string arrName = utils::valueToString(op.getOperand(i));
+    if (op.getOperand(i).getDefiningOp() != nullptr)
+      arrName = cast<AllocOp>(op.getOperand(i).getDefiningOp()).getName();
+
     Access access(op.getLoc());
-    access.setName(utils::valueToString(op.getOperand(i)));
+    access.setName(arrName);
     scope.addNode(access);
 
     Connector accOut(access);
     access.addOutConnector(accOut);
 
-    MultiEdge edge_out(connector, accOut);
+    MultiEdge edge_out(op.getLoc(), connector, accOut);
     scope.addEdge(edge_out);
 
     scope.mapConnector(op.getOperand(i), accOut);
@@ -466,7 +470,7 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
       Connector valConn(mapEntry, lb);
       mapEntry.addInConnector(valConn);
 
-      MultiEdge multiedge(scope.lookup(val), valConn);
+      MultiEdge multiedge(op.getLoc(), scope.lookup(val), valConn);
       scope.addEdge(multiedge);
     }
 
@@ -480,7 +484,7 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
       Connector valConn(mapEntry, ub);
       mapEntry.addInConnector(valConn);
 
-      MultiEdge multiedge(scope.lookup(val), valConn);
+      MultiEdge multiedge(op.getLoc(), scope.lookup(val), valConn);
       scope.addEdge(multiedge);
     }
 
@@ -494,7 +498,7 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
       Connector valConn(mapEntry, st);
       mapEntry.addInConnector(valConn);
 
-      MultiEdge multiedge(scope.lookup(val), valConn);
+      MultiEdge multiedge(op.getLoc(), scope.lookup(val), valConn);
       scope.addEdge(multiedge);
     }
 
@@ -551,7 +555,7 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   Connector stream(consumeEntry, "IN_stream");
   consumeEntry.addInConnector(stream);
 
-  MultiEdge edge(scope.lookup(op.stream()), stream);
+  MultiEdge edge(op.getLoc(), scope.lookup(op.stream()), stream);
   scope.addEdge(edge);
 
   Connector elem(consumeEntry, "OUT_stream");
@@ -600,7 +604,7 @@ LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
   Connector accOut(access);
   access.addOutConnector(accOut);
 
-  MultiEdge edge(scope.lookup(op.src()), accOut);
+  MultiEdge edge(op.getLoc(), scope.lookup(op.src()), accOut);
   scope.addEdge(edge);
 
   scope.mapConnector(op.dest(), accOut);
@@ -700,12 +704,12 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 
   Connector taskArr(task, "_array");
   task.addInConnector(taskArr);
-  MultiEdge arrayEdge(scope.lookup(op.arr()), taskArr);
+  MultiEdge arrayEdge(op.getLoc(), scope.lookup(op.arr()), taskArr);
   scope.addEdge(arrayEdge);
 
   Connector taskVal(task, "_value");
   task.addInConnector(taskVal);
-  MultiEdge valEdge(scope.lookup(op.val()), taskVal);
+  MultiEdge valEdge(op.getLoc(), scope.lookup(op.val()), taskVal);
   scope.addEdge(valEdge);
 
   std::string accessCode = "_array[";
@@ -722,7 +726,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
       Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
       task.addInConnector(input);
-      MultiEdge inputEdge(scope.lookup(idxOp), input);
+      MultiEdge inputEdge(op.getLoc(), scope.lookup(idxOp), input);
       scope.addEdge(inputEdge);
       accessCode.append("_i" + std::to_string(num.getInt()));
     }
@@ -824,7 +828,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 
   Connector taskArr(task, "_array");
   task.addInConnector(taskArr);
-  MultiEdge arrayEdge(scope.lookup(op.arr()), taskArr);
+  MultiEdge arrayEdge(op.getLoc(), scope.lookup(op.arr()), taskArr);
   scope.addEdge(arrayEdge);
 
   std::string accessCode = "_out = _array[";
@@ -841,7 +845,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
       Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
       task.addInConnector(input);
-      MultiEdge inputEdge(scope.lookup(idxOp), input);
+      MultiEdge inputEdge(op.getLoc(), scope.lookup(idxOp), input);
       scope.addEdge(inputEdge);
       accessCode.append("_i" + std::to_string(num.getInt()));
     }

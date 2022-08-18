@@ -3,7 +3,7 @@
 sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
   sdfg.state @state_0{
     sdfg.nested_sdfg () -> (%r: !sdfg.array<i32>) {
-      %3 = sdfg.alloc() : !sdfg.array<i32>
+      %3 = sdfg.alloc{transient}() : !sdfg.array<i32>
 
       sdfg.state @state_1{
         %0 = sdfg.load %r[] : !sdfg.array<i32> -> i32

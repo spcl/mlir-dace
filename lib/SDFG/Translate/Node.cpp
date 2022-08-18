@@ -88,6 +88,35 @@ void printRangeVector(std::vector<translation::Range> ranges, std::string name,
   jemit.endObject(); // name
 }
 
+void printLocation(Location loc, emitter::JsonEmitter &jemit) {
+  jemit.startNamedObject("debuginfo");
+  jemit.printKVPair("type", "DebugInfo");
+
+  std::string location;
+  llvm::raw_string_ostream locationStream(location);
+  loc.print(locationStream);
+
+  location.erase(0, location.find('"') + 1);
+  location.erase(location.length() - 1, 1);
+
+  std::string fileName = location.substr(0, location.find('"'));
+  location.erase(0, location.find('"') + 2);
+
+  std::string line = location.substr(0, location.find(":"));
+  location.erase(0, location.find(":") + 1);
+
+  std::string col = location.substr(0, location.find(":"));
+  location.erase(0, location.find(":") + 1);
+
+  jemit.printKVPair("start_line", line, /*stringify=*/false);
+  jemit.printKVPair("end_line", line, /*stringify=*/false);
+  jemit.printKVPair("start_column", col, /*stringify=*/false);
+  jemit.printKVPair("end_column", col, /*stringify=*/false);
+  jemit.printKVPair("filename", fileName);
+
+  jemit.endObject(); // debuginfo
+}
+
 //===----------------------------------------------------------------------===//
 // Array
 //===----------------------------------------------------------------------===//
@@ -194,6 +223,7 @@ void InterstateEdgeImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("dst", destination.getID());
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.startNamedObject("data");
   jemit.printKVPair("type", "InterstateEdge");
 
@@ -234,6 +264,7 @@ void MultiEdge::emit(emitter::JsonEmitter &jemit) {
                     /*stringify=*/!destination.isNull);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.startNamedObject("data");
   jemit.printKVPair("type", "Memlet");
   jemit.startNamedObject("attributes");
@@ -418,7 +449,7 @@ void ScopeNodeImpl::addNode(ConnectorNode node) {
 }
 
 void ScopeNodeImpl::routeWrite(Connector from, Connector to) {
-  MultiEdge edge(from, to);
+  MultiEdge edge(location, from, to);
   addEdge(edge);
 }
 
@@ -518,6 +549,7 @@ void SDFGImpl::emitBody(emitter::JsonEmitter &jemit) {
                     /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("name", name);
 
   jemit.startNamedList("arg_names");
@@ -567,6 +599,7 @@ void NestedSDFGImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("label", name);
   ConnectorNodeImpl::emit(jemit);
 
@@ -616,6 +649,7 @@ Connector StateImpl::lookup(Value value) {
 void StateImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
   jemit.printKVPair("type", "SDFGState");
+  printLocation(location, jemit);
   jemit.printKVPair("label", name);
   jemit.printKVPair("id", id, /*stringify=*/false);
 
@@ -642,6 +676,7 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("label", name);
 
   jemit.startNamedObject("code");
@@ -677,6 +712,7 @@ void LibraryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("classpath", classpath);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("name", name);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes
@@ -697,6 +733,7 @@ void AccessImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("data", name);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */
@@ -746,7 +783,7 @@ void MapEntryImpl::routeWrite(Connector from, Connector to) {
   in.setRanges(from.ranges);
   mapExit.addInConnector(in);
 
-  MultiEdge edge(from, in);
+  MultiEdge edge(location, from, in);
   addEdge(edge);
 
   Connector out(mapExit,
@@ -781,7 +818,7 @@ Connector MapEntryImpl::lookup(Value value, MapEntry mapEntry) {
     dstConn.setRanges(srcConn.ranges);
     addInConnector(dstConn);
 
-    MultiEdge multiedge(srcConn, dstConn);
+    MultiEdge multiedge(location, srcConn, dstConn);
     scope.addEdge(multiedge);
 
     Connector outConn(mapEntry, "OUT" + utils::valueToString(value));
@@ -802,6 +839,7 @@ void MapEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", getID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("label", getName());
 
   jemit.startNamedList("params");
@@ -833,6 +871,7 @@ void MapExitImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */
 
@@ -896,7 +935,7 @@ void ConsumeEntryImpl::routeWrite(Connector from, Connector to) {
   in.setRanges(from.ranges);
   consumeExit.addInConnector(in);
 
-  MultiEdge edge(from, in);
+  MultiEdge edge(location, from, in);
   addEdge(edge);
 
   Connector out(consumeExit,
@@ -930,7 +969,7 @@ Connector ConsumeEntryImpl::lookup(Value value, ConsumeEntry entry) {
     dstConn.setRanges(srcConn.ranges);
     addInConnector(dstConn);
 
-    MultiEdge multiedge(srcConn, dstConn);
+    MultiEdge multiedge(location, srcConn, dstConn);
     scope.addEdge(multiedge);
 
     Connector outConn(entry, "OUT_" + utils::valueToString(value));
@@ -951,6 +990,7 @@ void ConsumeEntryImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", getID(), /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   jemit.printKVPair("label", getName());
 
   if (num_pes.empty()) {
@@ -986,6 +1026,7 @@ void ConsumeExitImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("id", id, /*stringify=*/false);
 
   jemit.startNamedObject("attributes");
+  printLocation(location, jemit);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes */
 

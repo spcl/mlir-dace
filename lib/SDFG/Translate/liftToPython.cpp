@@ -178,6 +178,17 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            utils::valueToString(sqrtOp.getOperand(), op) + ")";
   }
 
+  if (math::ExpOp expOp = dyn_cast<math::ExpOp>(op)) {
+    return nameOut + " = math.exp(" +
+           utils::valueToString(expOp.getOperand(), op) + ")";
+  }
+
+  if (math::PowFOp powFOp = dyn_cast<math::PowFOp>(op)) {
+    return nameOut + " = math.pow(" +
+           utils::valueToString(powFOp.getLhs(), op) + "," +
+           utils::valueToString(powFOp.getRhs(), op) + ")";
+  }
+
   //===--------------------------------------------------------------------===//
   // LLVM
   //===--------------------------------------------------------------------===//

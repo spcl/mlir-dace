@@ -271,14 +271,16 @@ public:
 // MultiEdge
 //===----------------------------------------------------------------------===//
 
+// NOTE: Why not PImpl?
 class MultiEdge : public Emittable {
 private:
+  Location location;
   Connector source;
   Connector destination;
 
 public:
-  MultiEdge(Connector source, Connector destination)
-      : source(source), destination(destination) {}
+  MultiEdge(Location location, Connector source, Connector destination)
+      : location(location), source(source), destination(destination) {}
 
   void emit(emitter::JsonEmitter &jemit) override;
 };
@@ -463,8 +465,9 @@ private:
   std::shared_ptr<InterstateEdgeImpl> ptr;
 
 public:
-  InterstateEdge(State source, State destination)
-      : ptr(std::make_shared<InterstateEdgeImpl>(source, destination)) {}
+  InterstateEdge(Location location, State source, State destination)
+      : ptr(std::make_shared<InterstateEdgeImpl>(location, source,
+                                                 destination)) {}
 
   void setCondition(Condition condition);
   void addAssignment(Assignment assignment);
@@ -474,6 +477,7 @@ public:
 
 class InterstateEdgeImpl : public Emittable {
 private:
+  Location location;
   State source;
   State destination;
 
@@ -481,8 +485,9 @@ private:
   std::vector<Assignment> assignments;
 
 public:
-  InterstateEdgeImpl(State source, State destination)
-      : source(source), destination(destination), condition("1") {}
+  InterstateEdgeImpl(Location location, State source, State destination)
+      : location(location), source(source), destination(destination),
+        condition("1") {}
 
   void setCondition(Condition condition);
   // Check for duplicates
