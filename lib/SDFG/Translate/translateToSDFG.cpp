@@ -409,13 +409,7 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
     if (op.getOperand(i).getDefiningOp() != nullptr)
       arrName = cast<AllocOp>(op.getOperand(i).getDefiningOp()).getName();
 
-    Access access(op.getLoc());
-    access.setName(arrName);
-    scope.addNode(access);
-
-    Connector accOut(access);
-    access.addOutConnector(accOut);
-
+    Connector accOut = scope.lookup(op.getOperand(i));
     MultiEdge edge_out(op.getLoc(), connector, accOut);
     scope.addEdge(edge_out);
 
@@ -732,7 +726,19 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     }
   }
 
-  task.setCode(Code(accessCode + "] = _value", CodeLanguage::Python));
+  accessCode += "] = _value";
+
+  // Removes 1x arrays
+  if (ArrayType array = op.arr().getType().dyn_cast<ArrayType>()) {
+    SizedType sized = array.getDimensions();
+
+    if (sized.getRank() == 1 && sized.getIntegers().size() == 1 &&
+        sized.getIntegers()[0] == 1)
+      accessCode = "_array = _value";
+  }
+
+  task.setCode(Code(accessCode, CodeLanguage::Python));
+
   scope.routeWrite(taskOut, accOut);
   scope.mapConnector(op.arr(), accOut);
   return success();
@@ -851,8 +857,18 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
     }
   }
 
-  task.setCode(Code(accessCode + "]", CodeLanguage::Python));
+  accessCode += "]";
 
+  // Removes 1x arrays
+  if (ArrayType array = op.arr().getType().dyn_cast<ArrayType>()) {
+    SizedType sized = array.getDimensions();
+
+    if (sized.getRank() == 1 && sized.getIntegers().size() == 1 &&
+        sized.getIntegers()[0] == 1)
+      accessCode = "_out = _array";
+  }
+
+  task.setCode(Code(accessCode, CodeLanguage::Python));
   return success();
 }
 
