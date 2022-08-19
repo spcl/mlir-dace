@@ -6,9 +6,17 @@ using namespace sdfg;
 
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
 Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
-  std::string nameOut = op.getNumResults() == 1
-                            ? utils::valueToString(op.getResult(0), op)
-                            : "Not Supported";
+  std::string notSup = "Not Supported";
+
+  if (op.getNumResults() > 1)
+    return notSup;
+
+  std::string nameOut = utils::valueToString(op.getResult(0), op);
+
+  if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
+    nameOut = task.getOutputName(0);
+  }
+
   //===--------------------------------------------------------------------===//
   // Arith
   //===--------------------------------------------------------------------===//
@@ -239,18 +247,20 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
 
   if (isa<sdfg::ReturnOp>(op)) {
     std::string code = "";
-    for (unsigned i = 0; i < op.getNumOperands(); ++i) {
-      if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
-        if (i > 0)
-          code.append("\\n");
-        code.append(task.getOutputName(i) + " = " +
-                    utils::valueToString(op.getOperand(i), op));
-        continue;
-      }
 
-      // Tasklets are the only ones using sdfg.return
-      return None;
-    }
+    // NOTE: Reduces tasklets to one-liner
+    // for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+    //   if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
+    //     if (i > 0)
+    //       code.append("\\n");
+    //     code.append(task.getOutputName(i) + " = " +
+    //                 utils::valueToString(op.getOperand(i), op));
+    //     continue;
+    //   }
+
+    //   // Tasklets are the only ones using sdfg.return
+    //   return None;
+    // }
 
     return code;
   }
