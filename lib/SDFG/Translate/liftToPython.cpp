@@ -39,9 +39,11 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + nameArg0 + " * " + nameArg1;
   }
 
-  if (arith::DivFOp divFOp = dyn_cast<arith::DivFOp>(op)) {
-    return nameOut + " = " + utils::valueToString(divFOp.getLhs(), op) + " / " +
-           utils::valueToString(divFOp.getRhs(), op);
+  if (isa<arith::DivFOp>(op) || isa<arith::DivSIOp>(op) ||
+      isa<arith::DivUIOp>(op)) {
+    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    return nameOut + " = " + nameArg0 + " / " + nameArg1;
   }
 
   if (arith::NegFOp negFOp = dyn_cast<arith::NegFOp>(op)) {
@@ -175,6 +177,10 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = " + utils::valueToString(selectOp.getTrueValue(), op) +
            " if " + utils::valueToString(selectOp.getCondition(), op) +
            " else " + utils::valueToString(selectOp.getFalseValue(), op);
+  }
+
+  if (isa<arith::ExtSIOp>(op)) {
+    return nameOut + " = " + utils::valueToString(op.getOperand(0), op);
   }
 
   //===--------------------------------------------------------------------===//

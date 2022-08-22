@@ -229,7 +229,6 @@ public:
   LogicalResult
   matchAndRewrite(func::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-
     if (op.isDeclaration()) {
       rewriter.eraseOp(op);
       return success();
@@ -339,6 +338,61 @@ public:
     if (callee == "print_array") {
       rewriter.eraseOp(op);
       rewriter.eraseOp(funcOp);
+      return success();
+    }
+
+    // For LULESH
+    if (callee == "cbrt" || callee == "exit") {
+      StateNode state = StateNode::create(rewriter, op->getLoc(), callee);
+
+      SmallVector<Value> operands = adaptor.operands();
+      SmallVector<Value> loadedOps =
+          createLoads(rewriter, op->getLoc(), operands);
+
+      TaskletNode task = TaskletNode::create(rewriter, op->getLoc(), loadedOps,
+                                             op->getResultTypes());
+      task->setAttr("insert_code", rewriter.getStringAttr(callee));
+
+      if (task.getNumResults() == 1)
+        sdfg::ReturnOp::create(rewriter, op.getLoc(),
+                               task.body().getArguments());
+      else
+        sdfg::ReturnOp::create(rewriter, op.getLoc(), {});
+
+      rewriter.setInsertionPointAfter(task);
+
+      if (task.getNumResults() == 1) {
+        MemrefToMemletConverter memo;
+        Type nt = memo.convertType(op->getResultTypes()[0]);
+        SizedType sized =
+            SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
+        nt = ArrayType::get(op->getLoc().getContext(), sized);
+
+        Operation *sdfg = getParentSDFG(state);
+        OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+        rewriter.setInsertionPointToStart(
+            &sdfg->getRegion(0).getBlocks().front());
+        AllocOp alloc =
+            AllocOp::create(rewriter, op->getLoc(), nt, "_" + callee + "_tmp",
+                            /*transient=*/true);
+
+        rewriter.restoreInsertionPoint(ip);
+
+        StoreOp::create(rewriter, op->getLoc(), task.getResult(0), alloc,
+                        ValueRange());
+
+        LoadOp load =
+            LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
+
+        rewriter.replaceOp(op, {load});
+      } else {
+        rewriter.eraseOp(op);
+      }
+
+      linkToLastState(rewriter, op->getLoc(), state);
+      if (markedToLink(*op))
+        linkToNextState(rewriter, op->getLoc(), state);
+
       return success();
     }
 

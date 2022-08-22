@@ -331,12 +331,30 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
     insertTransientArray(op.getLoc(), connector, op.getResult(i), scope);
   }
 
-  Optional<std::string> code_data = liftToPython(*op);
-  if (code_data.hasValue()) {
-    Code code(code_data.getValue(), CodeLanguage::Python);
-    tasklet.setCode(code);
+  if (op->hasAttr("insert_code")) {
+    std::string operation = op->getAttr("insert_code").cast<StringAttr>().str();
+
+    if (operation == "cbrt") {
+      std::string nameOut = op.getOutputName(0);
+      std::string nameIn = op.getInputName(0);
+      Code code(nameOut + " = " + nameIn + " ** (1. / 3.)",
+                CodeLanguage::Python);
+      tasklet.setCode(code);
+    }
+
+    if (operation == "exit") {
+      Code code("sys.exit()", CodeLanguage::Python);
+      tasklet.setCode(code);
+    }
+
   } else {
-    // TODO: Write content as code
+    Optional<std::string> code_data = liftToPython(*op);
+    if (code_data.hasValue()) {
+      Code code(code_data.getValue(), CodeLanguage::Python);
+      tasklet.setCode(code);
+    } else {
+      // TODO: Write content as code
+    }
   }
 
   return success();
