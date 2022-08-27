@@ -478,6 +478,24 @@ public:
       return success();
     }
 
+    if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
+      StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
+
+      // NOTE: Set by SCFForToSDFG
+      if (op->getNumOperands() > 1) {
+        Value val = createLoad(rewriter, op->getLoc(), operands[0]);
+        Value memref = createLoad(rewriter, op->getLoc(), operands[1]);
+        StoreOp::create(rewriter, op->getLoc(), val, memref, {});
+      }
+
+      linkToLastState(rewriter, op->getLoc(), state);
+      if (markedToLink(*op))
+        linkToNextState(rewriter, op->getLoc(), state);
+
+      rewriter.eraseOp(op);
+      return success();
+    }
+
     if (isa<func::ReturnOp>(op) && !isa<func::FuncOp>(op->getParentOp())) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
       Operation *sdfg = getParentSDFG(state);
@@ -798,6 +816,36 @@ public:
   }
 };
 
+class MemrefCastToSDFG : public OpConversionPattern<memref::CastOp> {
+public:
+  using OpConversionPattern<memref::CastOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::CastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Type type = getTypeConverter()->convertType(op.getType());
+
+    // SizedType sized =
+    //     SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
+    // Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
+
+    // Operation *sdfg = getParentSDFG(op);
+    // OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    // rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
+    // AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT,
+    // "_cast_tmp",
+    //                                 /*transient=*/true);
+
+    // rewriter.restoreInsertionPoint(ip);
+    // StateNode state = StateNode::create(rewriter, op->getLoc(), "cast");
+    // CopyOp::create(rewriter, op.getLoc(), adaptor.source(), alloc);
+
+    // rewriter.replaceOp(op, {alloc});
+
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // SCF Patterns
 //===----------------------------------------------------------------------===//
@@ -816,9 +864,48 @@ public:
     rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
 
+    std::vector<AllocOp> iterAllocs = {};
+
+    for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
+      Value iterOp = op.getIterOperands()[i];
+
+      MemrefToMemletConverter memo;
+      Type nt = memo.convertType(iterOp.getType());
+      SizedType sized =
+          SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
+      nt = ArrayType::get(op->getLoc().getContext(), sized);
+
+      AllocOp alloc =
+          AllocOp::create(rewriter, op->getLoc(), nt,
+                          "_" + idxName + "_iter" + std::to_string(i),
+                          /*transient=*/true);
+
+      iterAllocs.push_back(alloc);
+    }
+
     rewriter.restoreInsertionPoint(ip);
 
     StateNode init = StateNode::create(rewriter, op.getLoc(), "for_init");
+
+    for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
+      Value iterOp = op.getIterOperands()[i];
+      Value initVal =
+          createLoad(rewriter, op.getLoc(), adaptor.getInitArgs()[i]);
+
+      StoreOp::create(rewriter, op->getLoc(), initVal, iterAllocs[i],
+                      ValueRange());
+
+      LoadOp newLoad =
+          LoadOp::create(rewriter, op->getLoc(), iterAllocs[i], ValueRange());
+
+      op.getRegionIterArgs()[i].replaceAllUsesWith(newLoad);
+
+      // TODO: Yield all
+      for (scf::YieldOp yieldOp : op.getLoopBody().getOps<scf::YieldOp>()) {
+        yieldOp->insertOperands(1, {iterAllocs[i]});
+      }
+    }
+
     linkToLastState(rewriter, op.getLoc(), init);
 
     rewriter.setInsertionPointAfter(init);
@@ -1299,6 +1386,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   patterns.add<MemrefAllocToSDFG>(converter, ctxt);
   patterns.add<MemrefAllocaToSDFG>(converter, ctxt);
   patterns.add<MemrefDeallocToSDFG>(converter, ctxt);
+  // patterns.add<MemrefCastToSDFG>(converter, ctxt);
 
   patterns.add<SCFForToSDFG>(converter, ctxt);
   patterns.add<SCFIfToSDFG>(converter, ctxt);

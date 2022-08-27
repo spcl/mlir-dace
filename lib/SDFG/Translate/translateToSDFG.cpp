@@ -147,8 +147,14 @@ LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
 
   for (BlockArgument ba : op.getRegion(0).getArguments()) {
     if (utils::isSizedType(ba.getType())) {
+      SizedType sizedType = utils::getSizedType(ba.getType());
+
+      for (StringAttr sym : sizedType.getSymbols())
+        // NOTE: Support other types?
+        sdfg.addSymbol(Symbol(sym.getValue(), DType::int64));
+
       Array array(utils::valueToString(ba), /*transient=*/false,
-                  /*stream=*/false, utils::getSizedType(ba.getType()));
+                  /*stream=*/false, sizedType);
       sdfg.addArg(array);
     } else {
       Array array(utils::valueToString(ba), /*transient=*/false,
@@ -711,13 +717,8 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   task.setName("indirect_store" + name);
   scope.addNode(task);
 
-  Connector taskOut(task, "_out");
-  task.addOutConnector(taskOut);
-
   Connector taskArr(task, "_array");
-  task.addInConnector(taskArr);
-  MultiEdge arrayEdge(op.getLoc(), scope.lookup(op.arr()), taskArr);
-  scope.addEdge(arrayEdge);
+  task.addOutConnector(taskArr);
 
   Connector taskVal(task, "_value");
   task.addInConnector(taskVal);
@@ -757,7 +758,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 
   task.setCode(Code(accessCode, CodeLanguage::Python));
 
-  scope.routeWrite(taskOut, accOut);
+  scope.routeWrite(taskArr, accOut);
   scope.mapConnector(op.arr(), accOut);
   return success();
 }

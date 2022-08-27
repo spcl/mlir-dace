@@ -64,6 +64,11 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            ")";
   }
 
+  if (arith::FPToSIOp fPToSIOp = dyn_cast<arith::FPToSIOp>(op)) {
+    return nameOut + " = int(" + utils::valueToString(fPToSIOp.getIn(), op) +
+           ")";
+  }
+
   if (isa<arith::CmpIOp>(op) || isa<arith::CmpFOp>(op)) {
     Value lhsValue;
     Value rhsValue;
@@ -198,9 +203,20 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   }
 
   if (math::PowFOp powFOp = dyn_cast<math::PowFOp>(op)) {
-    return nameOut + " = math.pow(" +
-           utils::valueToString(powFOp.getLhs(), op) + "," +
-           utils::valueToString(powFOp.getRhs(), op) + ")";
+    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+
+    return nameOut + " = math.pow(" + nameArg0 + "," + nameArg1 + ")";
+  }
+
+  if (math::CosOp cosOp = dyn_cast<math::CosOp>(op)) {
+    return nameOut + " = math.cos(" +
+           utils::valueToString(cosOp.getOperand(), op) + ")";
+  }
+
+  if (math::SinOp sinOp = dyn_cast<math::SinOp>(op)) {
+    return nameOut + " = math.sin(" +
+           utils::valueToString(sinOp.getOperand(), op) + ")";
   }
 
   //===--------------------------------------------------------------------===//
