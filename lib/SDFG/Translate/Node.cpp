@@ -127,7 +127,9 @@ void Array::emit(emitter::JsonEmitter &jemit) {
   if (stream) {
     jemit.printKVPair("type", "Stream");
   } else if (shape.getShape().empty()) {
-    jemit.printKVPair("type", "Scalar");
+    // NOTE: Temporary for evaluation
+    // jemit.printKVPair("type", "Scalar");
+    jemit.printKVPair("type", "Array");
   } else {
     jemit.printKVPair("type", "Array");
   }

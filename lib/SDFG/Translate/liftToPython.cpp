@@ -184,7 +184,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            " else " + utils::valueToString(selectOp.getFalseValue(), op);
   }
 
-  if (isa<arith::ExtSIOp>(op)) {
+  if (isa<arith::ExtSIOp>(op) || isa<arith::ExtUIOp>(op)) {
     return nameOut + " = " + utils::valueToString(op.getOperand(0), op);
   }
 
