@@ -151,17 +151,26 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 
   unsigned intIdx = 0;
   unsigned symIdx = 0;
-  SmallVector<std::string> strideList;
+  SmallVector<std::string> strideList = {"1"};
 
   for (unsigned i = 0; i < shape.getShape().size(); ++i) {
     jemit.startEntry();
     if (shape.getShape()[i]) {
       jemit.printString(std::to_string(shape.getIntegers()[intIdx]));
-      strideList.push_back(std::to_string(shape.getIntegers()[intIdx]));
+
+      if (i > 0) {
+        std::string newString = strideList.back() + " * " +
+                                std::to_string(shape.getIntegers()[intIdx]);
+        strideList.push_back(newString);
+      }
       ++intIdx;
     } else {
       jemit.printString(shape.getSymbols()[symIdx].str());
-      strideList.push_back(shape.getSymbols()[symIdx].str());
+      if (i > 0) {
+        std::string newString = strideList.back() + " * " +
+                                std::to_string(shape.getIntegers()[intIdx]);
+        strideList.push_back(newString);
+      }
       ++symIdx;
     }
   }
@@ -173,7 +182,7 @@ void Array::emit(emitter::JsonEmitter &jemit) {
 
     for (int i = strideList.size() - 1; i >= 0; --i) {
       jemit.startEntry();
-      jemit.printString(i == 0 ? "1" : strideList[i]);
+      jemit.printString(strideList[i]);
     }
 
     jemit.endList(); // strides
