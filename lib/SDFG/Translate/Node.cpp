@@ -124,12 +124,16 @@ void printLocation(Location loc, emitter::JsonEmitter &jemit) {
 void Array::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject(name);
 
+  // NOTE: Todo: Rewrite to check with sdfg args instead of string
+  bool isArg = false;
+  if (name.find("arg") != std::string::npos) {
+    isArg = true;
+  }
+
   if (stream) {
     jemit.printKVPair("type", "Stream");
-  } else if (shape.getShape().empty()) {
-    // NOTE: Temporary for evaluation
-    // jemit.printKVPair("type", "Scalar");
-    jemit.printKVPair("type", "Array");
+  } else if (shape.getShape().empty() && !isArg) {
+    jemit.printKVPair("type", "Scalar");
   } else {
     jemit.printKVPair("type", "Array");
   }
