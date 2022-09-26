@@ -1,5 +1,5 @@
 // RUN: sdfg-opt --convert-to-sdfg %s
-func.func private @main() {
+func.func private @main() -> i32 {
   %init1 = arith.constant 0 : i32
 
   %res = scf.while (%arg1 = %init1) : (i32) -> i32 {
@@ -13,6 +13,6 @@ func.func private @main() {
     scf.yield %next : i32
   }
   
-  return
+  return %res : i32
 }
  
