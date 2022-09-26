@@ -1794,7 +1794,7 @@ LogicalResult AllocSymbolOp::verify() {
   if (sym().empty())
     return emitOpError("failed to verify that input string is not empty");
 
-  if (!isalpha(sym().front()))
+  if (!isalpha(sym().front()) && sym().front() != '_')
     return emitOpError("failed to verify that input string starts with "
                        "an alphabetical character");
 

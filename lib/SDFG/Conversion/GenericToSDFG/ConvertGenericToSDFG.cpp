@@ -203,6 +203,11 @@ void linkToNextState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
+void markToLink(Operation &op) {
+  BoolAttr boolAttr = BoolAttr::get(op.getContext(), true);
+  op.setAttr("linkToNext", boolAttr);
+}
+
 bool markedToLink(Operation &op) {
   return op.hasAttr("linkToNext") &&
          op.getAttr("linkToNext").cast<BoolAttr>().getValue();
@@ -451,77 +456,41 @@ public:
   }
 };
 
-class EraseTerminators : public ConversionPattern {
+class ReturnToSDFG : public OpConversionPattern<func::ReturnOp> {
 public:
-  EraseTerminators(TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
+  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
+    Operation *sdfg = getParentSDFG(state);
 
-    if (isa<scf::YieldOp>(op) && !isa<scf::ForOp>(op->getParentOp())) {
-      StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
+    std::vector<Value> operands = {};
+    for (Value operand : adaptor.operands())
+      operands.push_back(operand);
 
-      // NOTE: Set by SCFIfToSDFG
-      if (op->getNumOperands() > 1) {
-        Value val = createLoad(rewriter, op->getLoc(), operands[0]);
-        Value memref = createLoad(rewriter, op->getLoc(), operands[1]);
-        StoreOp::create(rewriter, op->getLoc(), val, memref, {});
+    SmallVector<Value> loadedOps =
+        createLoads(rewriter, op->getLoc(), operands);
+
+    for (unsigned i = 0; i < loadedOps.size(); ++i) {
+      if (loadedOps[i].getType().isa<ArrayType>()) {
+        CopyOp::create(
+            rewriter, op->getLoc(), loadedOps[i],
+            sdfg->getRegion(0).getArgument(getSDFGNumArgs(sdfg) + i));
+      } else {
+        StoreOp::create(
+            rewriter, op->getLoc(), loadedOps[i],
+            sdfg->getRegion(0).getArgument(getSDFGNumArgs(sdfg) + i),
+            ValueRange());
       }
-
-      linkToLastState(rewriter, op->getLoc(), state);
-      if (markedToLink(*op))
-        linkToNextState(rewriter, op->getLoc(), state);
-
-      rewriter.eraseOp(op);
-      return success();
     }
 
-    if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
-      StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
-
-      // NOTE: Set by SCFForToSDFG
-      if (op->getNumOperands() > 1) {
-        Value val = createLoad(rewriter, op->getLoc(), operands[0]);
-        Value memref = createLoad(rewriter, op->getLoc(), operands[1]);
-        StoreOp::create(rewriter, op->getLoc(), val, memref, {});
-      }
-
-      linkToLastState(rewriter, op->getLoc(), state);
-      if (markedToLink(*op))
-        linkToNextState(rewriter, op->getLoc(), state);
-
-      rewriter.eraseOp(op);
-      return success();
-    }
-
-    if (isa<func::ReturnOp>(op) && !isa<func::FuncOp>(op->getParentOp())) {
-      StateNode state = StateNode::create(rewriter, op->getLoc(), "return");
-      Operation *sdfg = getParentSDFG(state);
-
-      SmallVector<Value> loadedOps =
-          createLoads(rewriter, op->getLoc(), operands);
-
-      for (unsigned i = 0; i < loadedOps.size(); ++i) {
-        if (loadedOps[i].getType().isa<ArrayType>()) {
-          CopyOp::create(
-              rewriter, op->getLoc(), loadedOps[i],
-              sdfg->getRegion(0).getArgument(getSDFGNumArgs(sdfg) + i));
-        } else {
-          StoreOp::create(
-              rewriter, op->getLoc(), loadedOps[i],
-              sdfg->getRegion(0).getArgument(getSDFGNumArgs(sdfg) + i),
-              ValueRange());
-        }
-      }
-
-      linkToLastState(rewriter, op->getLoc(), state);
-      if (markedToLink(*op))
-        linkToNextState(rewriter, op->getLoc(), state);
-      rewriter.eraseOp(op);
-      return success();
-    }
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+    rewriter.eraseOp(op);
+    return success();
 
     return failure();
   }
@@ -823,24 +792,23 @@ public:
   LogicalResult
   matchAndRewrite(memref::CastOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Type type = getTypeConverter()->convertType(op.getType());
+    Type type = getTypeConverter()->convertType(op.getType());
 
-    // SizedType sized =
-    //     SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
-    // Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
+    SizedType sized =
+        SizedType::get(op->getLoc().getContext(), type, {}, {}, {});
+    Type arrT = ArrayType::get(op->getLoc().getContext(), sized);
 
-    // Operation *sdfg = getParentSDFG(op);
-    // OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    // rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
-    // AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT,
-    // "_cast_tmp",
-    //                                 /*transient=*/true);
+    Operation *sdfg = getParentSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
+    AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), arrT, "_cast_tmp",
+                                    /*transient=*/true);
 
-    // rewriter.restoreInsertionPoint(ip);
-    // StateNode state = StateNode::create(rewriter, op->getLoc(), "cast");
-    // CopyOp::create(rewriter, op.getLoc(), adaptor.source(), alloc);
+    rewriter.restoreInsertionPoint(ip);
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "cast");
+    CopyOp::create(rewriter, op.getLoc(), adaptor.source(), alloc);
 
-    // rewriter.replaceOp(op, {alloc});
+    rewriter.replaceOp(op, {alloc});
 
     return success();
   }
@@ -1000,6 +968,158 @@ public:
   }
 };
 
+class SCFWhileToSDFG : public OpConversionPattern<scf::WhileOp> {
+public:
+  using OpConversionPattern<scf::WhileOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::WhileOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Values
+    Location loc = op.getLoc();
+    MLIRContext *context = loc->getContext();
+    scf::ConditionOp conditionOp = op.getConditionOp();
+    scf::YieldOp yieldOp = op.getYieldOp();
+
+    // Allocs
+    Operation *sdfg = getParentSDFG(op);
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
+
+    std::vector<SymOp> iterVars = {};
+    std::vector<AllocOp> iterAllocs = {};
+
+    for (BlockArgument arg : op.getBeforeArguments()) {
+      std::string symName = utils::generateName(utils::valueToString(arg));
+      AllocSymbolOp::create(rewriter, loc, symName);
+      // NOTE: Maybe using the rewriter would be more stable?
+      SymOp iterSym = SymOp::create(arg.getLoc(), arg.getType(), symName);
+      iterVars.push_back(iterSym);
+
+      MemrefToMemletConverter converter;
+      Type newType = converter.convertType(arg.getType());
+      SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
+      ArrayType arrayType = ArrayType::get(context, sizedType);
+
+      AllocOp alloc = AllocOp::create(rewriter, loc, arrayType, symName,
+                                      /*transient=*/true);
+      yieldOp->insertOperands(yieldOp.getNumOperands(), {alloc});
+      iterAllocs.push_back(alloc);
+    }
+
+    MemrefToMemletConverter converter;
+    Type newType = converter.convertType(conditionOp.getCondition().getType());
+    SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
+    ArrayType arrayType = ArrayType::get(context, sizedType);
+    AllocOp conditionAlloc =
+        AllocOp::create(rewriter, loc, arrayType, "while_condition",
+                        /*transient=*/true);
+
+    rewriter.restoreInsertionPoint(ip);
+
+    // Init state
+    StateNode initState = StateNode::create(rewriter, loc, "while_init");
+
+    linkToLastState(rewriter, loc, initState);
+    rewriter.setInsertionPointAfter(initState);
+
+    // Guard begin state
+    StateNode guardBeginState =
+        StateNode::create(rewriter, loc, "while_guard_begin");
+    linkToLastState(rewriter, loc, guardBeginState);
+    rewriter.setInsertionPointAfter(guardBeginState);
+
+    // Mark last op for linking
+    markToLink(op.getBefore().front().back());
+
+    // Copy ops for guard calculation
+    Block *cont =
+        rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
+
+    std::vector<Value> iterVarsValue(iterVars.begin(), iterVars.end());
+
+    rewriter.mergeBlocks(&op.getBefore().front(), rewriter.getBlock(),
+                         ValueRange(iterVarsValue));
+    rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
+
+    // Guard end state
+    StateNode guardEndState =
+        StateNode::create(rewriter, loc, "while_guard_end");
+
+    rewriter.setInsertionPointAfter(guardEndState);
+
+    // Body state
+    StateNode bodyState = StateNode::create(rewriter, loc, "while_body");
+    rewriter.setInsertionPointAfter(bodyState);
+
+    // Mark last op for linking
+    markToLink(op.getAfter().front().back());
+
+    // Copy all body ops
+    cont =
+        rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
+
+    rewriter.mergeBlocks(&op.getAfter().front(), rewriter.getBlock(),
+                         conditionOp.getArgs());
+    rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
+
+    // Return state
+    StateNode returnState = StateNode::create(rewriter, loc, "while_return");
+    rewriter.setInsertionPointAfter(returnState);
+
+    // Exit state
+    StateNode exitState = StateNode::create(rewriter, loc, "while_exit");
+
+    // Edges
+    rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
+    ArrayAttr emptyAssign = rewriter.getStrArrayAttr({});
+    // Guard_end -> Body
+    StringAttr condStr = rewriter.getStringAttr("ref");
+    EdgeOp::create(rewriter, loc, guardEndState, bodyState, emptyAssign,
+                   condStr, conditionAlloc);
+    // Guard_end -> Exit
+    StringAttr notCondStr = rewriter.getStringAttr("not (ref)");
+    EdgeOp::create(rewriter, loc, guardEndState, exitState, emptyAssign,
+                   notCondStr, conditionAlloc);
+
+    // Return -> Guard_begin
+    EdgeOp::create(rewriter, loc, returnState, guardBeginState);
+
+    // Inject condition array
+    conditionOp->insertOperands(conditionOp.getNumOperands(), {conditionAlloc});
+
+    if (markedToLink(*op))
+      linkToNextState(rewriter, loc, exitState);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class SCFConditionToSDFG : public OpConversionPattern<scf::ConditionOp> {
+public:
+  using OpConversionPattern<scf::ConditionOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ConditionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "condition");
+
+    Value val = createLoad(rewriter, op.getLoc(), adaptor.getCondition());
+    // adaptor.getArgs().back() set by SCFWhileToSDFG
+    StoreOp::create(rewriter, op.getLoc(), val, adaptor.getArgs().back(), {});
+
+    // TODO: Write shared values to array
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 class SCFIfToSDFG : public OpConversionPattern<scf::IfOp> {
 public:
   using OpConversionPattern<scf::IfOp>::OpConversionPattern;
@@ -1106,6 +1226,38 @@ public:
 
     if (markedToLink(*op))
       linkToNextState(rewriter, op->getLoc(), merge);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+class SCFYieldToSDFG : public OpConversionPattern<scf::YieldOp> {
+public:
+  using OpConversionPattern<scf::YieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "yield");
+
+    // The operands are set by the For/While/If patterns in the following shape:
+    // [Array of Values] [Array of Memrefs]
+
+    // NOTE: Maybe add a check for divisibility?
+    unsigned numVals = op->getNumOperands() / 2;
+
+    // NOTE: Maybe replace with updating symbols
+    for (unsigned i = 0; i < numVals; ++i) {
+      Value val = createLoad(rewriter, op->getLoc(), adaptor.getOperands()[i]);
+      Value memref = createLoad(rewriter, op->getLoc(),
+                                adaptor.getOperands()[i + numVals]);
+      StoreOp::create(rewriter, op->getLoc(), val, memref, {});
+    }
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
 
     rewriter.eraseOp(op);
     return success();
@@ -1375,9 +1527,9 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   MLIRContext *ctxt = patterns.getContext();
 
   patterns.add<FuncToSDFG>(converter, ctxt);
+  patterns.add<ReturnToSDFG>(converter, ctxt);
   patterns.add<CallToSDFG>(converter, ctxt);
   patterns.add<OpToTasklet>(converter, ctxt);
-  patterns.add<EraseTerminators>(converter, ctxt);
 
   patterns.add<MemrefLoadToSDFG>(converter, ctxt);
   patterns.add<MemrefStoreToSDFG>(converter, ctxt);
@@ -1386,10 +1538,13 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
   patterns.add<MemrefAllocToSDFG>(converter, ctxt);
   patterns.add<MemrefAllocaToSDFG>(converter, ctxt);
   patterns.add<MemrefDeallocToSDFG>(converter, ctxt);
-  // patterns.add<MemrefCastToSDFG>(converter, ctxt);
+  patterns.add<MemrefCastToSDFG>(converter, ctxt);
 
   patterns.add<SCFForToSDFG>(converter, ctxt);
+  patterns.add<SCFWhileToSDFG>(converter, ctxt);
+  patterns.add<SCFConditionToSDFG>(converter, ctxt);
   patterns.add<SCFIfToSDFG>(converter, ctxt);
+  patterns.add<SCFYieldToSDFG>(converter, ctxt);
 
   patterns.add<LLVMAllocaToSDFG>(converter, ctxt);
   patterns.add<LLVMBitcastToSDFG>(converter, ctxt);
