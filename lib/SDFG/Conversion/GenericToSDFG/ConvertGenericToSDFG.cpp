@@ -986,15 +986,12 @@ public:
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
 
-    std::vector<SymOp> iterVars = {};
     std::vector<AllocOp> iterAllocs = {};
+    std::vector<AllocOp> argAllocs = {};
 
+    // Itervars
     for (BlockArgument arg : op.getBeforeArguments()) {
       std::string symName = utils::generateName(utils::valueToString(arg));
-      AllocSymbolOp::create(rewriter, loc, symName);
-      // NOTE: Maybe using the rewriter would be more stable?
-      SymOp iterSym = SymOp::create(arg.getLoc(), arg.getType(), symName);
-      iterVars.push_back(iterSym);
 
       MemrefToMemletConverter converter;
       Type newType = converter.convertType(arg.getType());
@@ -1007,6 +1004,7 @@ public:
       iterAllocs.push_back(alloc);
     }
 
+    // Condition
     MemrefToMemletConverter converter;
     Type newType = converter.convertType(conditionOp.getCondition().getType());
     SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
@@ -1014,6 +1012,17 @@ public:
     AllocOp conditionAlloc =
         AllocOp::create(rewriter, loc, arrayType, "while_condition",
                         /*transient=*/true);
+
+    // Condition Arguments
+    for (Value arg : conditionOp.getArgs()) {
+      MemrefToMemletConverter converter;
+      Type newType = converter.convertType(arg.getType());
+      SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
+      ArrayType arrayType = ArrayType::get(context, sizedType);
+      AllocOp alloc = AllocOp::create(rewriter, loc, arrayType, "while_arg",
+                                      /*transient=*/true);
+      argAllocs.push_back(alloc);
+    }
 
     rewriter.restoreInsertionPoint(ip);
 
@@ -1026,6 +1035,14 @@ public:
     // Guard begin state
     StateNode guardBeginState =
         StateNode::create(rewriter, loc, "while_guard_begin");
+    // Add loads
+    std::vector<LoadOp> argLoads = {};
+    for (AllocOp alloc : argAllocs) {
+      LoadOp loadOp = LoadOp::create(rewriter, loc, alloc, {});
+      argLoads.push_back(loadOp);
+    }
+    std::vector<Value> argLoadsValue(argLoads.begin(), argLoads.end());
+
     linkToLastState(rewriter, loc, guardBeginState);
     rewriter.setInsertionPointAfter(guardBeginState);
 
@@ -1036,10 +1053,8 @@ public:
     Block *cont =
         rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
 
-    std::vector<Value> iterVarsValue(iterVars.begin(), iterVars.end());
-
     rewriter.mergeBlocks(&op.getBefore().front(), rewriter.getBlock(),
-                         ValueRange(iterVarsValue));
+                         argLoadsValue);
     rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
 
     // Guard end state
@@ -1060,7 +1075,7 @@ public:
         rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
 
     rewriter.mergeBlocks(&op.getAfter().front(), rewriter.getBlock(),
-                         conditionOp.getArgs());
+                         argLoadsValue);
     rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
 
     // Return state
@@ -1088,10 +1103,14 @@ public:
     // Inject condition array
     conditionOp->insertOperands(conditionOp.getNumOperands(), {conditionAlloc});
 
+    // Inject argument arrays
+    std::vector<Value> argAllocsValue(argAllocs.begin(), argAllocs.end());
+    conditionOp->insertOperands(conditionOp.getNumOperands(), argAllocsValue);
+
     if (markedToLink(*op))
       linkToNextState(rewriter, loc, exitState);
 
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, argLoadsValue);
     return success();
   }
 };
@@ -1105,11 +1124,22 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     StateNode state = StateNode::create(rewriter, op->getLoc(), "condition");
 
-    Value val = createLoad(rewriter, op.getLoc(), adaptor.getCondition());
-    // adaptor.getArgs().back() set by SCFWhileToSDFG
-    StoreOp::create(rewriter, op.getLoc(), val, adaptor.getArgs().back(), {});
+    // SCFWhileToSDFG sets the arguments in the following order:
+    // [Arg Values] condition_array [Arg Arrays]
 
-    // TODO: Write shared values to array
+    unsigned argLength = (adaptor.getArgs().size() - 1) / 2;
+
+    // Store condition value
+    Value val = createLoad(rewriter, op.getLoc(), adaptor.getCondition());
+    StoreOp::create(rewriter, op.getLoc(), val, adaptor.getArgs()[argLength],
+                    {});
+
+    // Store argument values
+    for (unsigned i = 0; i < argLength; ++i) {
+      Value val = createLoad(rewriter, op.getLoc(), adaptor.getArgs()[i]);
+      StoreOp::create(rewriter, op.getLoc(), val,
+                      adaptor.getArgs()[argLength + 1 + i], {});
+    }
 
     linkToLastState(rewriter, op->getLoc(), state);
     if (markedToLink(*op))
