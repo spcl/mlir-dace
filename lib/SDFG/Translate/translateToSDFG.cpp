@@ -768,6 +768,10 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
+  // TODO: Implement a dce pass
+  if (op.use_empty())
+    return success();
+
   std::string name = utils::valueToString(op.arr());
 
   if (op.arr().getDefiningOp() != nullptr) {

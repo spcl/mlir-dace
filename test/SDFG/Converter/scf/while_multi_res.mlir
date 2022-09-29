@@ -15,4 +15,3 @@ func.func private @main() -> (i32, i32) {
   
   return %res#0, %res#1 : i32, i32
 }
- 
