@@ -156,7 +156,8 @@ void Array::emit(emitter::JsonEmitter &jemit) {
   unsigned intIdx = 0;
   unsigned symIdx = 0;
   SmallVector<std::string> strideList = {"1"};
-  unsigned strideIdx = shape.getShape().size() - 1;
+  unsigned intStrideIdx = shape.getIntegers().size() - 1;
+  unsigned symStrideIdx = shape.getSymbols().size() - 1;
 
   for (unsigned i = 0; i < shape.getShape().size(); ++i) {
     jemit.startEntry();
@@ -164,19 +165,21 @@ void Array::emit(emitter::JsonEmitter &jemit) {
       jemit.printString(std::to_string(shape.getIntegers()[intIdx]));
 
       if (i > 0) {
-        std::string newString = strideList.back() + " * " +
-                                std::to_string(shape.getIntegers()[strideIdx]);
+        std::string newString =
+            strideList.back() + " * " +
+            std::to_string(shape.getIntegers()[intStrideIdx]);
         strideList.push_back(newString);
-        strideIdx--;
+        intStrideIdx--;
       }
       ++intIdx;
     } else {
       jemit.printString(shape.getSymbols()[symIdx].str());
+
       if (i > 0) {
-        std::string newString = strideList.back() + " * " +
-                                std::to_string(shape.getIntegers()[strideIdx]);
+        std::string newString =
+            strideList.back() + " * " + shape.getSymbols()[symStrideIdx].str();
         strideList.push_back(newString);
-        strideIdx--;
+        symStrideIdx--;
       }
       ++symIdx;
     }
