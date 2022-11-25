@@ -220,6 +220,11 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            utils::valueToString(sinOp.getOperand(), op) + ")";
   }
 
+  if (math::LogOp logOp = dyn_cast<math::LogOp>(op)) {
+    return nameOut + " = math.log(" +
+           utils::valueToString(logOp.getOperand(), op) + ")";
+  }
+
   //===--------------------------------------------------------------------===//
   // LLVM
   //===--------------------------------------------------------------------===//
