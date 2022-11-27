@@ -69,6 +69,11 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            ")";
   }
 
+  if (arith::MaxFOp maxFOp = dyn_cast<arith::MaxFOp>(op)) {
+    return nameOut + " = max(" + utils::valueToString(maxFOp.getLhs(), op) +
+           ", " + utils::valueToString(maxFOp.getRhs(), op) + ")";
+  }
+
   if (isa<arith::CmpIOp>(op) || isa<arith::CmpFOp>(op)) {
     Value lhsValue;
     Value rhsValue;
