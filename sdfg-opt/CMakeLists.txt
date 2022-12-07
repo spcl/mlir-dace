@@ -7,6 +7,7 @@ set(LIBS
   MLIROptLib 
   MLIR_SDFG
   GenericToSDFG
+  LinalgToSDFG
 )
 
 add_llvm_executable(sdfg-opt sdfg-opt.cpp)
