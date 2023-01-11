@@ -32,6 +32,8 @@ add_definitions(${LLVM_DEFINITIONS})
 
 add_custom_target(SOURCE_FILES_CPP DEPENDS print-source-files-cpp)
 add_custom_target(SOURCE_FILES_H DEPENDS print-source-files-h)
+add_custom_target(check-sdfg DEPENDS check-sdfg-opt check-sdfg-translate
+                                     check-sdfg-converter)
 
 add_subdirectory(include)
 add_subdirectory(lib)
