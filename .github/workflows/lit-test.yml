@@ -18,9 +18,12 @@ jobs:
         submodules: recursive
 
     - name: Install dependencies
+      #  TODO: Replace with release of DaCe
       run: |
         sudo apt-get update
         sudo apt-get install ninja-build
+        pip install --upgrade pip
+        pip install git+https://github.com/spcl/dace.git
 
     - name: Load MLIR cache
       id: mlir-cache
