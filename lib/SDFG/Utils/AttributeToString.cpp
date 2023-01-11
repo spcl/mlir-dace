@@ -1,6 +1,5 @@
 #include "SDFG/Utils/AttributeToString.h"
 #include "SDFG/Utils/Utils.h"
-#include "mlir/IR/AsmState.h"
 
 namespace mlir::sdfg::utils {
 
@@ -12,8 +11,6 @@ std::string attributeToString(Attribute attribute, Operation &op) {
   else
     sdfg = utils::getParentSDFG(op);
 
-  // NOTE: This AsmState seems to be unnecessary
-  AsmState state(sdfg);
   std::string name;
   llvm::raw_string_ostream nameStream(name);
 

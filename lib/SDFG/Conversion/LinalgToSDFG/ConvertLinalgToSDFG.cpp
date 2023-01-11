@@ -31,7 +31,6 @@ struct SDFGTarget : public ConversionTarget {
 
 void populateLinalgToSDFGConversionPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctxt = patterns.getContext();
-
 }
 
 namespace {
@@ -55,7 +54,6 @@ void LinalgToSDFGPass::runOnOperation() {
     signalPassFailure();
 }
 
-std::unique_ptr<Pass>
-conversion::createLinalgToSDFGPass() {
+std::unique_ptr<Pass> conversion::createLinalgToSDFGPass() {
   return std::make_unique<LinalgToSDFGPass>();
 }

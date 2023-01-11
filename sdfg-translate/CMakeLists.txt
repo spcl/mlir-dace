@@ -9,3 +9,5 @@ llvm_update_compile_flags(sdfg-translate)
 
 target_link_libraries(sdfg-translate PRIVATE ${LIBS})
 mlir_check_link_libraries(sdfg-translate)
+
+target_sources(SOURCE_FILES_CPP PRIVATE sdfg-translate.cpp)
