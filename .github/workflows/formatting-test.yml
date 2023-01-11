@@ -1,4 +1,3 @@
-# TODO: Move to CMake
 name: Formatting Test
 
 on:   
@@ -20,21 +19,30 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install clang-format
+        sudo apt-get install ninja-build
 
-    - name: Test
+    - name: Load MLIR cache
+      id: mlir-cache
+      uses: actions/cache@v2
+      with:
+        path: llvm-project/build
+        key: ${{ runner.os }}-mlir-commit-358d020
+    
+    # TODO: Prevent building in multiple workflows
+    - name: Build MLIR
+      if: steps.mlir-cache.outputs.cache-hit != 'true'
       run: |
-        succ=0
-        for filename in $(find * -name '*.cpp' -o -name '*.h'); do
-          if ! clang-format --Werror --dry-run --style=file $filename &> /dev/null; then
-              echo "$filename incorrectly formatted!"
-              succ=1
-          fi
-        done
-        if [ $succ -eq 0 ]; then
-          echo "All cpp/h files formatted correctly!"
-          exit 0
-        fi
-        exit 1
+        mkdir llvm-project/build
+        cd llvm-project/build
+        cmake -G Ninja ../llvm -DLLVM_ENABLE_PROJECTS=mlir -DLLVM_TARGETS_TO_BUILD="host" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON
+        ninja 
+
+    - name: Check Formatting
+      run: |
+        mkdir build
+        cd build
+        cmake -G Ninja .. -DMLIR_DIR=${{github.workspace}}/llvm-project/build/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=${{github.workspace}}/llvm-project/build/bin/llvm-lit
+        ninja check-format
         
 
 
