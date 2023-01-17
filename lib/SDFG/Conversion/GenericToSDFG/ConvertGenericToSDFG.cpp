@@ -505,12 +505,14 @@ public:
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Check if there is a proper way of doing this
-    if (op->getDialect()->getNamespace() == "arith" ||
-        op->getDialect()->getNamespace() == "math") {
+    if (op->getDialect()->getNamespace() ==
+            arith::ArithmeticDialect::getDialectNamespace() ||
+        op->getDialect()->getNamespace() ==
+            math::MathDialect::getDialectNamespace()) {
 
       if (isa<TaskletNode>(op->getParentOp()))
-        return failure(); // Operation already in a tasklet
+        return failure(); // Operation already in a
+                          // tasklet
 
       std::string name = utils::operationToString(*op);
       StateNode state = StateNode::create(rewriter, op->getLoc(), name);
