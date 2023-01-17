@@ -316,9 +316,7 @@ public:
         &sdfg.body().getBlocks().back(), &sdfg.body().getBlocks().front(),
         sdfg.body().getArguments().take_front(sdfg.num_args()));
 
-    // hasValue() is inaccessable
-    if (!rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())
-             .getPointer())
+    if (failed(rewriter.convertRegionTypes(&sdfg.body(), *getTypeConverter())))
       return failure();
 
     return success();
@@ -440,9 +438,8 @@ public:
                          &nestedSDFG.body().getBlocks().front(),
                          nestedSDFG.body().getArguments());
 
-    // hasValue() is inaccessable
-    if (!rewriter.convertRegionTypes(&nestedSDFG.body(), *getTypeConverter())
-             .getPointer())
+    if (failed(rewriter.convertRegionTypes(&nestedSDFG.body(),
+                                           *getTypeConverter())))
       return failure();
 
     rewriter.eraseOp(funcOp);
