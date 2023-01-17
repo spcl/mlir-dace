@@ -50,22 +50,23 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     return nameOut + " = -" + utils::valueToString(negFOp.getOperand(), op);
   }
 
-  if (arith::RemSIOp remSIOp = dyn_cast<arith::RemSIOp>(op)) {
-    return nameOut + " = " + utils::valueToString(remSIOp.getLhs(), op) +
-           " % " + utils::valueToString(remSIOp.getRhs(), op);
+  if (isa<arith::RemSIOp>(op) || isa<arith::RemUIOp>(op) ||
+      isa<arith::RemFOp>(op)) {
+    return nameOut + " = " + utils::valueToString(op.getOperand(0), op) +
+           " % " + utils::valueToString(op.getOperand(1), op);
   }
 
   if (arith::IndexCastOp indexCast = dyn_cast<arith::IndexCastOp>(op)) {
     return nameOut + " = " + utils::valueToString(indexCast.getIn(), op);
   }
 
-  if (arith::SIToFPOp sIToFPOp = dyn_cast<arith::SIToFPOp>(op)) {
-    return nameOut + " = float(" + utils::valueToString(sIToFPOp.getIn(), op) +
+  if (isa<arith::SIToFPOp>(op) || isa<arith::UIToFPOp>(op)) {
+    return nameOut + " = float(" + utils::valueToString(op.getOperand(0), op) +
            ")";
   }
 
-  if (arith::FPToSIOp fPToSIOp = dyn_cast<arith::FPToSIOp>(op)) {
-    return nameOut + " = int(" + utils::valueToString(fPToSIOp.getIn(), op) +
+  if (isa<arith::FPToSIOp>(op) || isa<arith::FPToUIOp>(op)) {
+    return nameOut + " = int(" + utils::valueToString(op.getOperand(0), op) +
            ")";
   }
 
