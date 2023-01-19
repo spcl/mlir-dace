@@ -241,11 +241,12 @@ public:
 
     // TODO: Should be passed by a subflag
     if (!op.getName().equals("main")) {
+      // COMMENT: The nested SDFG is created at the call operation conversion
       rewriter.eraseOp(op);
       return success();
     }
 
-    // For PolybenchC
+    // HACK: Replaces the print_array call with returning arrays (PolybenchC)
     if (op.getName().equals("main")) {
       for (int i = op.getNumArguments() - 1; i >= 0; --i)
         if (op.getArgument(i).getUses().empty())
@@ -337,14 +338,15 @@ public:
     ModuleOp mod = getTopModuleOp(op);
     func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
 
-    // For PolybenchC
+    // HACK: The function call got replaced at `FuncToSDFG` (PolybenchC)
     if (callee == "print_array") {
       rewriter.eraseOp(op);
       rewriter.eraseOp(funcOp);
       return success();
     }
 
-    // For LULESH
+    // HACK: Removes special function calls (cbrt, exit) and creates tasklet
+    //  with annotation (LULESH)
     if (callee == "cbrt" || callee == "exit") {
       StateNode state = StateNode::create(rewriter, op->getLoc(), callee);
 
@@ -405,7 +407,7 @@ public:
     SmallVector<Value> loadedOps =
         createLoads(rewriter, op->getLoc(), operands);
 
-    // TODO: Write a proper reordering. Primitives then Memrefs
+    // FIXME: Write a proper reordering. Primitives then Memrefs
     unsigned firstMemref = 0;
     for (unsigned i = 0; i < loadedOps.size(); ++i) {
       if (loadedOps[i].getType().isa<MemRefType>() ||
@@ -877,7 +879,7 @@ public:
 
       op.getRegionIterArgs()[i].replaceAllUsesWith(newLoad);
 
-      // TODO: Yield all
+      // FIXME: Yield all
       for (scf::YieldOp yieldOp : op.getLoopBody().getOps<scf::YieldOp>()) {
         yieldOp->insertOperands(1, {iterAllocs[i]});
       }
@@ -1174,7 +1176,7 @@ public:
     AllocSymbolOp::create(rewriter, op.getLoc(), condName);
 
     if (op.getNumResults() > 0) {
-      // TODO: Alloc all
+      // FIXME: Alloc all
       MemrefToMemletConverter memo;
 
       Type nt = memo.convertType(op.getResultTypes()[0]);
@@ -1283,10 +1285,10 @@ public:
     // The operands are set by the For/While/If patterns in the following shape:
     // [Array of Values] [Array of Memrefs]
 
-    // NOTE: Maybe add a check for divisibility?
+    // IDEA: Maybe add a check for divisibility?
     unsigned numVals = op->getNumOperands() / 2;
 
-    // NOTE: Maybe replace with updating symbols
+    // IDEA: Maybe replace with updating symbols
     for (unsigned i = 0; i < numVals; ++i) {
       Value val = createLoad(rewriter, op->getLoc(), adaptor.getOperands()[i]);
       Value memref = createLoad(rewriter, op->getLoc(),
@@ -1541,7 +1543,7 @@ public:
 
     rewriter.setInsertionPointAfter(task);
 
-    // TODO: Store all results
+    // FIXME: Store all results
     StoreOp::create(rewriter, op->getLoc(), task.getResult(0), alloc,
                     ValueRange());
 

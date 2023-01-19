@@ -6,13 +6,15 @@ using namespace sdfg;
 
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
 Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
-  std::string notSup = "Not Supported";
-
+  // FIXME: Support multiple return values
   if (op.getNumResults() > 1)
-    return notSup;
+    return std::string("Not Supported");
 
   std::string nameOut = utils::valueToString(op.getResult(0), op);
 
+  // HACK: Forces 2-liners to be a single line
+  // NOTE: Does this work with multiple return values? Seems like they would
+  //  have the same output name
   if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
     nameOut = task.getOutputName(0);
   }
@@ -274,15 +276,15 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   }
 
   if (StreamLengthOp streamLen = dyn_cast<StreamLengthOp>(op)) {
-    // NOTE: What's the proper stream name?
+    // FIXME: What's the proper stream name?
     std::string streamName = utils::valueToString(streamLen.str(), op);
     return nameOut + " = len(" + streamName + ")";
   }
 
   if (isa<sdfg::ReturnOp>(op)) {
     std::string code = "";
-
-    // NOTE: Reduces tasklets to one-liner
+    // TODO: Reduce tasklets to one-liners
+    // Reduces tasklets to one-liner
     // for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     //   if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
     //     if (i > 0)
@@ -308,7 +310,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     for (unsigned i = 0; i < op.getNumOperands(); ++i) {
       if (i > 0)
         code.append("\\n");
-      // NOTE: What's the proper return name?
+      // FIXME: What's the proper return name?
       code.append("_out = " + utils::valueToString(op.getOperand(i), op));
     }
     return code;

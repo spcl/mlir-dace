@@ -251,7 +251,7 @@ public:
   bool isNull;
   std::vector<Range> ranges;
   std::string data;
-  // NOTE: DType?
+  // IDEA: Add DType?
 
   Connector(ConnectorNode parent)
       : parent(parent), name("null"), isNull(true) {}
@@ -271,7 +271,7 @@ public:
 // MultiEdge
 //===----------------------------------------------------------------------===//
 
-// NOTE: Why not PImpl?
+// IDEA: Rewrite to use PImpl?
 class MultiEdge : public Emittable {
 private:
   Location location;

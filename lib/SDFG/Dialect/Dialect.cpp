@@ -27,7 +27,7 @@ void SDFGDialect::initialize() {
 // SDFG Types
 //===----------------------------------------------------------------------===//
 
-// TODO: Rewrite to only use an ArrayAttr containing strings & ints
+// FIXME: Rewrite to only use an ArrayAttr containing strings & ints
 static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
                                       SmallVector<StringAttr> &symbols,
                                       SmallVector<int64_t> &integers,

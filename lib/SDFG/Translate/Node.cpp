@@ -124,7 +124,7 @@ void printLocation(Location loc, emitter::JsonEmitter &jemit) {
 void Array::emit(emitter::JsonEmitter &jemit) {
   jemit.startNamedObject(name);
 
-  // NOTE: Todo: Rewrite to check with sdfg args instead of string
+  // FIXME: Rewrite to check with sdfg args instead of string
   bool isArg = false;
   if (name.find("arg") != std::string::npos) {
     isArg = true;
