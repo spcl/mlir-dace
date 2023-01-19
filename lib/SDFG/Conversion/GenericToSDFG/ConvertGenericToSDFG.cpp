@@ -517,19 +517,24 @@ public:
       std::string name = utils::operationToString(*op);
       StateNode state = StateNode::create(rewriter, op->getLoc(), name);
 
-      MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op->getResultTypes()[0]);
-      SizedType sized =
-          SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
-      nt = ArrayType::get(op->getLoc().getContext(), sized);
-
       Operation *sdfg = getParentSDFG(state);
       OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(
           &sdfg->getRegion(0).getBlocks().front());
-      AllocOp alloc =
-          AllocOp::create(rewriter, op->getLoc(), nt, "_" + name + "_tmp",
-                          /*transient=*/true);
+
+      SmallVector<AllocOp> allocs;
+
+      for (Type opType : op->getResultTypes()) {
+        MemrefToMemletConverter memo;
+        Type newType = memo.convertType(opType);
+        SizedType sizedType =
+            SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
+        newType = ArrayType::get(op->getLoc().getContext(), sizedType);
+        AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), newType,
+                                        "_" + name + "_tmp",
+                                        /*transient=*/true);
+        allocs.push_back(alloc);
+      }
 
       rewriter.restoreInsertionPoint(ip);
 
@@ -551,13 +556,18 @@ public:
 
       rewriter.setInsertionPointAfter(task);
 
-      // TODO: Store all results
-      StoreOp::create(rewriter, op->getLoc(), task.getResult(0), alloc,
-                      ValueRange());
+      SmallVector<Value> loads;
 
-      LoadOp load = LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
+      for (AllocOp alloc : allocs) {
+        StoreOp::create(rewriter, op->getLoc(), task.getResult(0), alloc,
+                        ValueRange());
 
-      rewriter.replaceOp(op, {load});
+        LoadOp load =
+            LoadOp::create(rewriter, op->getLoc(), alloc, ValueRange());
+        loads.push_back(load);
+      }
+
+      rewriter.replaceOp(op, loads);
 
       linkToLastState(rewriter, op->getLoc(), state);
       if (markedToLink(*op))
