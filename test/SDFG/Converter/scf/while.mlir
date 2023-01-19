@@ -1,4 +1,4 @@
-// RUN: sdfg-opt --convert-to-sdfg %s
+// RUN: sdfg-opt --convert-to-sdfg %s | sdfg-opt
 func.func private @main() {
   %init1 = arith.constant 0 : i32
 

@@ -1,4 +1,4 @@
-// RUN: sdfg-opt --convert-to-sdfg %s
+// RUN: sdfg-opt --convert-to-sdfg %s | sdfg-opt
 memref.global @arr : memref<900xi32>
 
 func.func private @main(%1: index){

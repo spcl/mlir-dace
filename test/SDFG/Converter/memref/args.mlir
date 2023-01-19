@@ -1,4 +1,4 @@
-// RUN: sdfg-opt --convert-to-sdfg %s
+// RUN: sdfg-opt --convert-to-sdfg %s | sdfg-opt
 func.func private @main(%1: index, %arg6: memref<?x900xi32>){
   %c0 = arith.constant 0 : index
   %8 = memref.load %arg6[%c0, %1] : memref<?x900xi32>

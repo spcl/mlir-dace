@@ -1,5 +1,5 @@
 // XFAIL: *
-// RUN: mlir-opt --linalg-bufferize --func-bufferize --cse --finalizing-bufferize %s | sdfg-opt --linalg-to-sdfg
+// RUN: mlir-opt --linalg-bufferize --func-bufferize --cse --finalizing-bufferize %s | sdfg-opt --linalg-to-sdfg | sdfg-opt
 func.func @main() -> tensor<256x256xf32> {
   %0 = linalg.init_tensor [256, 16] : tensor<256x16xf32>
   %1 = linalg.init_tensor [16, 256] : tensor<16x256xf32>
