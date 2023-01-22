@@ -12,11 +12,28 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
 
   std::string nameOut = utils::valueToString(op.getResult(0), op);
 
-  // HACK: Forces 2-liners to be a single line
-  // NOTE: Does this work with multiple return values? Seems like they would
-  //  have the same output name
+  bool taskletToSingle = true;
   if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
-    nameOut = task.getOutputName(0);
+    // Figure out if we can transform the tasklet into a one-liner, i.e. no
+    // interdependent operations (one use = return op)
+    for (Operation &operation : task.getOps()) {
+      if (!operation.hasOneUse() && operation.getNumResults() > 0) {
+        taskletToSingle = false;
+        break;
+      }
+    }
+
+    // If we can, change the output name to the tasklet connector
+    if (taskletToSingle) {
+      unsigned i = 0;
+      for (Operation &operation : task.getOps()) {
+        if (operation.getLoc() == op.getLoc())
+          break;
+        ++i;
+      }
+
+      nameOut = task.getOutputName(i);
+    }
   }
 
   //===--------------------------------------------------------------------===//
@@ -283,20 +300,23 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
 
   if (isa<sdfg::ReturnOp>(op)) {
     std::string code = "";
-    // TODO: Reduce tasklets to one-liners
-    // Reduces tasklets to one-liner
-    // for (unsigned i = 0; i < op.getNumOperands(); ++i) {
-    //   if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
-    //     if (i > 0)
-    //       code.append("\\n");
-    //     code.append(task.getOutputName(i) + " = " +
-    //                 utils::valueToString(op.getOperand(i), op));
-    //     continue;
-    //   }
 
-    //   // Tasklets are the only ones using sdfg.return
-    //   return None;
-    // }
+    // Only add return code if we're not transforming tasklets to one-liners
+    if (!taskletToSingle) {
+      if (!isa<TaskletNode>(source)) {
+        // Tasklets are the only ones using sdfg.return
+        return None;
+      }
+
+      TaskletNode task = cast<TaskletNode>(source);
+
+      for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+        if (i > 0)
+          code.append("\\n");
+        code.append(task.getOutputName(i) + " = " +
+                    utils::valueToString(op.getOperand(i), op));
+      }
+    }
 
     return code;
   }

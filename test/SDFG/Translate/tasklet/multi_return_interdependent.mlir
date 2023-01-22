@@ -5,7 +5,7 @@ sdfg.sdfg () -> () {
   sdfg.state @state_0{
     %n:2 = sdfg.tasklet() -> (i32, i32) {
       %1 = arith.constant 1 : i32
-      %5 = arith.constant 5 : i32
+      %5 = arith.addi %1, %1 : i32
       sdfg.return %1, %5 : i32, i32
     }
   }
