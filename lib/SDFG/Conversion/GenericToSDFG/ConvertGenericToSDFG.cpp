@@ -495,6 +495,9 @@ public:
   }
 };
 
+// TODO: Implement func.call_indirect conversion
+// TODO: Implement func.constant conversion
+
 //===----------------------------------------------------------------------===//
 // Arith & Math Patterns
 //===----------------------------------------------------------------------===//
@@ -828,6 +831,15 @@ public:
     return success();
   }
 };
+
+// TODO: Implement memref.dim conversion
+// TODO: Implement memref.rank conversion
+// TODO: Implement memref.realloc conversion
+// TODO: Implement memref.reshape conversion
+// TODO: Implement memref.view conversion
+// TODO: Implement memref.subview conversion
+
+// TODO: Implement the remaining memref operation conversions
 
 //===----------------------------------------------------------------------===//
 // SCF Patterns
@@ -1308,6 +1320,12 @@ public:
   }
 };
 
+// TODO: Implement scf.execute_region conversion
+// TODO: Implement scf.foreach_thread conversion
+// TODO: Implement scf.index_switch conversion
+// TODO: Implement scf.parallel conversion
+// TODO: Implement scf.reduce conversion
+
 //===----------------------------------------------------------------------===//
 // LLVM Patterns
 //===----------------------------------------------------------------------===//
@@ -1491,6 +1509,7 @@ public:
   LogicalResult
   matchAndRewrite(mlir::LLVM::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Implement llvm.global conversion
     rewriter.eraseOp(op);
     return success();
   }
@@ -1503,6 +1522,7 @@ public:
   LogicalResult
   matchAndRewrite(mlir::LLVM::LLVMFuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // TODO: Implement llvm.func conversion
     rewriter.eraseOp(op);
     return success();
   }
@@ -1576,6 +1596,8 @@ public:
     return success();
   }
 };
+
+// TODO: Implement llvm operation conversions
 
 //===----------------------------------------------------------------------===//
 // Pass
