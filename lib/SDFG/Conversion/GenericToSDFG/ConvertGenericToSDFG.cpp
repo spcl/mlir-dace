@@ -241,7 +241,7 @@ public:
 
     // TODO: Should be passed by a subflag
     if (!op.getName().equals("main")) {
-      // COMMENT: The nested SDFG is created at the call operation conversion
+      // NOTE: The nested SDFG is created at the call operation conversion
       rewriter.eraseOp(op);
       return success();
     }
