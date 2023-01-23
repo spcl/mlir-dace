@@ -4,13 +4,6 @@
 namespace mlir::sdfg::utils {
 
 std::string attributeToString(Attribute attribute, Operation &op) {
-  Operation *sdfg;
-
-  if (isa<SDFGNode>(op))
-    sdfg = &op;
-  else
-    sdfg = utils::getParentSDFG(op);
-
   std::string name;
   llvm::raw_string_ostream nameStream(name);
 

@@ -37,13 +37,9 @@ static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
 
   do {
     OptionalParseResult typeOPR = parser.parseOptionalType(elemType);
-    if (typeOPR.hasValue()) {
-      if (typeOPR.getValue().succeeded()) {
-        if (parser.parseGreater())
-          return failure();
-        return success();
-      } else
-        return failure();
+    if (typeOPR.hasValue() && typeOPR.getValue().succeeded() &&
+        parser.parseGreater().succeeded()) {
+      return success();
     }
 
     if (parser.parseOptionalKeyword("sym").succeeded()) {
@@ -58,15 +54,12 @@ static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
       continue;
     }
 
-    int64_t num;
+    int32_t num = -1;
     OptionalParseResult intOPR = parser.parseOptionalInteger(num);
-    if (intOPR.hasValue()) {
-      if (intOPR.getValue().succeeded()) {
-        integers.push_back(num);
-        shape.push_back(true);
-        continue;
-      } else
-        return failure();
+    if (intOPR.hasValue() && intOPR.getValue().succeeded()) {
+      integers.push_back(num);
+      shape.push_back(true);
+      continue;
     }
 
     if (parser.parseOptionalQuestion().succeeded()) {

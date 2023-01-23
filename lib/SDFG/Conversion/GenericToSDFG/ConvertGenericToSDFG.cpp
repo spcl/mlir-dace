@@ -821,6 +821,10 @@ public:
 
     rewriter.replaceOp(op, {alloc});
 
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
     return success();
   }
 };
@@ -843,19 +847,19 @@ public:
     rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocSymbolOp::create(rewriter, op.getLoc(), idxName);
 
-    std::vector<AllocOp> iterAllocs = {};
+    SmallVector<AllocOp> iterAllocs;
 
     for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
       Value iterOp = op.getIterOperands()[i];
 
       MemrefToMemletConverter memo;
-      Type nt = memo.convertType(iterOp.getType());
-      SizedType sized =
-          SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
-      nt = ArrayType::get(op->getLoc().getContext(), sized);
+      Type newType = memo.convertType(iterOp.getType());
+      SizedType sizedType =
+          SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
+      newType = ArrayType::get(op->getLoc().getContext(), sizedType);
 
       AllocOp alloc =
-          AllocOp::create(rewriter, op->getLoc(), nt,
+          AllocOp::create(rewriter, op->getLoc(), newType,
                           "_" + idxName + "_iter" + std::to_string(i),
                           /*transient=*/true);
 
@@ -867,7 +871,6 @@ public:
     StateNode init = StateNode::create(rewriter, op.getLoc(), "for_init");
 
     for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
-      Value iterOp = op.getIterOperands()[i];
       Value initVal =
           createLoad(rewriter, op.getLoc(), adaptor.getInitArgs()[i]);
 

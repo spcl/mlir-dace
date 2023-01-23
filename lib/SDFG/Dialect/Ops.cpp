@@ -146,7 +146,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
       continue;
     }
 
-    int32_t num;
+    int32_t num = -1;
     OptionalParseResult intOPR = parser.parseOptionalInteger(num);
     if (intOPR.hasValue() && intOPR.getValue().succeeded()) {
       Attribute intAttr = parser.getBuilder().getI32IntegerAttr(num);

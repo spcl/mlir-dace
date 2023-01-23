@@ -29,9 +29,7 @@ struct SDFGTarget : public ConversionTarget {
 // Pass
 //===----------------------------------------------------------------------===//
 
-void populateLinalgToSDFGConversionPatterns(RewritePatternSet &patterns) {
-  MLIRContext *ctxt = patterns.getContext();
-}
+void populateLinalgToSDFGConversionPatterns(RewritePatternSet &patterns) {}
 
 namespace {
 struct LinalgToSDFGPass
