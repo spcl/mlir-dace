@@ -28,7 +28,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: llvm-project/build
-        key: ${{ runner.os }}-mlir-commit-358d020
+        key: ${{ runner.os }}-mlir-commit-67760d7
     
     # TODO: Prevent building in multiple workflows
     - name: Build MLIR
