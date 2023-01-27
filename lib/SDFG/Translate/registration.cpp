@@ -8,7 +8,7 @@
 
 void mlir::sdfg::translation::registerToSDFGTranslation() {
   mlir::TranslateFromMLIRRegistration registration(
-      "mlir-to-sdfg",
+      "mlir-to-sdfg", "Generates a SDFG JSON",
       [](mlir::ModuleOp module, llvm::raw_ostream &output) {
         mlir::sdfg::emitter::JsonEmitter jemit(output);
 
@@ -28,7 +28,7 @@ void mlir::sdfg::translation::registerToSDFGTranslation() {
       [](mlir::DialectRegistry &registry) {
         registry.insert<mlir::sdfg::SDFGDialect>();
         registry.insert<mlir::func::FuncDialect>();
-        registry.insert<mlir::arith::ArithmeticDialect>();
+        registry.insert<mlir::arith::ArithDialect>();
         registry.insert<mlir::math::MathDialect>();
         registry.insert<mlir::LLVM::LLVMDialect>();
       });

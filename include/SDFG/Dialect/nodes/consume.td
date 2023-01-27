@@ -34,8 +34,6 @@ def SDFG_ConsumeNode : SDFG_Op<"consume", [
     let regions = (region SizedRegion<1>:$body);
 
     let extraClassDeclaration = [{
-        void setEntryID(unsigned id);
-        void setExitID(unsigned id);
         BlockArgument pe();
         BlockArgument elem();
     }];

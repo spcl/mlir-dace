@@ -2,7 +2,6 @@
 #include "SDFG/Translate/Translation.h"
 #include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "llvm/ADT/DenseMap.h"
 #include <regex>
 #include <string>
@@ -18,12 +17,12 @@ void insertTransientArray(Location location, translation::Connector connector,
                           Value value, translation::ScopeNode &scope) {
   using namespace translation;
 
-  Array array(utils::generateName("tmp"), /*transient=*/true, /*stream=*/false,
-              value.getType());
+  Array array(sdfg::utils::generateName("tmp"), /*transient=*/true,
+              /*stream=*/false, value.getType());
 
-  if (utils::isSizedType(value.getType()))
-    array = Array(utils::generateName("tmp"), /*transient=*/true,
-                  /*stream=*/false, utils::getSizedType(value.getType()));
+  if (sdfg::utils::isSizedType(value.getType()))
+    array = Array(sdfg::utils::generateName("tmp"), /*transient=*/true,
+                  /*stream=*/false, sdfg::utils::getSizedType(value.getType()));
 
   SDFG sdfg = scope.getSDFG();
   sdfg.addArray(array);
@@ -143,21 +142,21 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
 LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
   using namespace translation;
 
-  sdfg.setName(utils::generateName("sdfg"));
+  sdfg.setName(sdfg::utils::generateName("sdfg"));
 
   for (BlockArgument ba : op.getRegion(0).getArguments()) {
-    if (utils::isSizedType(ba.getType())) {
-      SizedType sizedType = utils::getSizedType(ba.getType());
+    if (sdfg::utils::isSizedType(ba.getType())) {
+      SizedType sizedType = sdfg::utils::getSizedType(ba.getType());
 
       for (StringAttr sym : sizedType.getSymbols())
         // IDEA: Support other types?
         sdfg.addSymbol(Symbol(sym.getValue(), DType::int64));
 
-      Array array(utils::valueToString(ba), /*transient=*/false,
+      Array array(sdfg::utils::valueToString(ba), /*transient=*/false,
                   /*stream=*/false, sizedType);
       sdfg.addArg(array);
     } else {
-      Array array(utils::valueToString(ba), /*transient=*/false,
+      Array array(sdfg::utils::valueToString(ba), /*transient=*/false,
                   /*stream=*/false, ba.getType());
       sdfg.addArg(array);
     }
@@ -184,12 +183,13 @@ LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
   }
 
   if (op.hasAttr("entry")) {
-    std::string entryName = utils::attributeToString(op.getAttr("entry"), op);
+    std::string entryName =
+        sdfg::utils::attributeToString(op.getAttr("entry"), op);
     entryName.erase(0, 1);
     sdfg.setStartState(sdfg.lookup(entryName));
   } else {
     StateNode stateNode = *op.getRegion(0).getOps<StateNode>().begin();
-    StringRef entryName = stateNode.sym_name();
+    StringRef entryName = stateNode.getSymName();
     sdfg.setStartState(sdfg.lookup(entryName));
   }
 
@@ -236,39 +236,39 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
-  Operation *sdfgNode = utils::getParentSDFG(*op);
+  Operation *sdfgNode = sdfg::utils::getParentSDFG(*op);
 
   StateNode srcNode =
       isa<SDFGNode>(sdfgNode)
-          ? cast<SDFGNode>(sdfgNode).getStateBySymRef(op.src())
-          : cast<NestedSDFGNode>(sdfgNode).getStateBySymRef(op.src());
+          ? cast<SDFGNode>(sdfgNode).getStateBySymRef(op.getSrc())
+          : cast<NestedSDFGNode>(sdfgNode).getStateBySymRef(op.getSrc());
   StateNode destNode =
       isa<SDFGNode>(sdfgNode)
-          ? cast<SDFGNode>(sdfgNode).getStateBySymRef(op.dest())
-          : cast<NestedSDFGNode>(sdfgNode).getStateBySymRef(op.dest());
+          ? cast<SDFGNode>(sdfgNode).getStateBySymRef(op.getDest())
+          : cast<NestedSDFGNode>(sdfgNode).getStateBySymRef(op.getDest());
 
-  State src = sdfg.lookup(srcNode.sym_name());
-  State dest = sdfg.lookup(destNode.sym_name());
+  State src = sdfg.lookup(srcNode.getSymName());
+  State dest = sdfg.lookup(destNode.getSymName());
 
   InterstateEdge edge(op.getLoc(), src, dest);
   sdfg.addEdge(edge);
 
   std::string refname = "";
 
-  if (op.ref() != Value()) {
-    refname = utils::valueToString(op.ref());
+  if (op.getRef() != Value()) {
+    refname = sdfg::utils::valueToString(op.getRef());
 
-    if (op.ref().getDefiningOp() != nullptr) {
-      AllocOp allocOp = cast<AllocOp>(op.ref().getDefiningOp());
-      refname = allocOp.getName();
+    if (op.getRef().getDefiningOp() != nullptr) {
+      AllocOp allocOp = cast<AllocOp>(op.getRef().getDefiningOp());
+      refname = allocOp.getName().value_or(refname);
     }
   }
 
   std::string replacedCondition =
-      std::regex_replace(op.condition().str(), std::regex("ref"), refname);
+      std::regex_replace(op.getCondition().str(), std::regex("ref"), refname);
   edge.setCondition(StringRef(replacedCondition));
 
-  for (mlir::Attribute attr : op.assign()) {
+  for (mlir::Attribute attr : op.getAssign()) {
     std::pair<StringRef, StringRef> kv =
         attr.cast<StringAttr>().getValue().split(':');
 
@@ -287,16 +287,16 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(AllocOp &op, SDFG &sdfg) {
-  Array array(op.getName(), op.transient(), op.isStream(),
-              utils::getSizedType(op.getType()));
+  Array array(op.getContainerName(), op.getTransient(), op.isStream(),
+              sdfg::utils::getSizedType(op.getType()));
   sdfg.addArray(array);
 
   return success();
 }
 
 LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
-  Array array(op.getName(), op.transient(), op.isStream(),
-              utils::getSizedType(op.getType()));
+  Array array(op.getContainerName(), op.getTransient(), op.isStream(),
+              sdfg::utils::getSizedType(op.getType()));
   scope.getSDFG().addArray(array);
 
   return success();
@@ -308,7 +308,7 @@ LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(AllocSymbolOp &op, SDFG &sdfg) {
   // IDEA: Support other types?
-  Symbol sym(op.sym(), DType::int64);
+  Symbol sym(op.getSym(), DType::int64);
   sdfg.addSymbol(sym);
   return success();
 }
@@ -356,8 +356,8 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
 
   } else {
     Optional<std::string> code_data = liftToPython(*op);
-    if (code_data.hasValue()) {
-      Code code(code_data.getValue(), CodeLanguage::Python);
+    if (code_data.has_value()) {
+      Code code(code_data.value(), CodeLanguage::Python);
       tasklet.setCode(code);
     } else {
       // TODO: Write content as code
@@ -373,8 +373,8 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(LibCallOp &op, ScopeNode &scope) {
   Library lib(op.getLoc());
-  lib.setName(utils::generateName(op.callee().str()));
-  lib.setClasspath(op.callee());
+  lib.setName(sdfg::utils::generateName(op.getCallee().str()));
+  lib.setClasspath(op.getCallee());
   scope.addNode(lib);
 
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
@@ -406,23 +406,23 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
     return failure();
 
   NestedSDFG nestedSDFG(op.getLoc(), sdfg);
-  nestedSDFG.setName(utils::generateName("nested_sdfg"));
+  nestedSDFG.setName(sdfg::utils::generateName("nested_sdfg"));
   scope.addNode(nestedSDFG);
 
-  for (unsigned i = 0; i < op.num_args(); ++i) {
-    Connector connector(
-        nestedSDFG,
-        utils::valueToString(op.body().getArgument(i), *op.getOperation()));
+  for (unsigned i = 0; i < op.getNumArgs(); ++i) {
+    Connector connector(nestedSDFG,
+                        sdfg::utils::valueToString(op.getBody().getArgument(i),
+                                                   *op.getOperation()));
     nestedSDFG.addInConnector(connector);
 
     MultiEdge edge(op.getLoc(), scope.lookup(op.getOperand(i)), connector);
     scope.addEdge(edge);
   }
 
-  for (unsigned i = op.num_args(); i < op.getNumOperands(); ++i) {
-    Connector connector(
-        nestedSDFG,
-        utils::valueToString(op.body().getArgument(i), *op.getOperation()));
+  for (unsigned i = op.getNumArgs(); i < op.getNumOperands(); ++i) {
+    Connector connector(nestedSDFG,
+                        sdfg::utils::valueToString(op.getBody().getArgument(i),
+                                                   *op.getOperation()));
 
     nestedSDFG.addOutConnector(connector);
     nestedSDFG.addInConnector(connector);
@@ -430,9 +430,11 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
     MultiEdge edge_in(op.getLoc(), scope.lookup(op.getOperand(i)), connector);
     scope.addEdge(edge_in);
 
-    std::string arrName = utils::valueToString(op.getOperand(i));
+    std::string arrName = sdfg::utils::valueToString(op.getOperand(i));
     if (op.getOperand(i).getDefiningOp() != nullptr)
-      arrName = cast<AllocOp>(op.getOperand(i).getDefiningOp()).getName();
+      arrName = cast<AllocOp>(op.getOperand(i).getDefiningOp())
+                    .getName()
+                    .value_or(arrName);
 
     Connector accOut = scope.lookup(op.getOperand(i));
     MultiEdge edge_out(op.getLoc(), connector, accOut);
@@ -450,10 +452,10 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   MapEntry mapEntry(op.getLoc());
-  mapEntry.setName(utils::generateName("mapEntry"));
+  mapEntry.setName(sdfg::utils::generateName("mapEntry"));
 
   MapExit mapExit(op.getLoc());
-  mapExit.setName(utils::generateName("mapExit"));
+  mapExit.setName(sdfg::utils::generateName("mapExit"));
 
   mapExit.setEntry(mapEntry);
   mapEntry.setExit(mapExit);
@@ -461,8 +463,8 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   scope.addNode(mapEntry);
   scope.addNode(mapExit);
 
-  for (BlockArgument bArg : op.body().getArguments()) {
-    std::string name = utils::valueToString(bArg);
+  for (BlockArgument bArg : op.getBody().getArguments()) {
+    std::string name = sdfg::utils::valueToString(bArg);
     mapEntry.addParam(name);
   }
 
@@ -481,10 +483,11 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
     int64_t lbNum = lbList[i].cast<IntegerAttr>().getInt();
     if (lbNum < 0) {
-      lb = utils::attributeToString(op.lowerBounds()[lbSymNumCounter++], *op);
+      lb = sdfg::utils::attributeToString(
+          op.getLowerBounds()[lbSymNumCounter++], *op);
     } else {
       Value val = op.getOperand(lbNum);
-      lb = utils::generateName("LB");
+      lb = sdfg::utils::generateName("LB");
 
       Connector valConn(mapEntry, lb);
       mapEntry.addInConnector(valConn);
@@ -495,10 +498,11 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
     int64_t ubNum = ubList[i].cast<IntegerAttr>().getInt();
     if (ubNum < 0) {
-      ub = utils::attributeToString(op.upperBounds()[ubSymNumCounter++], *op);
+      ub = sdfg::utils::attributeToString(
+          op.getUpperBounds()[ubSymNumCounter++], *op);
     } else {
       Value val = op.getOperand(ubNum);
-      ub = utils::generateName("UB");
+      ub = sdfg::utils::generateName("UB");
 
       Connector valConn(mapEntry, ub);
       mapEntry.addInConnector(valConn);
@@ -509,10 +513,11 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
     int64_t stNum = stList[i].cast<IntegerAttr>().getInt();
     if (stNum < 0) {
-      st = utils::attributeToString(op.steps()[stSymNumCounter++], *op);
+      st =
+          sdfg::utils::attributeToString(op.getSteps()[stSymNumCounter++], *op);
     } else {
       Value val = op.getOperand(stNum);
-      st = utils::generateName("ST");
+      st = sdfg::utils::generateName("ST");
 
       Connector valConn(mapEntry, st);
       mapEntry.addInConnector(valConn);
@@ -537,10 +542,10 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   ConsumeEntry consumeEntry(op.getLoc());
-  consumeEntry.setName(utils::generateName("consumeEntry"));
+  consumeEntry.setName(sdfg::utils::generateName("consumeEntry"));
 
   ConsumeExit consumeExit(op.getLoc());
-  consumeExit.setName(utils::generateName("consumeExit"));
+  consumeExit.setName(sdfg::utils::generateName("consumeExit"));
 
   scope.addNode(consumeEntry);
   scope.addNode(consumeExit);
@@ -548,23 +553,23 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   consumeExit.setEntry(consumeEntry);
   consumeEntry.setExit(consumeExit);
 
-  if (op.num_pes().hasValue()) {
+  if (op.getNumPes().has_value()) {
     llvm::SmallString<4U> num_pes;
-    op.num_pes().getValue().toStringUnsigned(num_pes);
+    op.getNumPes().value().toStringUnsigned(num_pes);
     consumeEntry.setNumPes(num_pes.str().str());
   } else {
     consumeEntry.setNumPes("1");
   }
 
-  consumeEntry.setPeIndex(utils::valueToString(op.pe()));
+  consumeEntry.setPeIndex(sdfg::utils::valueToString(op.pe()));
 
-  if (op.condition().hasValue()) {
-    StateNode parentState = utils::getParentState(*op);
-    Operation *condFunc = parentState.lookupSymbol(op.condition().getValue());
+  if (op.getCondition().has_value()) {
+    StateNode parentState = sdfg::utils::getParentState(*op);
+    Operation *condFunc = parentState.lookupSymbol(op.getCondition().value());
 
     Optional<std::string> code_data = liftToPython(*condFunc);
-    if (code_data.hasValue()) {
-      Code code(code_data.getValue(), CodeLanguage::Python);
+    if (code_data.has_value()) {
+      Code code(code_data.value(), CodeLanguage::Python);
       consumeEntry.setCondition(code);
     } else {
       // TODO: Write content as code
@@ -574,7 +579,7 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   Connector stream(consumeEntry, "IN_stream");
   consumeEntry.addInConnector(stream);
 
-  MultiEdge edge(op.getLoc(), scope.lookup(op.stream()), stream);
+  MultiEdge edge(op.getLoc(), scope.lookup(op.getStream()), stream);
   scope.addEdge(edge);
 
   Connector elem(consumeEntry, "OUT_stream");
@@ -584,7 +589,7 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 
   if (!op.pe().getUses().empty()) {
     // TODO: Handle uses of PE
-    /* std::string name = utils::valueToString(op.pe());
+    /* std::string name = sdfg::utils::valueToString(op.pe());
     Tasklet task(op.getLoc());
     task.setName("SYM" + name);
 
@@ -594,7 +599,7 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
     task.setCode(code);
 
     consumeEntry.addNode(task);
-    insertTransientArray(op.getLoc(), taskOut, op.pe(), consumeEntry); */
+    insertTransientArray(op.getLoc(), taskOut, op.getPe(), consumeEntry); */
   }
 
   if (collectOperations(*op, consumeEntry).failed())
@@ -610,11 +615,11 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
   Access access(op.getLoc());
 
-  std::string name = utils::valueToString(op.dest());
+  std::string name = sdfg::utils::valueToString(op.getDest());
 
-  if (op.dest().getDefiningOp() != nullptr) {
-    AllocOp allocOp = cast<AllocOp>(op.dest().getDefiningOp());
-    name = allocOp.getName();
+  if (op.getDest().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.getDest().getDefiningOp());
+    name = allocOp.getName().value_or(name);
   }
 
   access.setName(name);
@@ -623,10 +628,10 @@ LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
   Connector accOut(access);
   access.addOutConnector(accOut);
 
-  MultiEdge edge(op.getLoc(), scope.lookup(op.src()), accOut);
+  MultiEdge edge(op.getLoc(), scope.lookup(op.getSrc()), accOut);
   scope.addEdge(edge);
 
-  scope.mapConnector(op.dest(), accOut);
+  scope.mapConnector(op.getDest(), accOut);
   return success();
 }
 
@@ -635,11 +640,11 @@ LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
-  std::string name = utils::valueToString(op.arr());
+  std::string name = sdfg::utils::valueToString(op.getArr());
 
-  if (op.arr().getDefiningOp() != nullptr) {
-    AllocOp allocOp = cast<AllocOp>(op.arr().getDefiningOp());
-    name = allocOp.getName();
+  if (op.getArr().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.getArr().getDefiningOp());
+    name = allocOp.getName().value_or(name);
   }
 
   Access access(op.getLoc());
@@ -657,14 +662,14 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     for (unsigned i = 0; i < numList.size(); ++i) {
       IntegerAttr num = numList[i].cast<IntegerAttr>();
       std::string idx =
-          utils::attributeToString(symNumList[-num.getInt() - 1], *op);
+          sdfg::utils::attributeToString(symNumList[-num.getInt() - 1], *op);
       Range range(idx, idx, "1", "1");
       accOut.addRange(range);
     }
 
-    Connector source = scope.lookup(op.val());
+    Connector source = scope.lookup(op.getVal());
     scope.routeWrite(source, accOut);
-    scope.mapConnector(op.arr(), accOut);
+    scope.mapConnector(op.getArr(), accOut);
     return success();
   }
 
@@ -699,18 +704,19 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
       IntegerAttr num = numList[i].cast<IntegerAttr>();
       if (num.getInt() < 0) {
         std::string idx =
-            utils::attributeToString(symNumList[-num.getInt() - 1], *op);
+            sdfg::utils::attributeToString(symNumList[-num.getInt() - 1], *op);
         Range range(idx, idx, "1", "1");
         accOut.addRange(range);
       } else {
-        std::string idx = utils::valueToString(op.getOperand(num.getInt()));
+        std::string idx =
+            sdfg::utils::valueToString(op.getOperand(num.getInt()));
         Range range(idx, idx, "1", "1");
         accOut.addRange(range);
       }
     }
 
-    scope.routeWrite(scope.lookup(op.val()), accOut);
-    scope.mapConnector(op.arr(), accOut);
+    scope.routeWrite(scope.lookup(op.getVal()), accOut);
+    scope.mapConnector(op.getArr(), accOut);
     return success();
   }
 
@@ -723,7 +729,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 
   Connector taskVal(task, "_value");
   task.addInConnector(taskVal);
-  MultiEdge valEdge(op.getLoc(), scope.lookup(op.val()), taskVal);
+  MultiEdge valEdge(op.getLoc(), scope.lookup(op.getVal()), taskVal);
   scope.addEdge(valEdge);
 
   std::string accessCode = "_array[";
@@ -735,7 +741,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
     IntegerAttr num = numList[i].cast<IntegerAttr>();
     if (num.getInt() < 0) {
       accessCode.append(
-          utils::attributeToString(symNumList[-num.getInt() - 1], *op));
+          sdfg::utils::attributeToString(symNumList[-num.getInt() - 1], *op));
     } else {
       Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
@@ -749,7 +755,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   accessCode += "] = _value";
 
   // Removes 1x arrays
-  if (ArrayType array = op.arr().getType().dyn_cast<ArrayType>()) {
+  if (ArrayType array = op.getArr().getType().dyn_cast<ArrayType>()) {
     SizedType sized = array.getDimensions();
 
     if (sized.getRank() == 1 && sized.getIntegers().size() == 1 &&
@@ -760,7 +766,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   task.setCode(Code(accessCode, CodeLanguage::Python));
 
   scope.routeWrite(taskArr, accOut);
-  scope.mapConnector(op.arr(), accOut);
+  scope.mapConnector(op.getArr(), accOut);
   return success();
 }
 
@@ -773,29 +779,29 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   if (op.use_empty())
     return success();
 
-  std::string name = utils::valueToString(op.arr());
+  std::string name = sdfg::utils::valueToString(op.getArr());
 
-  if (op.arr().getDefiningOp() != nullptr) {
-    AllocOp allocOp = cast<AllocOp>(op.arr().getDefiningOp());
-    name = allocOp.getName();
+  if (op.getArr().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.getArr().getDefiningOp());
+    name = allocOp.getName().value_or(name);
   }
 
   ArrayAttr numList = op->getAttr("indices_numList").cast<ArrayAttr>();
   ArrayAttr symNumList = op->getAttr("indices").cast<ArrayAttr>();
 
   if (!op.isIndirect()) {
-    Connector connector = scope.lookup(op.arr());
+    Connector connector = scope.lookup(op.getArr());
     connector.setData(name);
 
     for (unsigned i = 0; i < numList.size(); ++i) {
       IntegerAttr num = numList[i].cast<IntegerAttr>();
       std::string idx =
-          utils::attributeToString(symNumList[-num.getInt() - 1], *op);
+          sdfg::utils::attributeToString(symNumList[-num.getInt() - 1], *op);
       Range range(idx, idx, "1", "1");
       connector.addRange(range);
     }
 
-    scope.mapConnector(op.res(), connector);
+    scope.mapConnector(op.getRes(), connector);
     return success();
   }
 
@@ -827,24 +833,25 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   }
 
   if (!dependsOnNonMap) {
-    Connector connector = scope.lookup(op.arr());
+    Connector connector = scope.lookup(op.getArr());
     connector.setData(name);
 
     for (unsigned i = 0; i < numList.size(); ++i) {
       IntegerAttr num = numList[i].cast<IntegerAttr>();
       if (num.getInt() < 0) {
         std::string idx =
-            utils::attributeToString(symNumList[-num.getInt() - 1], *op);
+            sdfg::utils::attributeToString(symNumList[-num.getInt() - 1], *op);
         Range range(idx, idx, "1", "1");
         connector.addRange(range);
       } else {
-        std::string idx = utils::valueToString(op.getOperand(num.getInt()));
+        std::string idx =
+            sdfg::utils::valueToString(op.getOperand(num.getInt()));
         Range range(idx, idx, "1", "1");
         connector.addRange(range);
       }
     }
 
-    scope.mapConnector(op.res(), connector);
+    scope.mapConnector(op.getRes(), connector);
     return success();
   }
 
@@ -854,11 +861,11 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 
   Connector taskOut(task, "_out");
   task.addOutConnector(taskOut);
-  insertTransientArray(op.getLoc(), taskOut, op.res(), scope);
+  insertTransientArray(op.getLoc(), taskOut, op.getRes(), scope);
 
   Connector taskArr(task, "_array");
   task.addInConnector(taskArr);
-  MultiEdge arrayEdge(op.getLoc(), scope.lookup(op.arr()), taskArr);
+  MultiEdge arrayEdge(op.getLoc(), scope.lookup(op.getArr()), taskArr);
   scope.addEdge(arrayEdge);
 
   std::string accessCode = "_out = _array[";
@@ -870,7 +877,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
     IntegerAttr num = numList[i].cast<IntegerAttr>();
     if (num.getInt() < 0) {
       accessCode.append(
-          utils::attributeToString(symNumList[-num.getInt() - 1], *op));
+          sdfg::utils::attributeToString(symNumList[-num.getInt() - 1], *op));
     } else {
       Value idxOp = op.getOperand(num.getInt());
       Connector input(task, "_i" + std::to_string(num.getInt()));
@@ -884,7 +891,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   accessCode += "]";
 
   // Removes 1x arrays
-  if (ArrayType array = op.arr().getType().dyn_cast<ArrayType>()) {
+  if (ArrayType array = op.getArr().getType().dyn_cast<ArrayType>()) {
     SizedType sized = array.getDimensions();
 
     if (sized.getRank() == 1 && sized.getIntegers().size() == 1 &&
@@ -902,7 +909,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(AllocSymbolOp &op, ScopeNode &scope) {
   // IDEA: Support other types?
-  Symbol sym(op.sym(), DType::int64);
+  Symbol sym(op.getSym(), DType::int64);
 
   scope.getSDFG().addSymbol(sym);
   return success();
@@ -914,16 +921,16 @@ LogicalResult translation::collect(AllocSymbolOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(SymOp &op, ScopeNode &scope) {
   Tasklet task(op.getLoc());
-  task.setName("SYM_" + op.expr().str());
+  task.setName("SYM_" + op.getExpr().str());
 
   Connector taskOut(task, "_SYM_OUT");
   task.addOutConnector(taskOut);
 
-  Code code("_SYM_OUT = " + op.expr().str(), CodeLanguage::Python);
+  Code code("_SYM_OUT = " + op.getExpr().str(), CodeLanguage::Python);
   task.setCode(code);
 
   scope.addNode(task);
-  insertTransientArray(op.getLoc(), taskOut, op.res(), scope);
+  insertTransientArray(op.getLoc(), taskOut, op.getRes(), scope);
 
   return success();
 }
@@ -934,11 +941,11 @@ LogicalResult translation::collect(SymOp &op, ScopeNode &scope) {
 
 LogicalResult translation::collect(StreamPushOp &op, ScopeNode &scope) {
   Access access(op.getLoc());
-  std::string name = utils::valueToString(op.str());
+  std::string name = sdfg::utils::valueToString(op.getStr());
 
-  if (op.str().getDefiningOp() != nullptr) {
-    AllocOp allocOp = cast<AllocOp>(op.str().getDefiningOp());
-    name = allocOp.getName();
+  if (op.getStr().getDefiningOp() != nullptr) {
+    AllocOp allocOp = cast<AllocOp>(op.getStr().getDefiningOp());
+    name = allocOp.getName().value_or(name);
   }
 
   access.setName(name);
@@ -947,9 +954,9 @@ LogicalResult translation::collect(StreamPushOp &op, ScopeNode &scope) {
   Connector accOut(access);
   access.addOutConnector(accOut);
 
-  Connector source = scope.lookup(op.val());
+  Connector source = scope.lookup(op.getVal());
   scope.routeWrite(source, accOut);
-  scope.mapConnector(op.str(), accOut);
+  scope.mapConnector(op.getStr(), accOut);
 
   return success();
 }
@@ -959,8 +966,8 @@ LogicalResult translation::collect(StreamPushOp &op, ScopeNode &scope) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult translation::collect(StreamPopOp &op, ScopeNode &scope) {
-  Connector connector = scope.lookup(op.str());
-  scope.mapConnector(op.res(), connector);
+  Connector connector = scope.lookup(op.getStr());
+  scope.mapConnector(op.getRes(), connector);
 
   return success();
 }

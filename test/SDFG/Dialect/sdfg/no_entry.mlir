@@ -10,6 +10,6 @@ sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
   sdfg.state @state_1{
   }
 
-  // CHECK: sdfg.edge [[State0]] -> [[State1]]
+  // CHECK: sdfg.edge {assign = [], condition = "1"} [[State0]] -> [[State1]]
   sdfg.edge @state_0 -> @state_1
 }

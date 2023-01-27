@@ -2,7 +2,6 @@
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "llvm/ADT/MapVector.h"
@@ -148,7 +147,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
 
     int32_t num = -1;
     OptionalParseResult intOPR = parser.parseOptionalInteger(num);
-    if (intOPR.hasValue() && intOPR.getValue().succeeded()) {
+    if (intOPR.has_value() && intOPR.value().succeeded()) {
       Attribute intAttr = parser.getBuilder().getI32IntegerAttr(num);
       attrList.push_back(intAttr);
       numList.push_back(parser.getBuilder().getI32IntegerAttr(-attrIdx));
@@ -158,7 +157,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
 
     OpAsmParser::UnresolvedOperand op;
     OptionalParseResult opOPR = parser.parseOptionalOperand(op);
-    if (opOPR.hasValue() && opOPR.getValue().succeeded()) {
+    if (opOPR.has_value() && opOPR.value().succeeded()) {
       opList.push_back(op);
       numList.push_back(parser.getBuilder().getI32IntegerAttr(opIdx++));
       continue;
@@ -280,22 +279,23 @@ void SDFGNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
 
-  printArgsList(p, body().getArguments(), 0, num_args());
+  printArgsList(p, getBody().getArguments(), 0, getNumArgs());
   p << " ->";
-  printArgsList(p, body().getArguments(), num_args(), body().getNumArguments());
+  printArgsList(p, getBody().getArguments(), getNumArgs(),
+                getBody().getNumArguments());
 
-  p.printRegion(body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
 LogicalResult SDFGNode::verify() {
   // Verify that no other dialect is used in the body
-  for (Operation &oper : body().getOps())
+  for (Operation &oper : getBody().getOps())
     if (oper.getDialect() != (*this)->getDialect())
       return emitOpError("does not support other dialects");
 
   // Verify that body contains at least one state
-  if (body().getOps<StateNode>().empty())
+  if (getBody().getOps<StateNode>().empty())
     return emitOpError() << "must contain at least one state";
 
   return success();
@@ -318,7 +318,7 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 StateNode SDFGNode::getFirstState() {
-  return *body().getOps<StateNode>().begin();
+  return *getBody().getOps<StateNode>().begin();
 }
 
 StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
@@ -380,27 +380,27 @@ void NestedSDFGNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
 
-  printAsArgs(p, getOperands(), body().getArguments(), 0, num_args());
+  printAsArgs(p, getOperands(), getBody().getArguments(), 0, getNumArgs());
   p << " ->";
-  printAsArgs(p, getOperands(), body().getArguments(), num_args(),
+  printAsArgs(p, getOperands(), getBody().getArguments(), getNumArgs(),
               getNumOperands());
 
-  p.printRegion(body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
 LogicalResult NestedSDFGNode::verify() {
   // Verify that no other dialect is used in the body
-  for (Operation &oper : body().getOps())
+  for (Operation &oper : getBody().getOps())
     if (oper.getDialect() != (*this)->getDialect())
       return emitOpError("does not support other dialects");
 
   // Verify that body contains at least one state
-  if (body().getOps<StateNode>().empty())
+  if (getBody().getOps<StateNode>().empty())
     return emitOpError() << "must contain at least one state";
 
   // Verify that operands and arguments line up
-  if (getNumOperands() != body().getNumArguments())
+  if (getNumOperands() != getBody().getNumArguments())
     emitOpError() << "must have matching amount of operands and arguments";
 
   return success();
@@ -424,7 +424,7 @@ NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 StateNode NestedSDFGNode::getFirstState() {
-  return *body().getOps<StateNode>().begin();
+  return *getBody().getOps<StateNode>().begin();
 }
 
 StateNode NestedSDFGNode::getStateBySymRef(StringRef symRef) {
@@ -446,7 +446,7 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
   OperationState state(loc, getOperationName());
   build(builder, state, utils::generateID(), utils::generateName(name.str()));
   StateNode stateNode = cast<StateNode>(rewriter.create(state));
-  rewriter.createBlock(&stateNode.body());
+  rewriter.createBlock(&stateNode.getBody());
   return stateNode;
 }
 
@@ -483,14 +483,14 @@ void StateNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "sym_name"});
   p << ' ';
-  p.printSymbolName(sym_name());
-  p.printRegion(body());
+  p.printSymbolName(getSymName());
+  p.printRegion(getBody());
 }
 
 LogicalResult StateNode::verify() {
   // Verify that no other dialect is used in the body
   // Except func operations
-  for (Operation &oper : body().getOps())
+  for (Operation &oper : getBody().getOps())
     if (oper.getDialect() != (*this)->getDialect() &&
         !dyn_cast<func::FuncOp>(oper))
       return emitOpError("does not support other dialects");
@@ -525,15 +525,15 @@ ParseResult TaskletNode::parse(OpAsmParser &parser, OperationState &result) {
 
 void TaskletNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"ID"});
-  printAsArgs(p, getOperands(), body().getArguments(), 0, getNumOperands());
+  printAsArgs(p, getOperands(), getBody().getArguments(), 0, getNumOperands());
   p << " -> (" << getResultTypes() << ")";
-  p.printRegion(body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
 LogicalResult TaskletNode::verify() {
   // Verify that operands and arguments line up
-  if (getNumOperands() != body().getNumArguments())
+  if (getNumOperands() != getBody().getNumArguments())
     emitOpError() << "must have matching amount of operands and arguments";
 
   return success();
@@ -567,12 +567,12 @@ TaskletNode TaskletNode::create(Location location, ValueRange operands,
   for (unsigned i = 0; i < operands.size(); ++i)
     locs.push_back(location);
 
-  builder.createBlock(&task.body(), {}, operands.getTypes(), locs);
+  builder.createBlock(&task.getBody(), {}, operands.getTypes(), locs);
   return task;
 }
 
 std::string TaskletNode::getInputName(unsigned idx) {
-  return utils::valueToString(body().getArgument(idx), *getOperation());
+  return utils::valueToString(getBody().getArgument(idx), *getOperation());
 }
 
 std::string TaskletNode::getOutputName(unsigned idx) {
@@ -633,7 +633,7 @@ void MapNode::print(OpAsmPrinter &p) {
       p, (*this)->getAttrs(),
       {"entryID", "exitID", "lowerBounds", "upperBounds", "steps"});
 
-  p << " (" << getBody()->getArguments() << ") = (";
+  p << " (" << getBody().getArguments() << ") = (";
 
   printNumberList(p, getOperation(), "lowerBounds");
 
@@ -647,12 +647,12 @@ void MapNode::print(OpAsmPrinter &p) {
 
   p << ")";
 
-  p.printRegion(body(), /*printEntryBlockArgs=*/false,
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
 LogicalResult MapNode::verify() {
-  size_t var_count = getBody()->getArguments().size();
+  size_t var_count = getBody().getArguments().size();
 
   if (getNumListSize(*this, "lowerBounds") != var_count)
     return emitOpError("failed to verify that size of "
@@ -667,26 +667,14 @@ LogicalResult MapNode::verify() {
                        "steps matches size of arguments");
 
   // Verify that no other dialect is used in the body
-  for (Operation &oper : body().getOps())
+  for (Operation &oper : getBody().getOps())
     if (oper.getDialect() != (*this)->getDialect())
       return emitOpError("does not support other dialects");
 
   return success();
 }
 
-Region &MapNode::getLoopBody() { return body(); }
-
-void MapNode::setEntryID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  entryIDAttr(intAttr);
-}
-
-void MapNode::setExitID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  exitIDAttr(intAttr);
-}
+Region &MapNode::getLoopBody() { return getBody(); }
 
 //===----------------------------------------------------------------------===//
 // ConsumeNode
@@ -747,20 +735,20 @@ ParseResult ConsumeNode::parse(OpAsmParser &parser, OperationState &result) {
 void ConsumeNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"entryID", "exitID"});
-  p << " (" << stream() << " : " << stream().getType() << ")";
-  p << " -> (pe: " << getBody()->getArgument(0);
-  p << ", elem: " << getBody()->getArgument(1) << ")";
-  p.printRegion(body(), /*printEntryBlockArgs=*/false,
+  p << " (" << getStream() << " : " << getStream().getType() << ")";
+  p << " -> (pe: " << getBody().getArgument(0);
+  p << ", elem: " << getBody().getArgument(1) << ")";
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
 
 LogicalResult ConsumeNode::verify() {
-  if (num_pes().hasValue() && num_pes().getValue().isNonPositive())
+  if (getNumPes().has_value() && getNumPes().value().isNonPositive())
     return emitOpError("failed to verify that number of "
                        "processing elements is at least one");
 
   // Verify that no other dialect is used in the body
-  for (Operation &oper : body().getOps())
+  for (Operation &oper : getBody().getOps())
     if (oper.getDialect() != (*this)->getDialect())
       return emitOpError("does not support other dialects");
 
@@ -785,29 +773,16 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
     return emitOpError() << "'" << condAttr.getValue()
                          << "' references a func with invalid signature";
 
-  if (cond.getArgument(0).getType() != stream().getType())
+  if (cond.getArgument(0).getType() != getStream().getType())
     return emitOpError() << "'" << condAttr.getValue()
                          << "' references a func with invalid signature";
 
   return success();
 }
 
-Region &ConsumeNode::getLoopBody() { return body(); }
-
-void ConsumeNode::setEntryID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  entryIDAttr(intAttr);
-}
-
-void ConsumeNode::setExitID(unsigned id) {
-  Builder builder(*this);
-  IntegerAttr intAttr = builder.getI32IntegerAttr(id);
-  exitIDAttr(intAttr);
-}
-
-BlockArgument ConsumeNode::pe() { return body().getArgument(0); }
-BlockArgument ConsumeNode::elem() { return body().getArgument(1); }
+Region &ConsumeNode::getLoopBody() { return getBody(); }
+BlockArgument ConsumeNode::pe() { return getBody().getArgument(0); }
+BlockArgument ConsumeNode::elem() { return getBody().getArgument(1); }
 
 //===----------------------------------------------------------------------===//
 // EdgeOp
@@ -818,7 +793,8 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       Value ref) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, from.sym_name(), to.sym_name(), assign, condition, ref);
+  build(builder, state, from.getSymName(), to.getSymName(), assign, condition,
+        ref);
   return cast<EdgeOp>(rewriter.create(state));
 }
 
@@ -826,7 +802,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, from.sym_name(), to.sym_name(),
+  build(builder, state, from.getSymName(), to.getSymName(),
         rewriter.getStrArrayAttr({}), "1", nullptr);
   return cast<EdgeOp>(rewriter.create(state));
 }
@@ -835,7 +811,8 @@ EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
                       ArrayAttr &assign, StringAttr &condition, Value ref) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
-  build(builder, state, from.sym_name(), to.sym_name(), assign, condition, ref);
+  build(builder, state, from.getSymName(), to.getSymName(), assign, condition,
+        ref);
   return cast<EdgeOp>(Operation::create(state));
 }
 
@@ -853,7 +830,7 @@ ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
 
     if (parser.parseKeyword("ref") || parser.parseColon() ||
         parser.parseOperand(op) || parser.parseColon() || parser.parseType(t) ||
-        parser.parseRParen() || parser.resolveOperands(op, t, valList))
+        parser.parseRParen() || parser.resolveOperand(op, t, valList))
       return failure();
 
     result.addOperands(valList);
@@ -874,16 +851,16 @@ ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
 void EdgeOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
   p << ' ';
-  if (!refMutable().empty())
-    p << "(ref: " << ref() << ": " << ref().getType() << ") ";
-  p.printAttributeWithoutType(srcAttr());
+  if (!getRefMutable().empty())
+    p << "(ref: " << getRef() << ": " << getRef().getType() << ") ";
+  p.printAttributeWithoutType(getSrcAttr());
   p << " -> ";
-  p.printAttributeWithoutType(destAttr());
+  p.printAttributeWithoutType(getDestAttr());
 }
 
 LogicalResult EdgeOp::verify() {
   // Check that condition is non-empty
-  if (condition().empty())
+  if (getCondition().empty())
     return emitOpError() << "condition must be non-empty or omitted";
 
   return success();
@@ -942,15 +919,15 @@ ParseResult AllocOp::parse(OpAsmParser &parser, OperationState &result) {
 void AllocOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " (";
-  p.printOperands(params());
+  p.printOperands(getParams());
   p << ") : ";
   p << getOperation()->getResultTypes();
 }
 
 LogicalResult AllocOp::verify() {
-  SizedType result = utils::getSizedType(res().getType());
+  SizedType result = utils::getSizedType(getRes().getType());
 
-  if (result.getUndefRank() != params().size())
+  if (result.getUndefRank() != getParams().size())
     return emitOpError("failed to verify that parameter size "
                        "matches undefined dimensions size");
 
@@ -1004,7 +981,7 @@ bool AllocOp::isInState() {
   return utils::getParentState(*this->getOperation()) != nullptr;
 }
 
-std::string AllocOp::getName() {
+std::string AllocOp::getContainerName() {
   if ((*this)->hasAttr("name")) {
     Attribute nameAttr = (*this)->getAttr("name");
     if (StringAttr name = nameAttr.cast<StringAttr>()) {
@@ -1111,19 +1088,19 @@ ParseResult LoadOp::parse(OpAsmParser &parser, OperationState &result) {
 void LoadOp::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  /*elidedAttrs*/ {"indices"});
-  p << ' ' << arr();
+  p << ' ' << getArr();
   p << "[";
   printNumberList(p, getOperation(), "indices");
   p << "]";
   p << " : ";
-  p << ArrayRef<Type>(arr().getType());
+  p << ArrayRef<Type>(getArr().getType());
   p << " -> ";
-  p << ArrayRef<Type>(res().getType());
+  p << ArrayRef<Type>(getRes().getType());
 }
 
 LogicalResult LoadOp::verify() {
   size_t idx_size = getNumListSize(getOperation(), "indices");
-  size_t mem_size = utils::getSizedType(arr().getType()).getRank();
+  size_t mem_size = utils::getSizedType(getArr().getType()).getRank();
 
   if (idx_size != mem_size)
     return emitOpError("incorrect number of indices for load");
@@ -1131,7 +1108,7 @@ LogicalResult LoadOp::verify() {
   return success();
 }
 
-bool LoadOp::isIndirect() { return !indices().empty(); }
+bool LoadOp::isIndirect() { return !getIndices().empty(); }
 
 //===----------------------------------------------------------------------===//
 // StoreOp
@@ -1265,19 +1242,19 @@ ParseResult StoreOp::parse(OpAsmParser &parser, OperationState &result) {
 void StoreOp::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  /*elidedAttrs=*/{"indices"});
-  p << ' ' << val() << "," << ' ' << arr();
+  p << ' ' << getVal() << "," << ' ' << getArr();
   p << "[";
   printNumberList(p, getOperation(), "indices");
   p << "]";
   p << " : ";
-  p << ArrayRef<Type>(val().getType());
+  p << ArrayRef<Type>(getVal().getType());
   p << " -> ";
-  p << ArrayRef<Type>(arr().getType());
+  p << ArrayRef<Type>(getArr().getType());
 }
 
 LogicalResult StoreOp::verify() {
   size_t idx_size = getNumListSize(getOperation(), "indices");
-  size_t mem_size = utils::getSizedType(arr().getType()).getRank();
+  size_t mem_size = utils::getSizedType(getArr().getType()).getRank();
 
   if (idx_size != mem_size)
     return emitOpError("incorrect number of indices for store");
@@ -1285,7 +1262,7 @@ LogicalResult StoreOp::verify() {
   return success();
 }
 
-bool StoreOp::isIndirect() { return !indices().empty(); }
+bool StoreOp::isIndirect() { return !getIndices().empty(); }
 
 //===----------------------------------------------------------------------===//
 // CopyOp
@@ -1333,9 +1310,9 @@ ParseResult CopyOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void CopyOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << ' ' << src() << " -> " << dest();
+  p << ' ' << getSrc() << " -> " << getDest();
   p << " : ";
-  p << ArrayRef<Type>(src().getType());
+  p << ArrayRef<Type>(getSrc().getType());
 }
 
 LogicalResult CopyOp::verify() { return success(); }
@@ -1372,7 +1349,7 @@ ParseResult ViewCastOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   result.addTypes(destType);
 
-  if (parser.resolveOperands(memletOperand, srcType, result.operands))
+  if (parser.resolveOperand(memletOperand, srcType, result.operands))
     return failure();
 
   return success();
@@ -1380,16 +1357,16 @@ ParseResult ViewCastOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void ViewCastOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << ' ' << src();
+  p << ' ' << getSrc();
   p << " : ";
-  p << ArrayRef<Type>(src().getType());
+  p << ArrayRef<Type>(getSrc().getType());
   p << " -> ";
   p << getOperation()->getResultTypes();
 }
 
 LogicalResult ViewCastOp::verify() {
-  size_t src_size = utils::getSizedType(src().getType()).getRank();
-  size_t res_size = utils::getSizedType(res().getType()).getRank();
+  size_t src_size = utils::getSizedType(getSrc().getType()).getRank();
+  size_t res_size = utils::getSizedType(getRes().getType()).getRank();
 
   if (src_size != res_size)
     return emitOpError("incorrect rank for view_cast");
@@ -1449,7 +1426,7 @@ ParseResult SubviewOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   result.addTypes(destType);
 
-  if (parser.resolveOperands(memletOperand, srcType, result.operands))
+  if (parser.resolveOperand(memletOperand, srcType, result.operands))
     return failure();
 
   return success();
@@ -1458,7 +1435,7 @@ ParseResult SubviewOp::parse(OpAsmParser &parser, OperationState &result) {
 void SubviewOp::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  {"offsets", "sizes", "strides"});
-  p << ' ' << src() << "[";
+  p << ' ' << getSrc() << "[";
   printNumberList(p, getOperation(), "offsets");
   p << "][";
   printNumberList(p, getOperation(), "sizes");
@@ -1466,7 +1443,7 @@ void SubviewOp::print(OpAsmPrinter &p) {
   printNumberList(p, getOperation(), "strides");
   p << "]";
   p << " : ";
-  p << ArrayRef<Type>(src().getType());
+  p << ArrayRef<Type>(getSrc().getType());
   p << " -> ";
   p << getOperation()->getResultTypes();
 }
@@ -1505,11 +1482,11 @@ ParseResult StreamPopOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void StreamPopOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << ' ' << str();
+  p << ' ' << getStr();
   p << " : ";
-  p << ArrayRef<Type>(str().getType());
+  p << ArrayRef<Type>(getStr().getType());
   p << " -> ";
-  p << ArrayRef<Type>(res().getType());
+  p << ArrayRef<Type>(getRes().getType());
 }
 
 LogicalResult StreamPopOp::verify() { return success(); }
@@ -1554,11 +1531,11 @@ ParseResult StreamPushOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void StreamPushOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << ' ' << val() << ", " << str();
+  p << ' ' << getVal() << ", " << getStr();
   p << " : ";
-  p << ArrayRef<Type>(val().getType());
+  p << ArrayRef<Type>(getVal().getType());
   p << " -> ";
-  p << ArrayRef<Type>(str().getType());
+  p << ArrayRef<Type>(getStr().getType());
 }
 
 LogicalResult StreamPushOp::verify() { return success(); }
@@ -1587,7 +1564,7 @@ ParseResult StreamLengthOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   result.addTypes(resultType);
 
-  if (parser.resolveOperands(streamOperand, streamType, result.operands))
+  if (parser.resolveOperand(streamOperand, streamType, result.operands))
     return failure();
 
   return success();
@@ -1595,9 +1572,9 @@ ParseResult StreamLengthOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void StreamLengthOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
-  p << ' ' << str();
+  p << ' ' << getStr();
   p << " : ";
-  p << ArrayRef<Type>(str().getType());
+  p << ArrayRef<Type>(getStr().getType());
   p << " -> ";
   p << getOperation()->getResultTypes();
 }
@@ -1641,7 +1618,7 @@ ParseResult sdfg::ReturnOp::parse(OpAsmParser &parser, OperationState &result) {
 void sdfg::ReturnOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   if (getNumOperands() > 0)
-    p << ' ' << input() << " : " << input().getTypes();
+    p << ' ' << getInput() << " : " << getInput().getTypes();
 }
 
 LogicalResult sdfg::ReturnOp::verify() {
@@ -1713,10 +1690,10 @@ void LibCallOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(),
                           /*elidedAttrs=*/{"callee"});
   p << ' ';
-  p.printAttributeWithoutType(calleeAttr());
-  p << " (" << operands() << ")";
+  p.printAttributeWithoutType(getCalleeAttr());
+  p << " (" << getOperands() << ")";
   p << " : ";
-  p.printFunctionalType(operands().getTypes(),
+  p.printFunctionalType(getOperands().getTypes(),
                         getOperation()->getResultTypes());
 }
 
@@ -1786,19 +1763,19 @@ ParseResult AllocSymbolOp::parse(OpAsmParser &parser, OperationState &result) {
 void AllocSymbolOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"sym"});
   p << " (";
-  p.printAttributeWithoutType(symAttr());
+  p.printAttributeWithoutType(getSymAttr());
   p << ")";
 }
 
 LogicalResult AllocSymbolOp::verify() {
-  if (sym().empty())
+  if (getSym().empty())
     return emitOpError("failed to verify that input string is not empty");
 
-  if (!isalpha(sym().front()) && sym().front() != '_')
+  if (!isalpha(getSym().front()) && getSym().front() != '_')
     return emitOpError("failed to verify that input string starts with "
                        "an alphabetical character");
 
-  for (char c : sym())
+  for (char c : getSym())
     if (!isalnum(c) && c != '_')
       return emitOpError("failed to verify that input string only "
                          "contains alphanumeric characters");
@@ -1846,7 +1823,7 @@ ParseResult SymOp::parse(OpAsmParser &parser, OperationState &result) {
 void SymOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"expr"});
   p << " (";
-  p.printAttributeWithoutType(exprAttr());
+  p.printAttributeWithoutType(getExprAttr());
   p << ") : " << getOperation()->getResultTypes();
 }
 

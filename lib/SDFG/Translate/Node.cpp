@@ -651,7 +651,7 @@ Connector StateImpl::lookup(Value value) {
 
     if (value.getDefiningOp() != nullptr) {
       AllocOp allocOp = cast<AllocOp>(value.getDefiningOp());
-      name = allocOp.getName();
+      name = allocOp.getName().value_or(name);
     }
 
     access.setName(name);

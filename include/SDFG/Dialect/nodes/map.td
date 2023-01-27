@@ -31,11 +31,6 @@ def SDFG_MapNode : SDFG_Op<"map", [
     );
 
     let regions = (region SizedRegion<1>:$body);
-
-    let extraClassDeclaration = [{
-        void setEntryID(unsigned id);
-        void setExitID(unsigned id);
-    }];
 }
 
 #endif // SDFG_MapNode

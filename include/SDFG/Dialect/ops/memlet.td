@@ -33,7 +33,7 @@ def SDFG_AllocOp : SDFG_Op<"alloc", [
         bool isScalar();
         bool isStream();
         bool isInState();
-        std::string getName();
+        std::string getContainerName();
     }];
 }
 

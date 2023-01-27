@@ -10,7 +10,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   if (op.getNumResults() > 1)
     return std::string("Not Supported");
 
-  std::string nameOut = utils::valueToString(op.getResult(0), op);
+  std::string nameOut = sdfg::utils::valueToString(op.getResult(0), op);
 
   bool taskletToSingle = true;
   if (TaskletNode task = dyn_cast<TaskletNode>(source)) {
@@ -41,57 +41,59 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   //===--------------------------------------------------------------------===//
 
   if (isa<arith::AddFOp>(op) || isa<arith::AddIOp>(op)) {
-    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
-    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    std::string nameArg0 = sdfg::utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = sdfg::utils::valueToString(op.getOperand(1), op);
     return nameOut + " = " + nameArg0 + " + " + nameArg1;
   }
 
   if (isa<arith::SubFOp>(op) || isa<arith::SubIOp>(op)) {
-    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
-    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    std::string nameArg0 = sdfg::utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = sdfg::utils::valueToString(op.getOperand(1), op);
     return nameOut + " = " + nameArg0 + " - " + nameArg1;
   }
 
   if (isa<arith::MulFOp>(op) || isa<arith::MulIOp>(op)) {
-    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
-    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    std::string nameArg0 = sdfg::utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = sdfg::utils::valueToString(op.getOperand(1), op);
     return nameOut + " = " + nameArg0 + " * " + nameArg1;
   }
 
   if (isa<arith::DivFOp>(op) || isa<arith::DivSIOp>(op) ||
       isa<arith::DivUIOp>(op)) {
-    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
-    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    std::string nameArg0 = sdfg::utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = sdfg::utils::valueToString(op.getOperand(1), op);
     return nameOut + " = " + nameArg0 + " / " + nameArg1;
   }
 
   if (arith::NegFOp negFOp = dyn_cast<arith::NegFOp>(op)) {
-    return nameOut + " = -" + utils::valueToString(negFOp.getOperand(), op);
+    return nameOut + " = -" +
+           sdfg::utils::valueToString(negFOp.getOperand(), op);
   }
 
   if (isa<arith::RemSIOp>(op) || isa<arith::RemUIOp>(op) ||
       isa<arith::RemFOp>(op)) {
-    return nameOut + " = " + utils::valueToString(op.getOperand(0), op) +
-           " % " + utils::valueToString(op.getOperand(1), op);
+    return nameOut + " = " + sdfg::utils::valueToString(op.getOperand(0), op) +
+           " % " + sdfg::utils::valueToString(op.getOperand(1), op);
   }
 
   if (arith::IndexCastOp indexCast = dyn_cast<arith::IndexCastOp>(op)) {
-    return nameOut + " = " + utils::valueToString(indexCast.getIn(), op);
+    return nameOut + " = " + sdfg::utils::valueToString(indexCast.getIn(), op);
   }
 
   if (isa<arith::SIToFPOp>(op) || isa<arith::UIToFPOp>(op)) {
-    return nameOut + " = float(" + utils::valueToString(op.getOperand(0), op) +
-           ")";
+    return nameOut + " = float(" +
+           sdfg::utils::valueToString(op.getOperand(0), op) + ")";
   }
 
   if (isa<arith::FPToSIOp>(op) || isa<arith::FPToUIOp>(op)) {
-    return nameOut + " = int(" + utils::valueToString(op.getOperand(0), op) +
-           ")";
+    return nameOut + " = int(" +
+           sdfg::utils::valueToString(op.getOperand(0), op) + ")";
   }
 
   if (arith::MaxFOp maxFOp = dyn_cast<arith::MaxFOp>(op)) {
-    return nameOut + " = max(" + utils::valueToString(maxFOp.getLhs(), op) +
-           ", " + utils::valueToString(maxFOp.getRhs(), op) + ")";
+    return nameOut + " = max(" +
+           sdfg::utils::valueToString(maxFOp.getLhs(), op) + ", " +
+           sdfg::utils::valueToString(maxFOp.getRhs(), op) + ")";
   }
 
   if (isa<arith::CmpIOp>(op) || isa<arith::CmpFOp>(op)) {
@@ -179,8 +181,8 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
       }
     }
 
-    std::string lhs = utils::valueToString(lhsValue, op);
-    std::string rhs = utils::valueToString(rhsValue, op);
+    std::string lhs = sdfg::utils::valueToString(lhsValue, op);
+    std::string rhs = sdfg::utils::valueToString(rhsValue, op);
 
     return nameOut + " = " + lhs + " " + predicate + " " + rhs;
   }
@@ -204,14 +206,15 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   }
 
   if (arith::SelectOp selectOp = dyn_cast<arith::SelectOp>(op)) {
-    return nameOut + " = " + utils::valueToString(selectOp.getTrueValue(), op) +
-           " if " + utils::valueToString(selectOp.getCondition(), op) +
-           " else " + utils::valueToString(selectOp.getFalseValue(), op);
+    return nameOut + " = " +
+           sdfg::utils::valueToString(selectOp.getTrueValue(), op) + " if " +
+           sdfg::utils::valueToString(selectOp.getCondition(), op) + " else " +
+           sdfg::utils::valueToString(selectOp.getFalseValue(), op);
   }
 
   if (isa<arith::ExtSIOp>(op) || isa<arith::ExtUIOp>(op) ||
       isa<arith::ExtFOp>(op)) {
-    return nameOut + " = " + utils::valueToString(op.getOperand(0), op);
+    return nameOut + " = " + sdfg::utils::valueToString(op.getOperand(0), op);
   }
 
   //===--------------------------------------------------------------------===//
@@ -220,34 +223,34 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
 
   if (math::SqrtOp sqrtOp = dyn_cast<math::SqrtOp>(op)) {
     return nameOut + " = math.sqrt(" +
-           utils::valueToString(sqrtOp.getOperand(), op) + ")";
+           sdfg::utils::valueToString(sqrtOp.getOperand(), op) + ")";
   }
 
   if (math::ExpOp expOp = dyn_cast<math::ExpOp>(op)) {
     return nameOut + " = math.exp(" +
-           utils::valueToString(expOp.getOperand(), op) + ")";
+           sdfg::utils::valueToString(expOp.getOperand(), op) + ")";
   }
 
   if (math::PowFOp powFOp = dyn_cast<math::PowFOp>(op)) {
-    std::string nameArg0 = utils::valueToString(op.getOperand(0), op);
-    std::string nameArg1 = utils::valueToString(op.getOperand(1), op);
+    std::string nameArg0 = sdfg::utils::valueToString(op.getOperand(0), op);
+    std::string nameArg1 = sdfg::utils::valueToString(op.getOperand(1), op);
 
     return nameOut + " = math.pow(" + nameArg0 + "," + nameArg1 + ")";
   }
 
   if (math::CosOp cosOp = dyn_cast<math::CosOp>(op)) {
     return nameOut + " = math.cos(" +
-           utils::valueToString(cosOp.getOperand(), op) + ")";
+           sdfg::utils::valueToString(cosOp.getOperand(), op) + ")";
   }
 
   if (math::SinOp sinOp = dyn_cast<math::SinOp>(op)) {
     return nameOut + " = math.sin(" +
-           utils::valueToString(sinOp.getOperand(), op) + ")";
+           sdfg::utils::valueToString(sinOp.getOperand(), op) + ")";
   }
 
   if (math::LogOp logOp = dyn_cast<math::LogOp>(op)) {
     return nameOut + " = math.log(" +
-           utils::valueToString(logOp.getOperand(), op) + ")";
+           sdfg::utils::valueToString(logOp.getOperand(), op) + ")";
   }
 
   //===--------------------------------------------------------------------===//
@@ -263,7 +266,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   //===--------------------------------------------------------------------===//
 
   if (SymOp sym = dyn_cast<SymOp>(op)) {
-    return nameOut + " = " + sym.expr().str();
+    return nameOut + " = " + sym.getExpr().str();
   }
 
   if (StoreOp store = dyn_cast<StoreOp>(op)) {
@@ -272,10 +275,10 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     for (unsigned i = 0; i < op.getNumOperands() - 1; ++i) {
       if (i > 0)
         indices.append(", ");
-      indices.append(utils::valueToString(op.getOperand(i), op));
+      indices.append(sdfg::utils::valueToString(op.getOperand(i), op));
     }
 
-    std::string nameVal = utils::valueToString(store.arr(), op);
+    std::string nameVal = sdfg::utils::valueToString(store.getArr(), op);
     return nameOut + "[" + indices + "]" + " = " + nameVal;
   }
 
@@ -285,16 +288,16 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     for (unsigned i = 0; i < op.getNumOperands() - 1; ++i) {
       if (i > 0)
         indices.append(", ");
-      indices.append(utils::valueToString(op.getOperand(i), op));
+      indices.append(sdfg::utils::valueToString(op.getOperand(i), op));
     }
 
-    std::string nameArr = utils::valueToString(load.arr(), op);
+    std::string nameArr = sdfg::utils::valueToString(load.getArr(), op);
     return nameOut + " = " + nameArr + "[" + indices + "]";
   }
 
   if (StreamLengthOp streamLen = dyn_cast<StreamLengthOp>(op)) {
     // FIXME: What's the proper stream name?
-    std::string streamName = utils::valueToString(streamLen.str(), op);
+    std::string streamName = sdfg::utils::valueToString(streamLen.getStr(), op);
     return nameOut + " = len(" + streamName + ")";
   }
 
@@ -305,7 +308,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
     if (!taskletToSingle) {
       if (!isa<TaskletNode>(source)) {
         // Tasklets are the only ones using sdfg.return
-        return None;
+        return std::nullopt;
       }
 
       TaskletNode task = cast<TaskletNode>(source);
@@ -314,7 +317,7 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
         if (i > 0)
           code.append("\\n");
         code.append(task.getOutputName(i) + " = " +
-                    utils::valueToString(op.getOperand(i), op));
+                    sdfg::utils::valueToString(op.getOperand(i), op));
       }
     }
 
@@ -331,12 +334,12 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
       if (i > 0)
         code.append("\\n");
       // FIXME: What's the proper return name?
-      code.append("_out = " + utils::valueToString(op.getOperand(i), op));
+      code.append("_out = " + sdfg::utils::valueToString(op.getOperand(i), op));
     }
     return code;
   }
 
-  return None;
+  return std::nullopt;
 }
 
 // If successful returns Python code as string
@@ -345,12 +348,12 @@ Optional<std::string> translation::liftToPython(Operation &op) {
 
   for (Operation &oper : op.getRegion(0).getOps()) {
     Optional<std::string> line = liftOperationToPython(oper, op);
-    if (line.hasValue()) {
-      code.append(line.getValue() + "\\n");
+    if (line.has_value()) {
+      code.append(line.value() + "\\n");
     } else {
       emitRemark(op.getLoc(), "No lifting to python possible");
       emitRemark(oper.getLoc(), "Failed to lift");
-      return None;
+      return std::nullopt;
     }
   }
 
@@ -359,5 +362,5 @@ Optional<std::string> translation::liftToPython(Operation &op) {
 
 std::string translation::getTaskletName(Operation &op) {
   Operation &firstOp = *op.getRegion(0).getOps().begin();
-  return utils::operationToString(firstOp);
+  return sdfg::utils::operationToString(firstOp);
 }

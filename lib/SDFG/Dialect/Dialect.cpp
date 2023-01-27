@@ -37,7 +37,7 @@ static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
 
   do {
     OptionalParseResult typeOPR = parser.parseOptionalType(elemType);
-    if (typeOPR.hasValue() && typeOPR.getValue().succeeded() &&
+    if (typeOPR.has_value() && typeOPR.value().succeeded() &&
         parser.parseGreater().succeeded()) {
       return success();
     }
@@ -56,7 +56,7 @@ static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
 
     int32_t num = -1;
     OptionalParseResult intOPR = parser.parseOptionalInteger(num);
-    if (intOPR.hasValue() && intOPR.getValue().succeeded()) {
+    if (intOPR.has_value() && intOPR.value().succeeded()) {
       integers.push_back(num);
       shape.push_back(true);
       continue;

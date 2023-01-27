@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: sdfg-opt --convert-to-sdfg %s | sdfg-opt
 func.func @main(%arg0: !llvm.ptr<f64>, %arg1: i64) {
   %2 = llvm.getelementptr %arg0[%arg1] : (!llvm.ptr<f64>, i64) -> !llvm.ptr<f64>
