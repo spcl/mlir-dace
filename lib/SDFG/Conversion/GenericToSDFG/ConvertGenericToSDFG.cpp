@@ -409,7 +409,11 @@ public:
     SmallVector<Value> loadedOps =
         createLoads(rewriter, op->getLoc(), operands);
 
-    // FIXME: Write a proper reordering. Primitives then Memrefs
+    // FIXME: Write a proper reordering. First primitives, then memrefs
+    // HACK: Because memrefs can be written to, they need to appear in the
+    // read/write section of the nested SDFG. This keeps all arguments before
+    // the first memref as read-only and moves everything else to the read/write
+    // section.
     unsigned firstMemref = 0;
     for (unsigned i = 0; i < loadedOps.size(); ++i) {
       if (loadedOps[i].getType().isa<MemRefType>() ||
@@ -1194,8 +1198,7 @@ public:
     rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
     AllocSymbolOp::create(rewriter, op.getLoc(), condName);
 
-    if (op.getNumResults() > 0) {
-      // FIXME: Alloc all
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
       MemrefToMemletConverter memo;
 
       Type nt = memo.convertType(op.getResultTypes()[0]);
@@ -1207,10 +1210,10 @@ public:
           AllocOp::create(rewriter, op->getLoc(), nt, "_" + condName + "_yield",
                           /*transient=*/true);
 
-      op.thenYield()->insertOperands(1, {alloc});
-      op.elseYield()->insertOperands(1, {alloc});
+      op.thenYield()->insertOperands(op.thenYield().getNumOperands(), {alloc});
+      op.elseYield()->insertOperands(op.elseYield().getNumOperands(), {alloc});
 
-      op.getResult(0).replaceAllUsesWith(alloc);
+      op.getResult(i).replaceAllUsesWith(alloc);
     }
 
     rewriter.restoreInsertionPoint(ip);
