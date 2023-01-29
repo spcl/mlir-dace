@@ -494,10 +494,9 @@ public:
     linkToLastState(rewriter, op->getLoc(), state);
     if (markedToLink(*op))
       linkToNextState(rewriter, op->getLoc(), state);
+
     rewriter.eraseOp(op);
     return success();
-
-    return failure();
   }
 };
 
@@ -877,10 +876,9 @@ public:
           SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
       newType = ArrayType::get(op->getLoc().getContext(), sizedType);
 
-      AllocOp alloc =
-          AllocOp::create(rewriter, op->getLoc(), newType,
-                          "_" + idxName + "_iter" + std::to_string(i),
-                          /*transient=*/true);
+      AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), newType,
+                                      "_" + idxName + "_iter",
+                                      /*transient=*/true);
 
       iterAllocs.push_back(alloc);
     }
@@ -899,11 +897,11 @@ public:
       LoadOp newLoad =
           LoadOp::create(rewriter, op->getLoc(), iterAllocs[i], ValueRange());
 
-      op.getRegionIterArgs()[i].replaceAllUsesWith(newLoad);
+      rewriter.replaceAllUsesWith(op.getRegionIterArg(i), newLoad);
+      rewriter.replaceAllUsesWith(op.getResult(i), newLoad);
 
-      // FIXME: Yield all
       for (scf::YieldOp yieldOp : op.getLoopBody().getOps<scf::YieldOp>()) {
-        yieldOp->insertOperands(1, {iterAllocs[i]});
+        yieldOp->insertOperands(yieldOp.getNumOperands(), {iterAllocs[i]});
       }
     }
 
