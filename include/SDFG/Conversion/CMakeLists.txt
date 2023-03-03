@@ -1,0 +1,2 @@
+add_subdirectory(GenericToSDFG)
+add_subdirectory(LinalgToSDFG)

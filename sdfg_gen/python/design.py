@@ -1,4 +1,4 @@
-# This file was used to create the images for the design of SDIR
+# This file was used to create the images for the design of SDFG
 
 import dace
 from dace import dtypes
