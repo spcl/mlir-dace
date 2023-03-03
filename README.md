@@ -1,7 +1,4 @@
-[![LIT Test](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml)
-[![Parse Test](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml)
-[![Translation Test](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml)
-[![Conversion Test](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml)
+[![Tests](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml)
 
 # MLIR-DaCe
 MLIR-DaCe is a project aiming to bridge the gap between control-centric and data-centric intermediate representations.
