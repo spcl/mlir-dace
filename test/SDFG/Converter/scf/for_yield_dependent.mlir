@@ -1,6 +1,4 @@
-// XFAIL: *
 // RUN: sdfg-opt --convert-to-sdfg %s | sdfg-opt
-// BUG: Somehow the second arith operation in the for loop doesn't create load operations properly
 func.func private @main() -> (index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

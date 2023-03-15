@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: sdfg-opt --convert-to-sdfg %s | sdfg-translate --mlir-to-sdfg | python3 %S/../execute_sdfg.py | FileCheck %s
 
 // HACK: Has issues with parallel execution. Make sure it runs sequentially

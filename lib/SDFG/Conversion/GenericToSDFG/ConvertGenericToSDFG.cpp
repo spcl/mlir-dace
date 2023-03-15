@@ -860,6 +860,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     std::string idxName = sdfg::utils::generateName("for_idx");
 
+    // Allocs
     Operation *sdfg = getParentSDFG(op);
     OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(&sdfg->getRegion(0).getBlocks().front());
@@ -867,6 +868,7 @@ public:
 
     SmallVector<AllocOp> iterAllocs;
 
+    // Itervars
     for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
       Value iterOp = op.getIterOperands()[i];
 
@@ -876,15 +878,16 @@ public:
           SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
       newType = ArrayType::get(op->getLoc().getContext(), sizedType);
 
-      AllocOp alloc = AllocOp::create(rewriter, op->getLoc(), newType,
-                                      "_" + idxName + "_iter",
-                                      /*transient=*/true);
+      AllocOp alloc =
+          AllocOp::create(rewriter, op->getLoc(), newType, "for_iterarg",
+                          /*transient=*/true);
 
       iterAllocs.push_back(alloc);
     }
 
     rewriter.restoreInsertionPoint(ip);
 
+    // Init state
     StateNode init = StateNode::create(rewriter, op.getLoc(), "for_init");
 
     for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
@@ -894,49 +897,62 @@ public:
       StoreOp::create(rewriter, op->getLoc(), initVal, iterAllocs[i],
                       ValueRange());
 
-      LoadOp newLoad =
-          LoadOp::create(rewriter, op->getLoc(), iterAllocs[i], ValueRange());
-
-      rewriter.replaceAllUsesWith(op.getRegionIterArg(i), newLoad);
-      rewriter.replaceAllUsesWith(op.getResult(i), newLoad);
-
       for (scf::YieldOp yieldOp : op.getLoopBody().getOps<scf::YieldOp>()) {
         yieldOp->insertOperands(yieldOp.getNumOperands(), {iterAllocs[i]});
       }
     }
 
     linkToLastState(rewriter, op.getLoc(), init);
-
     rewriter.setInsertionPointAfter(init);
+
+    // Guard state
     StateNode guard = StateNode::create(rewriter, op.getLoc(), "for_guard");
+    rewriter.setInsertionPointAfter(guard);
+
+    // Body state
+    StateNode body = StateNode::create(rewriter, op.getLoc(), "for_body");
+
+    // Add loads
+    std::vector<LoadOp> iterLoads = {};
+    for (AllocOp alloc : iterAllocs) {
+      LoadOp loadOp = LoadOp::create(rewriter, op.getLoc(), alloc, {});
+      iterLoads.push_back(loadOp);
+    }
+    std::vector<Value> iterLoadsValue(iterLoads.begin(), iterLoads.end());
+
     SymOp idxSym = SymOp::create(rewriter, op.getLoc(),
                                  op.getInductionVar().getType(), idxName);
-    op.getInductionVar().replaceAllUsesWith(idxSym);
-
-    rewriter.setInsertionPointAfter(guard);
-    StateNode body = StateNode::create(rewriter, op.getLoc(), "for_body");
+    std::vector<Value> bodyValues(iterLoadsValue);
+    bodyValues.insert(bodyValues.begin(), idxSym);
 
     rewriter.setInsertionPointAfter(body);
 
-    SmallVector<Operation *> copies;
-    for (Operation &nop : op.getLoopBody().getOps())
-      copies.push_back(&nop);
+    // Mark last op for linking
+    markToLink(op.getLoopBody().front().back());
 
-    copies.back()->setAttr("linkToNext", rewriter.getBoolAttr(true));
+    // Copy all body ops
+    Block *cont =
+        rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
 
-    for (Operation *oper : copies)
-      op.moveOutOfLoop(oper);
+    rewriter.mergeBlocks(&op.getLoopBody().front(), rewriter.getBlock(),
+                         bodyValues);
+    rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
 
+    // Return state
     StateNode returnState =
         StateNode::create(rewriter, op.getLoc(), "for_return");
 
     rewriter.setInsertionPointAfter(op);
+
+    // Exit state
     StateNode exitState = StateNode::create(rewriter, op.getLoc(), "for_exit");
 
+    // Edges
     rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
     ArrayAttr emptyArr = rewriter.getStrArrayAttr({});
     StringAttr emptyStr = rewriter.getStringAttr("1");
 
+    // Init -> Guard
     if (adaptor.getLowerBound().getDefiningOp() != nullptr &&
         isa<SymOp>(adaptor.getLowerBound().getDefiningOp())) {
       SymOp symOp = cast<SymOp>(adaptor.getLowerBound().getDefiningOp());
@@ -950,6 +966,7 @@ public:
                      getTransientValue(adaptor.getLowerBound()));
     }
 
+    // Guard -> Body
     if (adaptor.getUpperBound().getDefiningOp() != nullptr &&
         isa<SymOp>(adaptor.getUpperBound().getDefiningOp())) {
       SymOp symOp = cast<SymOp>(adaptor.getUpperBound().getDefiningOp());
@@ -963,6 +980,7 @@ public:
                      getTransientValue(adaptor.getUpperBound()));
     }
 
+    // Return -> Guard
     if (adaptor.getStep().getDefiningOp() != nullptr &&
         isa<SymOp>(adaptor.getStep().getDefiningOp())) {
       SymOp symOp = cast<SymOp>(adaptor.getStep().getDefiningOp());
@@ -978,6 +996,7 @@ public:
                      emptyStr, getTransientValue(adaptor.getStep()));
     }
 
+    // Guard -> Exit
     if (adaptor.getUpperBound().getDefiningOp() != nullptr &&
         isa<SymOp>(adaptor.getUpperBound().getDefiningOp())) {
       SymOp symOp = cast<SymOp>(adaptor.getUpperBound().getDefiningOp());
@@ -994,7 +1013,7 @@ public:
     if (markedToLink(*op))
       linkToNextState(rewriter, op->getLoc(), exitState);
 
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, iterLoadsValue);
     return success();
   }
 };
