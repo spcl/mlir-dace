@@ -6,6 +6,7 @@ import dace
 from dace import SDFG
 
 sdfg = SDFG.from_json(json.load(sys.stdin))
+sdfg.validate()
 obj = sdfg.compile()
 
 arg_dict = {}

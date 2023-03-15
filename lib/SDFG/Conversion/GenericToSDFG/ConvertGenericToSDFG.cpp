@@ -1022,16 +1022,14 @@ public:
 
     // Itervars
     for (BlockArgument arg : op.getBeforeArguments()) {
-      std::string symName =
-          sdfg::utils::generateName(sdfg::utils::valueToString(arg));
-
       MemrefToMemletConverter converter;
       Type newType = converter.convertType(arg.getType());
       SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
       ArrayType arrayType = ArrayType::get(context, sizedType);
 
-      AllocOp alloc = AllocOp::create(rewriter, loc, arrayType, symName,
-                                      /*transient=*/true);
+      AllocOp alloc =
+          AllocOp::create(rewriter, loc, arrayType, "while_before_arg",
+                          /*transient=*/true);
       yieldOp->insertOperands(yieldOp.getNumOperands(), {alloc});
       iterAllocs.push_back(alloc);
     }
@@ -1051,8 +1049,9 @@ public:
       Type newType = converter.convertType(arg.getType());
       SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
       ArrayType arrayType = ArrayType::get(context, sizedType);
-      AllocOp alloc = AllocOp::create(rewriter, loc, arrayType, "while_arg",
-                                      /*transient=*/true);
+      AllocOp alloc =
+          AllocOp::create(rewriter, loc, arrayType, "while_after_arg",
+                          /*transient=*/true);
       argAllocs.push_back(alloc);
     }
 
@@ -1061,6 +1060,11 @@ public:
     // Init state
     StateNode initState = StateNode::create(rewriter, loc, "while_init");
 
+    for (unsigned i = 0; i < op.getNumOperands(); ++i) {
+      Value val = createLoad(rewriter, loc, adaptor.getInits()[i]);
+      StoreOp::create(rewriter, loc, val, iterAllocs[i], {});
+    }
+
     linkToLastState(rewriter, loc, initState);
     rewriter.setInsertionPointAfter(initState);
 
@@ -1068,12 +1072,12 @@ public:
     StateNode guardBeginState =
         StateNode::create(rewriter, loc, "while_guard_begin");
     // Add loads
-    std::vector<LoadOp> argLoads = {};
-    for (AllocOp alloc : argAllocs) {
+    std::vector<LoadOp> iterLoads = {};
+    for (AllocOp alloc : iterAllocs) {
       LoadOp loadOp = LoadOp::create(rewriter, loc, alloc, {});
-      argLoads.push_back(loadOp);
+      iterLoads.push_back(loadOp);
     }
-    std::vector<Value> argLoadsValue(argLoads.begin(), argLoads.end());
+    std::vector<Value> iterLoadsValue(iterLoads.begin(), iterLoads.end());
 
     linkToLastState(rewriter, loc, guardBeginState);
     rewriter.setInsertionPointAfter(guardBeginState);
@@ -1086,7 +1090,7 @@ public:
         rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
 
     rewriter.mergeBlocks(&op.getBefore().front(), rewriter.getBlock(),
-                         argLoadsValue);
+                         iterLoadsValue);
     rewriter.mergeBlocks(cont, rewriter.getBlock(), {});
 
     // Guard end state
@@ -1097,6 +1101,14 @@ public:
 
     // Body state
     StateNode bodyState = StateNode::create(rewriter, loc, "while_body");
+    // Add loads
+    std::vector<LoadOp> argLoads = {};
+    for (AllocOp alloc : argAllocs) {
+      LoadOp loadOp = LoadOp::create(rewriter, loc, alloc, {});
+      argLoads.push_back(loadOp);
+    }
+    std::vector<Value> argLoadsValue(argLoads.begin(), argLoads.end());
+
     rewriter.setInsertionPointAfter(bodyState);
 
     // Mark last op for linking
