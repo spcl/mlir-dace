@@ -1,7 +1,4 @@
-[![LIT Test](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml)
-[![Parse Test](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/parse-test.yml)
-[![Translation Test](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/translation-test.yml)
-[![Conversion Test](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/conversion-test.yml)
+[![Tests](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml/badge.svg)](https://github.com/spcl/mlir-dace/actions/workflows/lit-test.yml)
 
 # MLIR-DaCe
 MLIR-DaCe is a project aiming to bridge the gap between control-centric and data-centric intermediate representations.
@@ -20,3 +17,17 @@ To build the documentation from the TableGen description of the dialect operatio
 cmake --build . --target mlir-doc
 ```
 **Note**: Make sure to pass `-DLLVM_INSTALL_UTILS=ON` when building LLVM with CMake in order to install `FileCheck` to the chosen installation prefix.
+
+## Publication
+The paper on DCIR can be found [here](https://dl.acm.org/doi/10.1145/3579990.3580018).
+
+If you use MLIR-DaCe, cite us:
+```bibtex
+@inproceedings{mlir-dace,
+author = {Ben-Nun, Tal and Ates, Berke and Calotoiu, Alexandru and Hoefler, Torsten},
+title = {Bridging Control-Centric and Data-Centric Optimization},
+year = {2023},
+booktitle = {Proceedings of the 21st ACM/IEEE International Symposium on Code Generation and Optimization},
+series = {CGO 2023}
+}
+```
