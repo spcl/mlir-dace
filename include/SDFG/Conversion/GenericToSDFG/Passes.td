@@ -5,7 +5,7 @@ include "mlir/Pass/PassBase.td"
 include "SDFG/Dialect/Dialect.td"
 
 def GenericToSDFGPass : Pass<"convert-to-sdfg", "ModuleOp"> {
-  let summary = "Convert SCF, Arith and Memref dialect to SDFG dialect";
+  let summary = "Convert SCF, Arith, Math and Memref dialect to SDFG dialect";
   let constructor = "mlir::sdfg::conversion::createGenericToSDFGPass()";
   let dependentDialects = ["mlir::sdfg::SDFGDialect"];
   let options = [

@@ -7,12 +7,14 @@
 
 #include "SDFG/Conversion/GenericToSDFG/Passes.h"
 #include "SDFG/Conversion/LinalgToSDFG/Passes.h"
+#include "SDFG/Conversion/SDFGToGeneric/Passes.h"
 #include "SDFG/Dialect/Dialect.h"
 
 int main(int argc, char **argv) {
   // Register SDFG passes
   mlir::sdfg::conversion::registerGenericToSDFGPasses();
   mlir::sdfg::conversion::registerLinalgToSDFGPasses();
+  mlir::sdfg::conversion::registerSDFGToGenericPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::sdfg::SDFGDialect>();
