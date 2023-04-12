@@ -326,6 +326,37 @@ StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
   return dyn_cast<StateNode>(op);
 }
 
+StateNode SDFGNode::getEntryState() {
+  if (this->getEntry().has_value())
+    return getStateBySymRef(this->getEntry().value());
+
+  return this->getFirstState();
+}
+
+Block::BlockArgListType SDFGNode::getArgs() {
+  return this->getBody().getArguments().take_front(getNumArgs());
+}
+
+TypeRange SDFGNode::getArgTypes() {
+  SmallVector<Type> types = {};
+  for (BlockArgument BArg : getArgs()) {
+    types.push_back(BArg.getType());
+  }
+  return TypeRange(types);
+}
+
+Block::BlockArgListType SDFGNode::getResults() {
+  return this->getBody().getArguments().drop_front(getNumArgs());
+}
+
+TypeRange SDFGNode::getResultTypes() {
+  SmallVector<Type> types = {};
+  for (BlockArgument BArg : getResults()) {
+    types.push_back(BArg.getType());
+  }
+  return TypeRange(types);
+}
+
 //===----------------------------------------------------------------------===//
 // NestedSDFGNode
 //===----------------------------------------------------------------------===//
@@ -430,6 +461,21 @@ StateNode NestedSDFGNode::getFirstState() {
 StateNode NestedSDFGNode::getStateBySymRef(StringRef symRef) {
   Operation *op = lookupSymbol(symRef);
   return dyn_cast<StateNode>(op);
+}
+
+StateNode NestedSDFGNode::getEntryState() {
+  if (this->getEntry().has_value())
+    return getStateBySymRef(this->getEntry().value());
+
+  return this->getFirstState();
+}
+
+ValueRange NestedSDFGNode::getArgs() {
+  return this->getOperands().take_front(getNumArgs());
+}
+
+ValueRange NestedSDFGNode::getResults() {
+  return this->getOperands().drop_front(getNumArgs());
 }
 
 //===----------------------------------------------------------------------===//

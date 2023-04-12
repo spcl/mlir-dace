@@ -34,6 +34,11 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
         static SDFGNode create(PatternRewriter &rewriter, Location location);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
+        StateNode getEntryState();
+        Block::BlockArgListType getArgs();
+        TypeRange getArgTypes();
+        Block::BlockArgListType getResults();
+        TypeRange getResultTypes();
     }];
 }
 
@@ -71,6 +76,9 @@ def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
         static NestedSDFGNode create(PatternRewriter &rewriter, Location location);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
+        StateNode getEntryState();
+        ValueRange getArgs();
+        ValueRange getResults();
     }];
 }
 

@@ -2,13 +2,12 @@
 #include "SDFG/Conversion/GenericToSDFG/Passes.h"
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
-#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
-#include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
 using namespace sdfg;
@@ -30,9 +29,9 @@ struct SDFGTarget : public ConversionTarget {
   }
 };
 
-class MemrefToMemletConverter : public TypeConverter {
+class ToArrayConverter : public TypeConverter {
 public:
-  MemrefToMemletConverter() {
+  ToArrayConverter() {
     addConversion([](Type type) { return type; });
     addConversion(convertMemrefTypes);
     addConversion(convertLLVMPtrTypes);
@@ -280,14 +279,14 @@ public:
 
     SmallVector<Type> args = {};
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
-      MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op.getArgumentTypes()[i]);
+      ToArrayConverter tac;
+      Type nt = tac.convertType(op.getArgumentTypes()[i]);
       args.push_back(nt);
     }
 
     for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op.getResultTypes()[i]);
+      ToArrayConverter tac;
+      Type nt = tac.convertType(op.getResultTypes()[i]);
 
       if (!nt.isa<ArrayType>()) {
         SizedType sized = SizedType::get(nt.getContext(), nt, {}, {}, {});
@@ -369,8 +368,8 @@ public:
       rewriter.setInsertionPointAfter(task);
 
       if (task.getNumResults() == 1) {
-        MemrefToMemletConverter memo;
-        Type nt = memo.convertType(op->getResultTypes()[0]);
+        ToArrayConverter tac;
+        Type nt = tac.convertType(op->getResultTypes()[0]);
         SizedType sized =
             SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
         nt = ArrayType::get(op->getLoc().getContext(), sized);
@@ -535,8 +534,8 @@ public:
       SmallVector<AllocOp> allocs;
 
       for (Type opType : op->getResultTypes()) {
-        MemrefToMemletConverter memo;
-        Type newType = memo.convertType(opType);
+        ToArrayConverter tac;
+        Type newType = tac.convertType(opType);
         SizedType sizedType =
             SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
         newType = ArrayType::get(op->getLoc().getContext(), sizedType);
@@ -872,8 +871,8 @@ public:
     for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
       Value iterOp = op.getIterOperands()[i];
 
-      MemrefToMemletConverter memo;
-      Type newType = memo.convertType(iterOp.getType());
+      ToArrayConverter tac;
+      Type newType = tac.convertType(iterOp.getType());
       SizedType sizedType =
           SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
       newType = ArrayType::get(op->getLoc().getContext(), sizedType);
@@ -1041,7 +1040,7 @@ public:
 
     // Itervars
     for (BlockArgument arg : op.getBeforeArguments()) {
-      MemrefToMemletConverter converter;
+      ToArrayConverter converter;
       Type newType = converter.convertType(arg.getType());
       SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
       ArrayType arrayType = ArrayType::get(context, sizedType);
@@ -1054,7 +1053,7 @@ public:
     }
 
     // Condition
-    MemrefToMemletConverter converter;
+    ToArrayConverter converter;
     Type newType = converter.convertType(conditionOp.getCondition().getType());
     SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
     ArrayType arrayType = ArrayType::get(context, sizedType);
@@ -1064,7 +1063,7 @@ public:
 
     // Condition Arguments
     for (Value arg : conditionOp.getArgs()) {
-      MemrefToMemletConverter converter;
+      ToArrayConverter converter;
       Type newType = converter.convertType(arg.getType());
       SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
       ArrayType arrayType = ArrayType::get(context, sizedType);
@@ -1228,9 +1227,9 @@ public:
     AllocSymbolOp::create(rewriter, op.getLoc(), condName);
 
     for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      MemrefToMemletConverter memo;
+      ToArrayConverter tac;
 
-      Type nt = memo.convertType(op.getResultTypes()[0]);
+      Type nt = tac.convertType(op.getResultTypes()[0]);
       SizedType sized =
           SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
       nt = ArrayType::get(op->getLoc().getContext(), sized);
@@ -1575,8 +1574,8 @@ public:
     std::string name = sdfg::utils::operationToString(*op);
     StateNode state = StateNode::create(rewriter, op->getLoc(), name);
 
-    MemrefToMemletConverter memo;
-    Type nt = memo.convertType(op->getResultTypes()[0]);
+    ToArrayConverter tac;
+    Type nt = tac.convertType(op->getResultTypes()[0]);
     SizedType sized = SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
     nt = ArrayType::get(op->getLoc().getContext(), sized);
 
@@ -1587,8 +1586,8 @@ public:
     SmallVector<AllocOp> allocs;
 
     for (Type opType : op->getResultTypes()) {
-      MemrefToMemletConverter memo;
-      Type newType = memo.convertType(opType);
+      ToArrayConverter tac;
+      Type newType = tac.convertType(opType);
       SizedType sizedType =
           SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
       newType = ArrayType::get(op->getLoc().getContext(), sizedType);
@@ -1738,7 +1737,7 @@ void GenericToSDFGPass::runOnOperation() {
     module->removeAttr(a.getName());
 
   SDFGTarget target(getContext());
-  MemrefToMemletConverter converter;
+  ToArrayConverter converter;
 
   RewritePatternSet patterns(&getContext());
   populateGenericToSDFGConversionPatterns(patterns, converter);
