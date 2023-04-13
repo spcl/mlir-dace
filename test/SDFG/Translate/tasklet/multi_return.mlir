@@ -1,8 +1,6 @@
 // RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../import_translation_test.py
 
 // RUN: sdfg-translate --mlir-to-sdfg %s | python3 %S/../execute_sdfg.py | FileCheck %s
-// HACK: Has issues with parallel execution. Make sure it runs sequentially
-// ALLOW_RETRIES: 10
 // CHECK: begin_dump: [[ARRAY:[a-zA-Z0-9_]*]]
 // CHECK-NEXT: 1
 // CHECK-NEXT: end_dump: [[ARRAY]]

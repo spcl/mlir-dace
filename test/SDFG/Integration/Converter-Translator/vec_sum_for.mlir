@@ -1,7 +1,5 @@
 // RUN: sdfg-opt --convert-to-sdfg %s | sdfg-translate --mlir-to-sdfg | python3 %S/../execute_sdfg.py | FileCheck %s
 
-// HACK: Has issues with parallel execution. Make sure it runs sequentially
-// ALLOW_RETRIES: 10
 // CHECK: begin_dump: [[ARRAY:[a-zA-Z0-9_]*]]
 // CHECK-COUNT-64: 3
 // CHECK-NEXT: end_dump: [[ARRAY]]

@@ -4,6 +4,9 @@ import json
 import sys
 import dace
 from dace import SDFG
+from dace.config import Config
+
+Config.set("cache", value='unique')
 
 sdfg = SDFG.from_json(json.load(sys.stdin))
 sdfg.validate()
