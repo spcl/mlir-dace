@@ -174,19 +174,19 @@ void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName) {
 }
 
 // Creates operations that perform the symbolic expression
-void symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
-                              StringRef symExpr) {
+Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
+                               StringRef symExpr) {
   std::unique_ptr<Node> ast = SymbolicParser::parse(symExpr);
   if (!ast)
     emitError(loc, "failed to parse symbolic expression");
 
-  // SmallVector<std::string> symbols;
-  // ast->collect_variables(symbols);
+  SmallVector<std::string> symbols;
+  ast->collect_variables(symbols);
 
-  // for (std::string symbol : symbols)
-  //   allocSymbol(rewriter, loc, symbol);
+  for (std::string symbol : symbols)
+    allocSymbol(rewriter, loc, symbol);
 
-  // Value result = ast->codegen(rewriter, loc);
+  return ast->codegen(rewriter, loc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -290,7 +290,8 @@ public:
     rewriter.setInsertionPointToEnd(srcBlock);
 
     // Compute condition
-    // symbolicExpressionToMLIR(rewriter, op.getLoc(), adaptor.getCondition());
+    Value condition =
+        symbolicExpressionToMLIR(rewriter, op.getLoc(), adaptor.getCondition());
 
     // Add conditional branch
     // createCondBranch(rewriter, op.getLoc(), condition, destBlock, newBlock);

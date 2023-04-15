@@ -37,14 +37,17 @@ void skip_whitespace(StringRef input, unsigned &pos) {
 }
 
 std::unique_ptr<Node> parse_parenthesized(StringRef input, unsigned &pos) {
+  unsigned prev_pos = pos;
   skip_whitespace(input, pos);
 
   if (input[pos] == '(') {
     ++pos;
     std::unique_ptr<Node> node = SymbolicParser::parse(input, pos);
 
-    if (!node)
+    if (!node) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     skip_whitespace(input, pos);
 
@@ -54,6 +57,7 @@ std::unique_ptr<Node> parse_parenthesized(StringRef input, unsigned &pos) {
     }
   }
 
+  pos = prev_pos;
   return nullptr;
 }
 
@@ -77,17 +81,22 @@ public:
   }
 
   static std::unique_ptr<UnOpNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
     skip_whitespace(input, pos);
     Optional<std::string> op = find_unop(input, pos);
 
-    if (!op)
+    if (!op) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     pos += op->length();
     std::unique_ptr<Node> expr = SymbolicParser::parse(input, pos);
 
-    if (!expr)
+    if (!expr) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     return std::make_unique<UnOpNode>(*op, std::move(expr));
   }
@@ -126,23 +135,30 @@ public:
   }
 
   static std::unique_ptr<BinOpNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
     skip_whitespace(input, pos);
     Optional<std::string> op = find_binop(input, pos);
 
-    if (!op)
+    if (!op) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     std::unique_ptr<Node> left = SymbolicParser::parse(input, pos);
 
-    if (!left)
+    if (!left) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     skip_whitespace(input, pos);
     pos += op->length();
     std::unique_ptr<Node> right = SymbolicParser::parse(input, pos);
 
-    if (!right)
+    if (!right) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     return std::make_unique<BinOpNode>(std::move(left), *op, std::move(right));
   }
@@ -178,10 +194,13 @@ public:
   }
 
   static std::unique_ptr<VariableNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
     skip_whitespace(input, pos);
 
-    if (!isalpha(input[pos]) && input[pos] != '_')
+    if (!isalpha(input[pos]) && input[pos] != '_') {
+      pos = prev_pos;
       return nullptr;
+    }
 
     std::string name;
     while (pos < input.size() && (isalnum(input[pos]) || input[pos] == '_'))
@@ -207,10 +226,13 @@ public:
   void collect_variables(SmallVector<std::string> &variables) override {}
 
   static std::unique_ptr<ConstantNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
     skip_whitespace(input, pos);
 
-    if (!isdigit(input[pos]))
+    if (!isdigit(input[pos])) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     int value = 0;
     while (pos < input.size() && isdigit(input[pos]))
@@ -242,18 +264,25 @@ public:
   }
 
   static std::unique_ptr<AssignmentNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
     std::unique_ptr<VariableNode> variable = VariableNode::parse(input, pos);
 
-    if (!variable)
+    if (!variable) {
+      pos = prev_pos;
       return nullptr;
+    }
 
-    if (pos >= input.size() || input[pos] != ':')
+    if (pos >= input.size() || input[pos] != ':') {
+      pos = prev_pos;
       return nullptr;
+    }
 
     pos++;
     std::unique_ptr<Node> expr = SymbolicParser::parse(input, pos);
-    if (!expr)
+    if (!expr) {
+      pos = prev_pos;
       return nullptr;
+    }
 
     return std::make_unique<AssignmentNode>(std::move(variable),
                                             std::move(expr));
