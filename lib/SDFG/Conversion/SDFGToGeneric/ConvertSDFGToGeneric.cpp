@@ -1,5 +1,6 @@
 #include "SDFG/Conversion/SDFGToGeneric/PassDetail.h"
 #include "SDFG/Conversion/SDFGToGeneric/Passes.h"
+#include "SDFG/Conversion/SDFGToGeneric/SymbolicParser.h"
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -31,7 +32,7 @@ llvm::StringMap<memref::AllocOp *> symbolMap;
 // Store -> memref.store
 // Copy -> memref.copy
 //
-// Alloc Symbol -> memref.alloc (int)
+// Alloc Symbol -> memref.alloc (int64)
 // Sym ->
 //      If single symbol: memref.load
 //      If expression: not supported for now
@@ -152,6 +153,42 @@ memref::AllocOp createAlloc(PatternRewriter &rewriter, Location loc,
   return cast<memref::AllocOp>(rewriter.create(state));
 }
 
+// Allocates a symbol as a memref<i64> if it's not already allocated
+void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName) {
+  if (symbolMap.find(symName) != symbolMap.end())
+    return;
+
+  OpBuilder::InsertPoint insertionPoint = rewriter.saveInsertionPoint();
+
+  // Set insertion point to the beginning of the first block (top of func)
+  rewriter.setInsertionPointToStart(&rewriter.getBlock()->getParent()->front());
+
+  IntegerType intType = IntegerType::get(loc->getContext(), 64);
+  MemRefType memrefType = MemRefType::get({}, intType);
+  memref::AllocOp allocOp = createAlloc(rewriter, loc, memrefType);
+
+  // Update symbol map
+  symbolMap[symName] = &allocOp;
+
+  rewriter.restoreInsertionPoint(insertionPoint);
+}
+
+// Creates operations that perform the symbolic expression
+void symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
+                              StringRef symExpr) {
+  std::unique_ptr<Node> ast = SymbolicParser::parse(symExpr);
+  if (!ast)
+    emitError(loc, "failed to parse symbolic expression");
+
+  // SmallVector<std::string> symbols;
+  // ast->collect_variables(symbols);
+
+  // for (std::string symbol : symbols)
+  //   allocSymbol(rewriter, loc, symbol);
+
+  // Value result = ast->codegen(rewriter, loc);
+}
+
 //===----------------------------------------------------------------------===//
 // SDFG, State & Edge Patterns
 //===----------------------------------------------------------------------===//
@@ -230,8 +267,12 @@ public:
     Block *srcBlock = blockMap[adaptor.getSrc()];
     Block *destBlock = blockMap[adaptor.getDest()];
 
-    rewriter.setInsertionPointToEnd(destBlock);
-    // TODO: Add assignment to the beginning of destBlock
+    if (!adaptor.getAssign().empty()) {
+      rewriter.setInsertionPointToEnd(destBlock);
+      for (Attribute assignment : adaptor.getAssign())
+        symbolicExpressionToMLIR(rewriter, op.getLoc(),
+                                 cast<StringAttr>(assignment));
+    }
 
     rewriter.setInsertionPointToEnd(srcBlock);
 
@@ -249,6 +290,7 @@ public:
     rewriter.setInsertionPointToEnd(srcBlock);
 
     // Compute condition
+    // symbolicExpressionToMLIR(rewriter, op.getLoc(), adaptor.getCondition());
 
     // Add conditional branch
     // createCondBranch(rewriter, op.getLoc(), condition, destBlock, newBlock);
