@@ -61,121 +61,6 @@ std::unique_ptr<Node> parse_parenthesized(StringRef input, unsigned &pos) {
   return nullptr;
 }
 
-class UnOpNode : public Node {
-private:
-  std::string op;
-  std::unique_ptr<Node> expr;
-
-public:
-  UnOpNode(std::string op, std::unique_ptr<Node> expr)
-      : op(op), expr(std::move(expr)) {}
-
-  mlir::Value codegen(mlir::PatternRewriter &rewriter,
-                      mlir::Location loc) override {
-    // TODO: Code generation logic for unary operators
-    return nullptr;
-  }
-
-  void collect_variables(SmallVector<std::string> &variables) override {
-    expr->collect_variables(variables);
-  }
-
-  static std::unique_ptr<UnOpNode> parse(StringRef input, unsigned &pos) {
-    unsigned prev_pos = pos;
-    skip_whitespace(input, pos);
-    Optional<std::string> op = find_unop(input, pos);
-
-    if (!op) {
-      pos = prev_pos;
-      return nullptr;
-    }
-
-    pos += op->length();
-    std::unique_ptr<Node> expr = SymbolicParser::parse(input, pos);
-
-    if (!expr) {
-      pos = prev_pos;
-      return nullptr;
-    }
-
-    return std::make_unique<UnOpNode>(*op, std::move(expr));
-  }
-
-  static Optional<std::string> find_unop(StringRef input, unsigned pos) {
-    std::string binops[] = {"-", "~", "not"};
-
-    for (std::string op : binops)
-      if (input.substr(pos).startswith(op))
-        return op;
-
-    return std::nullopt;
-  }
-};
-
-class BinOpNode : public Node {
-private:
-  std::unique_ptr<Node> left;
-  std::string op;
-  std::unique_ptr<Node> right;
-
-public:
-  BinOpNode(std::unique_ptr<Node> left, std::string op,
-            std::unique_ptr<Node> right)
-      : left(std::move(left)), op(op), right(std::move(right)) {}
-
-  mlir::Value codegen(mlir::PatternRewriter &rewriter,
-                      mlir::Location loc) override {
-    // TODO: Code generation logic for binary operators
-    return nullptr;
-  }
-
-  void collect_variables(SmallVector<std::string> &variables) override {
-    left->collect_variables(variables);
-    right->collect_variables(variables);
-  }
-
-  static std::unique_ptr<BinOpNode> parse(StringRef input, unsigned &pos) {
-    unsigned prev_pos = pos;
-    skip_whitespace(input, pos);
-    Optional<std::string> op = find_binop(input, pos);
-
-    if (!op) {
-      pos = prev_pos;
-      return nullptr;
-    }
-
-    std::unique_ptr<Node> left = SymbolicParser::parse(input, pos);
-
-    if (!left) {
-      pos = prev_pos;
-      return nullptr;
-    }
-
-    skip_whitespace(input, pos);
-    pos += op->length();
-    std::unique_ptr<Node> right = SymbolicParser::parse(input, pos);
-
-    if (!right) {
-      pos = prev_pos;
-      return nullptr;
-    }
-
-    return std::make_unique<BinOpNode>(std::move(left), *op, std::move(right));
-  }
-
-  static Optional<std::string> find_binop(StringRef input, unsigned pos) {
-    std::string binops[] = {"+", "-",  "*",  "/",  "//", "%",   "&",
-                            "|", "^",  "<<", ">>", "**", "and", "or",
-                            "<", "<=", ">",  ">=", "==", "!="};
-
-    for (std::string op : binops)
-      if (input.substr(pos).startswith(op))
-        return op;
-
-    return std::nullopt;
-  }
-};
-
 class VariableNode : public Node {
 private:
   std::string name;
@@ -286,6 +171,131 @@ public:
 
     return std::make_unique<AssignmentNode>(std::move(variable),
                                             std::move(expr));
+  }
+};
+
+class UnOpNode : public Node {
+private:
+  std::string op;
+  std::unique_ptr<Node> expr;
+
+public:
+  UnOpNode(std::string op, std::unique_ptr<Node> expr)
+      : op(op), expr(std::move(expr)) {}
+
+  mlir::Value codegen(mlir::PatternRewriter &rewriter,
+                      mlir::Location loc) override {
+    // TODO: Code generation logic for unary operators
+    return nullptr;
+  }
+
+  void collect_variables(SmallVector<std::string> &variables) override {
+    expr->collect_variables(variables);
+  }
+
+  static std::unique_ptr<UnOpNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
+    skip_whitespace(input, pos);
+    Optional<std::string> op = find_unop(input, pos);
+
+    if (!op) {
+      pos = prev_pos;
+      return nullptr;
+    }
+
+    pos += op->length();
+    std::unique_ptr<Node> expr = SymbolicParser::parse(input, pos);
+
+    if (!expr) {
+      pos = prev_pos;
+      return nullptr;
+    }
+
+    return std::make_unique<UnOpNode>(*op, std::move(expr));
+  }
+
+  static Optional<std::string> find_unop(StringRef input, unsigned pos) {
+    std::string binops[] = {"-", "~", "not"};
+
+    for (std::string op : binops)
+      if (input.substr(pos).startswith(op))
+        return op;
+
+    return std::nullopt;
+  }
+};
+
+class BinOpNode : public Node {
+private:
+  std::unique_ptr<Node> left;
+  std::string op;
+  std::unique_ptr<Node> right;
+
+public:
+  BinOpNode(std::unique_ptr<Node> left, std::string op,
+            std::unique_ptr<Node> right)
+      : left(std::move(left)), op(op), right(std::move(right)) {}
+
+  mlir::Value codegen(mlir::PatternRewriter &rewriter,
+                      mlir::Location loc) override {
+    // TODO: Code generation logic for binary operators
+    return nullptr;
+  }
+
+  void collect_variables(SmallVector<std::string> &variables) override {
+    left->collect_variables(variables);
+    right->collect_variables(variables);
+  }
+
+  static std::unique_ptr<BinOpNode> parse(StringRef input, unsigned &pos) {
+    unsigned prev_pos = pos;
+    std::unique_ptr<Node> left;
+
+    // FIXME: Rewrite to respect operator precedence
+    left = parse_parenthesized(input, pos);
+    if (!left)
+      left = UnOpNode::parse(input, pos);
+
+    if (!left)
+      left = VariableNode::parse(input, pos);
+
+    if (!left)
+      left = ConstantNode::parse(input, pos);
+
+    if (!left) {
+      pos = prev_pos;
+      return nullptr;
+    }
+
+    skip_whitespace(input, pos);
+    Optional<std::string> op = find_binop(input, pos);
+
+    if (!op) {
+      pos = prev_pos;
+      return nullptr;
+    }
+
+    pos += op->length();
+    std::unique_ptr<Node> right = SymbolicParser::parse(input, pos);
+
+    if (!right) {
+      pos = prev_pos;
+      return nullptr;
+    }
+
+    return std::make_unique<BinOpNode>(std::move(left), *op, std::move(right));
+  }
+
+  static Optional<std::string> find_binop(StringRef input, unsigned pos) {
+    std::string binops[] = {"+", "-",  "*",  "/",  "//", "%",   "&",
+                            "|", "^",  "<<", ">>", "**", "and", "or",
+                            "<", "<=", ">",  ">=", "==", "!="};
+
+    for (std::string op : binops)
+      if (input.substr(pos).startswith(op))
+        return op;
+
+    return std::nullopt;
   }
 };
 
