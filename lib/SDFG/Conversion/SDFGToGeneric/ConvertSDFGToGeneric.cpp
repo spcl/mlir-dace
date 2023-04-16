@@ -176,7 +176,7 @@ void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName) {
 // Creates operations that perform the symbolic expression
 Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
                                StringRef symExpr) {
-  std::unique_ptr<Node> ast = SymbolicParser::parse(symExpr);
+  std::unique_ptr<ASTNode> ast = SymbolicParser::parse(symExpr);
   if (!ast)
     emitError(loc, "failed to parse symbolic expression");
 

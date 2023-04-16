@@ -5,9 +5,9 @@
 
 namespace mlir::sdfg::conversion {
 
-class Node {
+class ASTNode {
 public:
-  virtual ~Node() = default;
+  virtual ~ASTNode() = default;
   virtual mlir::Value codegen(mlir::PatternRewriter &rewriter,
                               mlir::Location loc) = 0;
   virtual void collect_variables(SmallVector<std::string> &variables) = 0;
@@ -15,7 +15,7 @@ public:
 
 class SymbolicParser {
 public:
-  static std::unique_ptr<Node> parse(StringRef input, unsigned pos = 0);
+  static std::unique_ptr<ASTNode> parse(StringRef input);
 };
 
 } // namespace mlir::sdfg::conversion
