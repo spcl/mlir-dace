@@ -220,7 +220,7 @@ public:
         symbolicExpressionToMLIR(rewriter, op.getLoc(), adaptor.getCondition());
 
     // Add conditional branch
-    // createCondBranch(rewriter, op.getLoc(), condition, destBlock, newBlock);
+    createCondBranch(rewriter, op.getLoc(), condition, destBlock, newBlock);
 
     // Update blockMap
     blockMap[adaptor.getSrc()] = newBlock;

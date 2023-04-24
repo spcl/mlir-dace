@@ -99,7 +99,12 @@ Value AssignNode::codegen(PatternRewriter &rewriter, Location loc,
                           llvm::StringMap<memref::AllocOp> &symbolMap) {
   allocSymbol(rewriter, loc, variable->name, symbolMap);
   Value eVal = expr->codegen(rewriter, loc, symbolMap);
-  createStore(rewriter, loc, eVal, symbolMap[variable->name], {});
+
+  if (eVal.getType().isInteger(64))
+    createStore(rewriter, loc, eVal, symbolMap[variable->name], {});
+
+  Value cVal = createExtSI(rewriter, loc, rewriter.getI64Type(), eVal);
+  createStore(rewriter, loc, cVal, symbolMap[variable->name], {});
   return nullptr;
 }
 
@@ -115,12 +120,15 @@ Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
     Value zero = createConstantInt(rewriter, loc, 0, 64);
     return createSubI(rewriter, loc, zero, eVal);
   }
-  case LOG_NOT:
-    break;
-    // TODO: Implement LOG_NOT case
-  case BIT_NOT:
-    break;
-    // TODO: Implement BIT_NOT case
+  case LOG_NOT: {
+    Value zero = createConstantInt(rewriter, loc, 0, 1);
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::eq, zero, eVal);
+  }
+
+  case BIT_NOT: {
+    Value negOne = createConstantInt(rewriter, loc, -1, 64);
+    return createXOrI(rewriter, loc, negOne, eVal);
+  }
   }
 
   return eVal;
@@ -138,35 +146,26 @@ Value BinOpNode::codegen(PatternRewriter &rewriter, Location loc,
   case SUB:
     return createSubI(rewriter, loc, lVal, rVal);
   case MUL:
-    break;
-  // TODO: Implement MUL case
+    return createMulI(rewriter, loc, lVal, rVal);
   case DIV:
-    break;
-  // TODO: Implement DIV case
+    return createDivSI(rewriter, loc, lVal, rVal);
   case FLOORDIV:
-    break;
-  // TODO: Implement FLOORDIV case
+    return createFloorDivSI(rewriter, loc, lVal, rVal);
   case MOD:
-    break;
-  // TODO: Implement MOD case
+    return createRemSI(rewriter, loc, lVal, rVal);
   case EXP:
     break;
   // TODO: Implement EXP case
   case BIT_OR:
-    break;
-  // TODO: Implement BIT_OR case
+    return createOrI(rewriter, loc, lVal, rVal);
   case BIT_XOR:
-    break;
-  // TODO: Implement BIT_XOR case
+    return createXOrI(rewriter, loc, lVal, rVal);
   case BIT_AND:
-    break;
-  // TODO: Implement BIT_AND case
+    return createAndI(rewriter, loc, lVal, rVal);
   case LSHIFT:
-    break;
-  // TODO: Implement LSHIFT case
+    return createShLI(rewriter, loc, lVal, rVal);
   case RSHIFT:
-    break;
-  // TODO: Implement RSHIFT case
+    return createShRSI(rewriter, loc, lVal, rVal);
   case LOG_OR:
     break;
   // TODO: Implement LOG_OR case

@@ -124,6 +124,88 @@ arith::SubIOp conversion::createSubI(PatternRewriter &rewriter, Location loc,
   return cast<arith::SubIOp>(rewriter.create(state));
 }
 
+arith::MulIOp conversion::createMulI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::MulIOp::getOperationName());
+
+  arith::MulIOp::build(builder, state, a, b);
+  return cast<arith::MulIOp>(rewriter.create(state));
+}
+
+arith::DivSIOp conversion::createDivSI(PatternRewriter &rewriter, Location loc,
+                                       Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::DivSIOp::getOperationName());
+
+  arith::DivSIOp::build(builder, state, a, b);
+  return cast<arith::DivSIOp>(rewriter.create(state));
+}
+
+arith::FloorDivSIOp conversion::createFloorDivSI(PatternRewriter &rewriter,
+                                                 Location loc, Value a,
+                                                 Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::FloorDivSIOp::getOperationName());
+
+  arith::FloorDivSIOp::build(builder, state, a, b);
+  return cast<arith::FloorDivSIOp>(rewriter.create(state));
+}
+
+arith::RemSIOp conversion::createRemSI(PatternRewriter &rewriter, Location loc,
+                                       Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::RemSIOp::getOperationName());
+
+  arith::RemSIOp::build(builder, state, a, b);
+  return cast<arith::RemSIOp>(rewriter.create(state));
+}
+
+arith::OrIOp conversion::createOrI(PatternRewriter &rewriter, Location loc,
+                                   Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::OrIOp::getOperationName());
+
+  arith::OrIOp::build(builder, state, a, b);
+  return cast<arith::OrIOp>(rewriter.create(state));
+}
+
+arith::AndIOp conversion::createAndI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::AndIOp::getOperationName());
+
+  arith::AndIOp::build(builder, state, a, b);
+  return cast<arith::AndIOp>(rewriter.create(state));
+}
+
+arith::XOrIOp conversion::createXOrI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::XOrIOp::getOperationName());
+
+  arith::XOrIOp::build(builder, state, a, b);
+  return cast<arith::XOrIOp>(rewriter.create(state));
+}
+
+arith::ShLIOp conversion::createShLI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::ShLIOp::getOperationName());
+
+  arith::ShLIOp::build(builder, state, a, b);
+  return cast<arith::ShLIOp>(rewriter.create(state));
+}
+
+arith::ShRSIOp conversion::createShRSI(PatternRewriter &rewriter, Location loc,
+                                       Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::ShRSIOp::getOperationName());
+
+  arith::ShRSIOp::build(builder, state, a, b);
+  return cast<arith::ShRSIOp>(rewriter.create(state));
+}
+
 arith::CmpIOp conversion::createCmpI(PatternRewriter &rewriter, Location loc,
                                      arith::CmpIPredicate predicate, Value lhs,
                                      Value rhs) {
@@ -132,4 +214,13 @@ arith::CmpIOp conversion::createCmpI(PatternRewriter &rewriter, Location loc,
 
   arith::CmpIOp::build(builder, state, predicate, lhs, rhs);
   return cast<arith::CmpIOp>(rewriter.create(state));
+}
+
+arith::ExtSIOp conversion::createExtSI(PatternRewriter &rewriter, Location loc,
+                                       Type out, Value in) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::ExtSIOp::getOperationName());
+
+  arith::ExtSIOp::build(builder, state, out, in);
+  return cast<arith::ExtSIOp>(rewriter.create(state));
 }

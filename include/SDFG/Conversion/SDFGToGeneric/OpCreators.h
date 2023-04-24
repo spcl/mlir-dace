@@ -46,8 +46,38 @@ arith::AddIOp createAddI(PatternRewriter &rewriter, Location loc, Value a,
 arith::SubIOp createSubI(PatternRewriter &rewriter, Location loc, Value a,
                          Value b);
 
+arith::MulIOp createMulI(PatternRewriter &rewriter, Location loc, Value a,
+                         Value b);
+
+arith::DivSIOp createDivSI(PatternRewriter &rewriter, Location loc, Value a,
+                           Value b);
+
+arith::FloorDivSIOp createFloorDivSI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b);
+
+arith::RemSIOp createRemSI(PatternRewriter &rewriter, Location loc, Value a,
+                           Value b);
+
+arith::OrIOp createOrI(PatternRewriter &rewriter, Location loc, Value a,
+                       Value b);
+
+arith::AndIOp createAndI(PatternRewriter &rewriter, Location loc, Value a,
+                         Value b);
+
+arith::XOrIOp createXOrI(PatternRewriter &rewriter, Location loc, Value a,
+                         Value b);
+
+arith::ShLIOp createShLI(PatternRewriter &rewriter, Location loc, Value a,
+                         Value b);
+
+arith::ShRSIOp createShRSI(PatternRewriter &rewriter, Location loc, Value a,
+                           Value b);
+
 arith::CmpIOp createCmpI(PatternRewriter &rewriter, Location loc,
                          arith::CmpIPredicate predicate, Value lhs, Value rhs);
+
+arith::ExtSIOp createExtSI(PatternRewriter &rewriter, Location loc, Type out,
+                           Value in);
 
 } // namespace mlir::sdfg::conversion
 
