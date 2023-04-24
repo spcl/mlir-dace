@@ -16,7 +16,6 @@ using namespace sdfg;
 using namespace conversion;
 
 // Maps state name to their generated block
-// IDEA: Would non-pointer version not work? Otherwise prefer smart pointers
 llvm::StringMap<Block *> blockMap;
 // Maps symbols to the generated allocation operation
 llvm::StringMap<memref::AllocOp> symbolMap;
@@ -109,14 +108,11 @@ public:
 // Creates operations that perform the symbolic expression
 Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
                                StringRef symExpr) {
-  ASTNode *ast = SymbolicParser().parse(symExpr);
+  std::unique_ptr<ASTNode> ast = SymbolicParser().parse(symExpr);
   if (!ast)
     emitError(loc, "failed to parse symbolic expression");
 
-  Value val = ast->codegen(rewriter, loc, symbolMap);
-  delete ast;
-
-  return val;
+  return ast->codegen(rewriter, loc, symbolMap);
 }
 
 //===----------------------------------------------------------------------===//

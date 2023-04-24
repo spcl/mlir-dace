@@ -45,16 +45,11 @@ public:
 
 class AssignNode : public ASTNode {
 public:
-  VarNode *variable;
-  ASTNode *expr;
+  std::unique_ptr<VarNode> variable;
+  std::unique_ptr<ASTNode> expr;
 
-  AssignNode(VarNode *variable, ASTNode *expr)
-      : variable(variable), expr(expr) {}
-
-  ~AssignNode() {
-    delete variable;
-    delete expr;
-  }
+  AssignNode(std::unique_ptr<VarNode> variable, std::unique_ptr<ASTNode> expr)
+      : variable(std::move(variable)), expr(std::move(expr)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<memref::AllocOp> &symbolMap) override;
@@ -64,10 +59,10 @@ class UnOpNode : public ASTNode {
 public:
   enum UnOp { ADD, SUB, LOG_NOT, BIT_NOT };
   UnOp op;
-  ASTNode *expr;
+  std::unique_ptr<ASTNode> expr;
 
-  UnOpNode(UnOp op, ASTNode *expr) : op(op), expr(expr) {}
-  ~UnOpNode() { delete expr; }
+  UnOpNode(UnOp op, std::unique_ptr<ASTNode> expr)
+      : op(op), expr(std::move(expr)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<memref::AllocOp> &symbolMap) override;
@@ -98,17 +93,13 @@ public:
     GE
   };
 
-  ASTNode *left;
+  std::unique_ptr<ASTNode> left;
   BinOp op;
-  ASTNode *right;
+  std::unique_ptr<ASTNode> right;
 
-  BinOpNode(ASTNode *left, BinOp op, ASTNode *right)
-      : left(left), op(op), right(right) {}
-
-  ~BinOpNode() {
-    delete left;
-    delete right;
-  }
+  BinOpNode(std::unique_ptr<ASTNode> left, BinOp op,
+            std::unique_ptr<ASTNode> right)
+      : left(std::move(left)), op(op), right(std::move(right)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<memref::AllocOp> &symbolMap) override;
@@ -154,8 +145,7 @@ struct Token {
 
 class SymbolicParser {
 public:
-  // FIXME: Replace bare pointers with smart pointers
-  ASTNode *parse(StringRef input);
+  std::unique_ptr<ASTNode> parse(StringRef input);
 
 private:
   unsigned pos;
@@ -163,28 +153,28 @@ private:
 
   Optional<SmallVector<Token>> tokenize(StringRef input);
 
-  ASTNode *stmt();
-  ASTNode *assignment();
+  std::unique_ptr<ASTNode> stmt();
+  std::unique_ptr<ASTNode> assignment();
 
-  ASTNode *log_or_expr();
-  ASTNode *log_and_expr();
+  std::unique_ptr<ASTNode> log_or_expr();
+  std::unique_ptr<ASTNode> log_and_expr();
 
-  ASTNode *eq_expr();
-  ASTNode *rel_expr();
-  ASTNode *shift_expr();
+  std::unique_ptr<ASTNode> eq_expr();
+  std::unique_ptr<ASTNode> rel_expr();
+  std::unique_ptr<ASTNode> shift_expr();
 
-  ASTNode *bit_or_expr();
-  ASTNode *bit_xor_expr();
-  ASTNode *bit_and_expr();
+  std::unique_ptr<ASTNode> bit_or_expr();
+  std::unique_ptr<ASTNode> bit_xor_expr();
+  std::unique_ptr<ASTNode> bit_and_expr();
 
-  ASTNode *add_expr();
-  ASTNode *mul_expr();
-  ASTNode *exp_expr();
-  ASTNode *unary_expr();
-  ASTNode *factor();
+  std::unique_ptr<ASTNode> add_expr();
+  std::unique_ptr<ASTNode> mul_expr();
+  std::unique_ptr<ASTNode> exp_expr();
+  std::unique_ptr<ASTNode> unary_expr();
+  std::unique_ptr<ASTNode> factor();
 
-  ASTNode *const_expr();
-  ASTNode *bool_const();
+  std::unique_ptr<ASTNode> const_expr();
+  std::unique_ptr<ASTNode> bool_const();
 };
 
 } // namespace mlir::sdfg::conversion
