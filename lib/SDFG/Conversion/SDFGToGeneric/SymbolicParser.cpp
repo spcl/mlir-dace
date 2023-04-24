@@ -106,17 +106,87 @@ Value AssignNode::codegen(PatternRewriter &rewriter, Location loc,
 // UnOpNode
 Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
                         llvm::StringMap<memref::AllocOp> &symbolMap) {
-  // TODO: Code generation logic
   Value eVal = expr->codegen(rewriter, loc, symbolMap);
+
+  switch (op) {
+  case ADD:
+    return eVal;
+  case SUB: {
+    Value zero = createConstantInt(rewriter, loc, 0, 64);
+    return createSubI(rewriter, loc, zero, eVal);
+  }
+  case LOG_NOT:
+    break;
+    // TODO: Implement LOG_NOT case
+  case BIT_NOT:
+    break;
+    // TODO: Implement BIT_NOT case
+  }
+
   return eVal;
 }
 
 // BinOpNode
 Value BinOpNode::codegen(PatternRewriter &rewriter, Location loc,
                          llvm::StringMap<memref::AllocOp> &symbolMap) {
-  // TODO: Code generation logic
   Value lVal = left->codegen(rewriter, loc, symbolMap);
   Value rVal = right->codegen(rewriter, loc, symbolMap);
+
+  switch (op) {
+  case ADD:
+    return createAddI(rewriter, loc, lVal, rVal);
+  case SUB:
+    return createSubI(rewriter, loc, lVal, rVal);
+  case MUL:
+    break;
+  // TODO: Implement MUL case
+  case DIV:
+    break;
+  // TODO: Implement DIV case
+  case FLOORDIV:
+    break;
+  // TODO: Implement FLOORDIV case
+  case MOD:
+    break;
+  // TODO: Implement MOD case
+  case EXP:
+    break;
+  // TODO: Implement EXP case
+  case BIT_OR:
+    break;
+  // TODO: Implement BIT_OR case
+  case BIT_XOR:
+    break;
+  // TODO: Implement BIT_XOR case
+  case BIT_AND:
+    break;
+  // TODO: Implement BIT_AND case
+  case LSHIFT:
+    break;
+  // TODO: Implement LSHIFT case
+  case RSHIFT:
+    break;
+  // TODO: Implement RSHIFT case
+  case LOG_OR:
+    break;
+  // TODO: Implement LOG_OR case
+  case LOG_AND:
+    break;
+  // TODO: Implement LOG_AND case
+  case EQ:
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::eq, lVal, rVal);
+  case NE:
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::ne, lVal, rVal);
+  case LT:
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::slt, lVal, rVal);
+  case LE:
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::sle, lVal, rVal);
+  case GT:
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::sgt, lVal, rVal);
+  case GE:
+    return createCmpI(rewriter, loc, arith::CmpIPredicate::sge, lVal, rVal);
+  }
+
   return lVal;
 }
 

@@ -40,6 +40,15 @@ void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName,
 arith::ConstantIntOp createConstantInt(PatternRewriter &rewriter, Location loc,
                                        int val, int width);
 
+arith::AddIOp createAddI(PatternRewriter &rewriter, Location loc, Value a,
+                         Value b);
+
+arith::SubIOp createSubI(PatternRewriter &rewriter, Location loc, Value a,
+                         Value b);
+
+arith::CmpIOp createCmpI(PatternRewriter &rewriter, Location loc,
+                         arith::CmpIPredicate predicate, Value lhs, Value rhs);
+
 } // namespace mlir::sdfg::conversion
 
 #endif // SDFG_Conversion_SDFGToGeneric_Op_Creators_H

@@ -105,3 +105,31 @@ arith::ConstantIntOp conversion::createConstantInt(PatternRewriter &rewriter,
   arith::ConstantIntOp::build(builder, state, val, width);
   return cast<arith::ConstantIntOp>(rewriter.create(state));
 }
+
+arith::AddIOp conversion::createAddI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::AddIOp::getOperationName());
+
+  arith::AddIOp::build(builder, state, a, b);
+  return cast<arith::AddIOp>(rewriter.create(state));
+}
+
+arith::SubIOp conversion::createSubI(PatternRewriter &rewriter, Location loc,
+                                     Value a, Value b) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::SubIOp::getOperationName());
+
+  arith::SubIOp::build(builder, state, a, b);
+  return cast<arith::SubIOp>(rewriter.create(state));
+}
+
+arith::CmpIOp conversion::createCmpI(PatternRewriter &rewriter, Location loc,
+                                     arith::CmpIPredicate predicate, Value lhs,
+                                     Value rhs) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::CmpIOp::getOperationName());
+
+  arith::CmpIOp::build(builder, state, predicate, lhs, rhs);
+  return cast<arith::CmpIOp>(rewriter.create(state));
+}
