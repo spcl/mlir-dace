@@ -1,3 +1,4 @@
+#include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
 #include "SDFG/Conversion/SDFGToGeneric/PassDetail.h"
 #include "SDFG/Conversion/SDFGToGeneric/Passes.h"
 #include "SDFG/Conversion/SDFGToGeneric/SymbolicParser.h"
@@ -15,9 +16,10 @@ using namespace sdfg;
 using namespace conversion;
 
 // Maps state name to their generated block
+// IDEA: Would non-pointer version not work? Otherwise prefer smart pointers
 llvm::StringMap<Block *> blockMap;
 // Maps symbols to the generated allocation operation
-llvm::StringMap<memref::AllocOp *> symbolMap;
+llvm::StringMap<memref::AllocOp> symbolMap;
 
 //
 // SDFG -> func.func
@@ -25,7 +27,8 @@ llvm::StringMap<memref::AllocOp *> symbolMap;
 // Edges ->
 //       Default: cf.br
 //       Condition: Insert block (false branch) => compute condition =>
-//       cf.cond_br Assignment: Add assignments in the target block => cf.br
+//                  cf.cond_br
+//       Assignment: Add assignments in the target block => cf.br
 //
 // Alloc -> memref.alloc
 // Load -> memref.load
@@ -35,7 +38,7 @@ llvm::StringMap<memref::AllocOp *> symbolMap;
 // Alloc Symbol -> memref.alloc (int64)
 // Sym ->
 //      If single symbol: memref.load
-//      If expression: not supported for now
+//      If expression: parse, build AST, create ops
 //
 // Return -> func.return
 // Tasklet -> func.func + func.call
@@ -103,90 +106,17 @@ public:
 // Helpers
 //===----------------------------------------------------------------------===//
 
-func::FuncOp createFunc(PatternRewriter &rewriter, Location loc, StringRef name,
-                        TypeRange inputTypes, TypeRange resultTypes,
-                        StringRef visibility) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, func::FuncOp::getOperationName());
-
-  FunctionType func_type = builder.getFunctionType(inputTypes, resultTypes);
-  StringAttr visAttr = builder.getStringAttr(visibility);
-
-  func::FuncOp::build(builder, state, name, func_type, visAttr, {}, {});
-  return cast<func::FuncOp>(rewriter.create(state));
-}
-
-func::ReturnOp createReturn(PatternRewriter &rewriter, Location loc,
-                            ValueRange operands) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, func::ReturnOp::getOperationName());
-
-  func::ReturnOp::build(builder, state, operands);
-  return cast<func::ReturnOp>(rewriter.create(state));
-}
-
-cf::BranchOp createBranch(PatternRewriter &rewriter, Location loc,
-                          ValueRange operands, Block *dest) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, cf::BranchOp::getOperationName());
-
-  cf::BranchOp::build(builder, state, operands, dest);
-  return cast<cf::BranchOp>(rewriter.create(state));
-}
-
-cf::CondBranchOp createCondBranch(PatternRewriter &rewriter, Location loc,
-                                  Value condition, Block *trueDest,
-                                  Block *falseDest) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, cf::CondBranchOp::getOperationName());
-
-  cf::CondBranchOp::build(builder, state, condition, trueDest, falseDest);
-  return cast<cf::CondBranchOp>(rewriter.create(state));
-}
-
-memref::AllocOp createAlloc(PatternRewriter &rewriter, Location loc,
-                            MemRefType memreftype) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, memref::AllocOp ::getOperationName());
-
-  memref::AllocOp ::build(builder, state, memreftype);
-  return cast<memref::AllocOp>(rewriter.create(state));
-}
-
-// Allocates a symbol as a memref<i64> if it's not already allocated
-void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName) {
-  if (symbolMap.find(symName) != symbolMap.end())
-    return;
-
-  OpBuilder::InsertPoint insertionPoint = rewriter.saveInsertionPoint();
-
-  // Set insertion point to the beginning of the first block (top of func)
-  rewriter.setInsertionPointToStart(&rewriter.getBlock()->getParent()->front());
-
-  IntegerType intType = IntegerType::get(loc->getContext(), 64);
-  MemRefType memrefType = MemRefType::get({}, intType);
-  memref::AllocOp allocOp = createAlloc(rewriter, loc, memrefType);
-
-  // Update symbol map
-  symbolMap[symName] = &allocOp;
-
-  rewriter.restoreInsertionPoint(insertionPoint);
-}
-
 // Creates operations that perform the symbolic expression
 Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
                                StringRef symExpr) {
-  std::unique_ptr<ASTNode> ast = SymbolicParser::parse(symExpr);
+  ASTNode *ast = SymbolicParser().parse(symExpr);
   if (!ast)
     emitError(loc, "failed to parse symbolic expression");
 
-  SmallVector<std::string> symbols;
-  ast->collect_variables(symbols);
+  Value val = ast->codegen(rewriter, loc, symbolMap);
+  delete ast;
 
-  for (std::string symbol : symbols)
-    allocSymbol(rewriter, loc, symbol);
-
-  return ast->codegen(rewriter, loc);
+  return val;
 }
 
 //===----------------------------------------------------------------------===//
