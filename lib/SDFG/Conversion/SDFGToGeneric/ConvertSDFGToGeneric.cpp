@@ -27,7 +27,7 @@ llvm::StringMap<memref::AllocOp> symbolMap;
 //       Default: cf.br
 //       Condition: Insert block (false branch) => compute condition =>
 //                  cf.cond_br
-//       Assignment: Add assignments in the target block => cf.br
+//       Assignment: Add assignments at the of the src block => cf.br
 //
 // Alloc -> memref.alloc
 // Load -> memref.load
@@ -193,17 +193,14 @@ public:
     Block *srcBlock = blockMap[adaptor.getSrc()];
     Block *destBlock = blockMap[adaptor.getDest()];
 
-    if (!adaptor.getAssign().empty()) {
-      rewriter.setInsertionPointToEnd(destBlock);
-      for (Attribute assignment : adaptor.getAssign())
-        symbolicExpressionToMLIR(rewriter, op.getLoc(),
-                                 cast<StringAttr>(assignment));
-    }
-
     rewriter.setInsertionPointToEnd(srcBlock);
 
     // If we don't have a condition (always true), add a simple branch
     if (adaptor.getCondition().equals("1")) {
+      for (Attribute assignment : adaptor.getAssign())
+        symbolicExpressionToMLIR(rewriter, op.getLoc(),
+                                 cast<StringAttr>(assignment));
+
       createBranch(rewriter, op.getLoc(), {}, destBlock);
       rewriter.eraseOp(op);
       return success();
@@ -222,9 +219,12 @@ public:
     // Add conditional branch
     createCondBranch(rewriter, op.getLoc(), condition, destBlock, newBlock);
 
+    // TODO: Create taken block and insert assignments
+
     // Update blockMap
     blockMap[adaptor.getSrc()] = newBlock;
 
+    // BUG: ReturnOp insertion does not work properly
     // If there is another edge op for the source state, don't add return
     // statement to the new block
     rewriter.eraseOp(op);
