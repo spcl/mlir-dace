@@ -100,8 +100,10 @@ Value AssignNode::codegen(PatternRewriter &rewriter, Location loc,
   allocSymbol(rewriter, loc, variable->name, symbolMap);
   Value eVal = expr->codegen(rewriter, loc, symbolMap);
 
-  if (eVal.getType().isInteger(64))
+  if (eVal.getType().isInteger(64)) {
     createStore(rewriter, loc, eVal, symbolMap[variable->name], {});
+    return nullptr;
+  }
 
   Value cVal = createExtSI(rewriter, loc, rewriter.getI64Type(), eVal);
   createStore(rewriter, loc, cVal, symbolMap[variable->name], {});
