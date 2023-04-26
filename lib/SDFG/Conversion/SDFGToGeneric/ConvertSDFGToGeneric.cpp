@@ -64,8 +64,22 @@ struct GenericTarget : public ConversionTarget {
     addLegalOp<memref::LoadOp>();
     addLegalOp<memref::StoreOp>();
     addLegalOp<memref::CopyOp>();
+    addLegalOp<arith::ConstantIntOp>();
+    addLegalOp<arith::AddIOp>();
+    addLegalOp<arith::SubIOp>();
+    addLegalOp<arith::MulIOp>();
+    addLegalOp<arith::DivSIOp>();
+    addLegalOp<arith::FloorDivSIOp>();
+    addLegalOp<arith::RemSIOp>();
+    addLegalOp<arith::OrIOp>();
+    addLegalOp<arith::AndIOp>();
+    addLegalOp<arith::XOrIOp>();
+    addLegalOp<arith::ShLIOp>();
+    addLegalOp<arith::ShRSIOp>();
+    addLegalOp<arith::CmpIOp>();
+    addLegalOp<arith::ExtSIOp>();
     // All other operations are illegal
-    markUnknownOpDynamicallyLegal([](Operation *op) { return true; });
+    markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
 };
 
@@ -242,8 +256,131 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// SDFG Patterns
+// Access Node Patterns
 //===----------------------------------------------------------------------===//
+
+class AllocToAlloc : public OpConversionPattern<AllocOp> {
+public:
+  using OpConversionPattern<AllocOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(AllocOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+class LoadToLoad : public OpConversionPattern<LoadOp> {
+public:
+  using OpConversionPattern<LoadOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(LoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+class StoreToStore : public OpConversionPattern<StoreOp> {
+public:
+  using OpConversionPattern<StoreOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(StoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+class CopyToCopy : public OpConversionPattern<CopyOp> {
+public:
+  using OpConversionPattern<CopyOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(CopyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Symbol Patterns
+//===----------------------------------------------------------------------===//
+
+class AllocSymbolToAlloc : public OpConversionPattern<AllocSymbolOp> {
+public:
+  using OpConversionPattern<AllocSymbolOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(AllocSymbolOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+class SymToOps : public OpConversionPattern<SymOp> {
+public:
+  using OpConversionPattern<SymOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SymOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Tasklet Patterns
+//===----------------------------------------------------------------------===//
+
+class TaskletToFunc : public OpConversionPattern<TaskletNode> {
+public:
+  using OpConversionPattern<TaskletNode>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(TaskletNode op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+class ReturnToReturn : public OpConversionPattern<ReturnOp> {
+public:
+  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Map & Consume Patterns
+//===----------------------------------------------------------------------===//
+
+class MapToParallel : public OpConversionPattern<MapNode> {
+public:
+  using OpConversionPattern<MapNode>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(MapNode op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return failure();
+  }
+};
+
+class ConsumeToTODO : public OpConversionPattern<ConsumeNode> {
+public:
+  using OpConversionPattern<ConsumeNode>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ConsumeNode op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // TODO: Write lowering for consume nodes
+    return failure();
+  }
+};
 
 //===----------------------------------------------------------------------===//
 // Pass
@@ -256,6 +393,16 @@ void populateSDFGToGenericConversionPatterns(RewritePatternSet &patterns,
   patterns.add<SDFGToFunc>(converter, ctxt);
   patterns.add<StateToBlock>(converter, ctxt);
   patterns.add<EdgeToBranch>(converter, ctxt);
+  patterns.add<AllocToAlloc>(converter, ctxt);
+  patterns.add<LoadToLoad>(converter, ctxt);
+  patterns.add<StoreToStore>(converter, ctxt);
+  patterns.add<CopyToCopy>(converter, ctxt);
+  patterns.add<AllocSymbolToAlloc>(converter, ctxt);
+  patterns.add<SymToOps>(converter, ctxt);
+  patterns.add<TaskletToFunc>(converter, ctxt);
+  patterns.add<ReturnToReturn>(converter, ctxt);
+  patterns.add<MapToParallel>(converter, ctxt);
+  patterns.add<ConsumeToTODO>(converter, ctxt);
 }
 
 namespace {
@@ -274,7 +421,7 @@ void SDFGToGenericPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   populateSDFGToGenericConversionPatterns(patterns, converter);
 
-  if (applyPartialConversion(module, target, std::move(patterns)).failed())
+  if (applyFullConversion(module, target, std::move(patterns)).failed())
     signalPassFailure();
 
   module.dump();
