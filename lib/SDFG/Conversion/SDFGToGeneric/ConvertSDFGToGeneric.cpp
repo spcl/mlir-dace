@@ -89,30 +89,26 @@ class ToMemrefConverter : public TypeConverter {
 public:
   ToMemrefConverter() {
     addConversion([](Type type) { return type; });
-    addConversion(convertMemrefTypes);
+    addConversion(convertArrayTypes);
   }
 
-  static Optional<Type> convertMemrefTypes(Type type) {
-    if (MemRefType mem = type.dyn_cast<MemRefType>()) {
-      SmallVector<int64_t> ints;
-      SmallVector<StringAttr> symbols;
-      SmallVector<bool> shape;
-      for (int64_t dim : mem.getShape()) {
-        if (dim <= 0) {
-          StringAttr sym =
-              StringAttr::get(mem.getContext(), sdfg::utils::generateName("s"));
-          symbols.push_back(sym);
-          shape.push_back(false);
-        } else {
-          ints.push_back(dim);
-          shape.push_back(true);
-        }
-      }
-      SizedType sized = SizedType::get(mem.getContext(), mem.getElementType(),
-                                       symbols, ints, shape);
+  static Optional<Type> convertArrayTypes(Type type) {
+    if (ArrayType arr = type.dyn_cast<ArrayType>()) {
+      SizedType sizedT = sdfg::utils::getSizedType(arr);
 
-      return ArrayType::get(mem.getContext(), sized);
+      SmallVector<int64_t> shape;
+      unsigned intIdx = 0;
+
+      for (unsigned i = 0; i < sizedT.getShape().size(); ++i) {
+        if (sizedT.getShape()[i])
+          shape.push_back(sizedT.getIntegers()[intIdx++]);
+        else
+          shape.push_back(-1);
+      }
+
+      return MemRefType::get(shape, sizedT.getElementType());
     }
+
     return std::nullopt;
   }
 };
@@ -152,6 +148,8 @@ public:
         createFunc(rewriter, op.getLoc(), "sdfg_func",
                    op.getBody().getArgumentTypes(), {}, "public");
     funcOp.getBody().takeBody(op.getBody());
+
+    // TODO: Convert function signature
 
     rewriter.eraseOp(op);
     return success();
@@ -283,6 +281,7 @@ public:
   LogicalResult
   matchAndRewrite(AllocOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+
     return failure();
   }
 };
