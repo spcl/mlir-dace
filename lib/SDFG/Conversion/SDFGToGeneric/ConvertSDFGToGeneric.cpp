@@ -19,6 +19,8 @@ using namespace conversion;
 llvm::StringMap<Block *> blockMap;
 // Maps symbols to the generated allocation operation
 llvm::StringMap<memref::AllocOp> symbolMap;
+// HACK: Keeps track of processed EdgeOps
+llvm::DenseSet<EdgeOp> processedEdges;
 
 //
 // SDFG -> func.func
@@ -163,8 +165,7 @@ public:
   matchAndRewrite(StateNode op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Split the current basic block at the current position
-    Block *newBlock =
-        rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
+    Block *newBlock = rewriter.createBlock(rewriter.getBlock()->getParent());
 
     // Add the mapping from the sdfg.state's name to the new basic block
     blockMap[op.getName()] = newBlock;
@@ -204,53 +205,65 @@ public:
   LogicalResult
   matchAndRewrite(EdgeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Block *srcBlock = blockMap[adaptor.getSrc()];
-    Block *destBlock = blockMap[adaptor.getDest()];
-
-    rewriter.setInsertionPointToEnd(srcBlock);
-
-    // If we don't have a condition (always true), add a simple branch
-    if (adaptor.getCondition().equals("1")) {
-      for (Attribute assignment : adaptor.getAssign())
-        symbolicExpressionToMLIR(rewriter, op.getLoc(),
-                                 cast<StringAttr>(assignment));
-
-      createBranch(rewriter, op.getLoc(), {}, destBlock);
+    // If we don't have a condition or assignments, add a simple branch
+    if (adaptor.getCondition().equals("1") && adaptor.getAssign().empty()) {
+      rewriter.setInsertionPointToEnd(blockMap[adaptor.getSrc()]);
+      createBranch(rewriter, op.getLoc(), {}, blockMap[adaptor.getDest()]);
       rewriter.eraseOp(op);
       return success();
     }
 
-    // If we have a condition, create a new block (not taken path)
-    Block *newBlock =
-        rewriter.splitBlock(rewriter.getBlock(), rewriter.getInsertionPoint());
+    Block *takenBlock = rewriter.createBlock(rewriter.getBlock()->getParent());
 
-    rewriter.setInsertionPointToEnd(srcBlock);
+    if (!adaptor.getCondition().equals("1")) {
+      // If we have a condition, create a second block (not taken path)
+      Block *notTakenBlock =
+          rewriter.createBlock(rewriter.getBlock()->getParent());
+      rewriter.setInsertionPointToEnd(blockMap[adaptor.getSrc()]);
+      // Compute condition
+      Value condition = symbolicExpressionToMLIR(rewriter, op.getLoc(),
+                                                 adaptor.getCondition());
+      // Add conditional branch
+      createCondBranch(rewriter, op.getLoc(), condition, takenBlock,
+                       notTakenBlock);
 
-    // Compute condition
-    Value condition =
-        symbolicExpressionToMLIR(rewriter, op.getLoc(), adaptor.getCondition());
+      // Update blockMap
+      blockMap[adaptor.getSrc()] = notTakenBlock;
 
-    // Add conditional branch
-    createCondBranch(rewriter, op.getLoc(), condition, destBlock, newBlock);
+      // If there is no other edge op for the source state, add return statement
+      // to the new block
+      bool hasEdge = false;
 
-    // TODO: Create taken block and insert assignments
-
-    // Update blockMap
-    blockMap[adaptor.getSrc()] = newBlock;
-
-    // BUG: ReturnOp insertion does not work properly
-    // If there is another edge op for the source state, don't add return
-    // statement to the new block
-    rewriter.eraseOp(op);
-
-    for (EdgeOp edge : op->getParentRegion()->getOps<EdgeOp>()) {
-      if (edge.getSrc().equals(adaptor.getSrc())) {
-        return success();
+      for (EdgeOp edge : rewriter.getBlock()->getParent()->getOps<EdgeOp>()) {
+        if (edge.getSrc().equals(adaptor.getSrc()) && edge != op &&
+            !processedEdges.contains(edge)) {
+          hasEdge = true;
+          break;
+        }
       }
+
+      if (!hasEdge) {
+        rewriter.setInsertionPointToEnd(notTakenBlock);
+        createReturn(rewriter, op.getLoc(), {});
+      }
+    } else {
+      rewriter.setInsertionPointToEnd(blockMap[adaptor.getSrc()]);
+      createBranch(rewriter, op.getLoc(), {}, takenBlock);
+      // No blockMap update because only one unconditial edge allowed per state
     }
 
-    rewriter.setInsertionPointToEnd(newBlock);
-    createReturn(rewriter, op.getLoc(), {});
+    // Add assignments
+    rewriter.setInsertionPointToStart(takenBlock);
+
+    for (Attribute assignment : adaptor.getAssign())
+      symbolicExpressionToMLIR(rewriter, op.getLoc(),
+                               cast<StringAttr>(assignment));
+
+    // Create simple branch to destination
+    createBranch(rewriter, op.getLoc(), {}, blockMap[adaptor.getDest()]);
+
+    rewriter.eraseOp(op);
+    processedEdges.insert(op);
     return success();
   }
 };
@@ -423,8 +436,6 @@ void SDFGToGenericPass::runOnOperation() {
 
   if (applyFullConversion(module, target, std::move(patterns)).failed())
     signalPassFailure();
-
-  module.dump();
 }
 
 std::unique_ptr<Pass> conversion::createSDFGToGenericPass() {
