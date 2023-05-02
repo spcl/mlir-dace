@@ -224,3 +224,13 @@ arith::ExtSIOp conversion::createExtSI(PatternRewriter &rewriter, Location loc,
   arith::ExtSIOp::build(builder, state, out, in);
   return cast<arith::ExtSIOp>(rewriter.create(state));
 }
+
+arith::IndexCastOp conversion::createIndexCast(PatternRewriter &rewriter,
+                                               Location loc, Type out,
+                                               Value in) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::IndexCastOp::getOperationName());
+
+  arith::IndexCastOp::build(builder, state, out, in);
+  return cast<arith::IndexCastOp>(rewriter.create(state));
+}

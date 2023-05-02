@@ -79,6 +79,9 @@ arith::CmpIOp createCmpI(PatternRewriter &rewriter, Location loc,
 arith::ExtSIOp createExtSI(PatternRewriter &rewriter, Location loc, Type out,
                            Value in);
 
+arith::IndexCastOp createIndexCast(PatternRewriter &rewriter, Location loc,
+                                   Type out, Value in);
+
 } // namespace mlir::sdfg::conversion
 
 #endif // SDFG_Conversion_SDFGToGeneric_Op_Creators_H

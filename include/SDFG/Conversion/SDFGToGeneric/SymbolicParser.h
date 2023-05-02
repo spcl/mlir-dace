@@ -10,7 +10,8 @@ class ASTNode {
 public:
   virtual ~ASTNode() = default;
   virtual Value codegen(PatternRewriter &rewriter, Location loc,
-                        llvm::StringMap<memref::AllocOp> &symbolMap) = 0;
+                        llvm::StringMap<memref::AllocOp> &symbolMap,
+                        llvm::StringMap<Value> &refMap) = 0;
 };
 
 class IntNode : public ASTNode {
@@ -20,7 +21,8 @@ public:
   IntNode(int value) : value(value){};
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap) override;
+                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &refMap) override;
 };
 
 class BoolNode : public ASTNode {
@@ -30,7 +32,8 @@ public:
   BoolNode(bool value) : value(value) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap) override;
+                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &refMap) override;
 };
 
 class VarNode : public ASTNode {
@@ -40,7 +43,8 @@ public:
   VarNode(std::string name) : name(name) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap) override;
+                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &refMap) override;
 };
 
 class AssignNode : public ASTNode {
@@ -52,7 +56,8 @@ public:
       : variable(std::move(variable)), expr(std::move(expr)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap) override;
+                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &refMap) override;
 };
 
 class UnOpNode : public ASTNode {
@@ -65,7 +70,8 @@ public:
       : op(op), expr(std::move(expr)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap) override;
+                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &refMap) override;
 };
 
 class BinOpNode : public ASTNode {
@@ -102,7 +108,8 @@ public:
       : left(std::move(left)), op(op), right(std::move(right)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap) override;
+                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &refMap) override;
 };
 
 enum TokenType {

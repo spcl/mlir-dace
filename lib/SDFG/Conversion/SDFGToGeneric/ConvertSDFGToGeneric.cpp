@@ -123,12 +123,13 @@ public:
 
 // Creates operations that perform the symbolic expression
 Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
-                               StringRef symExpr) {
+                               StringRef symExpr,
+                               llvm::StringMap<Value> refMap = {}) {
   std::unique_ptr<ASTNode> ast = SymbolicParser().parse(symExpr);
   if (!ast)
     emitError(loc, "failed to parse symbolic expression");
 
-  return ast->codegen(rewriter, loc, symbolMap);
+  return ast->codegen(rewriter, loc, symbolMap, refMap);
 }
 
 //===----------------------------------------------------------------------===//
@@ -214,6 +215,9 @@ public:
     }
 
     Block *takenBlock = rewriter.createBlock(rewriter.getBlock()->getParent());
+    llvm::StringMap<Value> refMap;
+    // FIXME: Extend to variable amount of references
+    refMap["ref"] = adaptor.getRef();
 
     if (!adaptor.getCondition().equals("1")) {
       // If we have a condition, create a second block (not taken path)
@@ -221,8 +225,8 @@ public:
           rewriter.createBlock(rewriter.getBlock()->getParent());
       rewriter.setInsertionPointToEnd(blockMap[adaptor.getSrc()]);
       // Compute condition
-      Value condition = symbolicExpressionToMLIR(rewriter, op.getLoc(),
-                                                 adaptor.getCondition());
+      Value condition = symbolicExpressionToMLIR(
+          rewriter, op.getLoc(), adaptor.getCondition(), refMap);
       // Add conditional branch
       createCondBranch(rewriter, op.getLoc(), condition, takenBlock,
                        notTakenBlock);
@@ -257,7 +261,7 @@ public:
 
     for (Attribute assignment : adaptor.getAssign())
       symbolicExpressionToMLIR(rewriter, op.getLoc(),
-                               cast<StringAttr>(assignment));
+                               cast<StringAttr>(assignment), refMap);
 
     // Create simple branch to destination
     createBranch(rewriter, op.getLoc(), {}, blockMap[adaptor.getDest()]);

@@ -77,43 +77,55 @@ namespace mlir::sdfg::conversion {
 
 // IntNode
 Value IntNode::codegen(PatternRewriter &rewriter, Location loc,
-                       llvm::StringMap<memref::AllocOp> &symbolMap) {
+                       llvm::StringMap<memref::AllocOp> &symbolMap,
+                       llvm::StringMap<Value> &refMap) {
   return createConstantInt(rewriter, loc, value, 64);
 }
 
 // BoolNode
 Value BoolNode::codegen(PatternRewriter &rewriter, Location loc,
-                        llvm::StringMap<memref::AllocOp> &symbolMap) {
+                        llvm::StringMap<memref::AllocOp> &symbolMap,
+                        llvm::StringMap<Value> &refMap) {
   return createConstantInt(rewriter, loc, value, 1);
 }
 
 // VarNode
 Value VarNode::codegen(PatternRewriter &rewriter, Location loc,
-                       llvm::StringMap<memref::AllocOp> &symbolMap) {
+                       llvm::StringMap<memref::AllocOp> &symbolMap,
+                       llvm::StringMap<Value> &refMap) {
+  if (refMap.find(name) != refMap.end()) {
+    Value val = refMap[name];
+
+    // BUG: Fails to legalize operation if this branch is taken
+    if (val.getType().isIndex())
+      return createIndexCast(rewriter, loc, rewriter.getI64Type(), val);
+
+    if (val.getType().isIntOrIndex() &&
+        val.getType().getIntOrFloatBitWidth() != 64)
+      return createExtSI(rewriter, loc, rewriter.getI64Type(), val);
+
+    return val;
+  }
+
   allocSymbol(rewriter, loc, name, symbolMap);
   return createLoad(rewriter, loc, symbolMap[name], {});
 }
 
 // AssignNode
 Value AssignNode::codegen(PatternRewriter &rewriter, Location loc,
-                          llvm::StringMap<memref::AllocOp> &symbolMap) {
+                          llvm::StringMap<memref::AllocOp> &symbolMap,
+                          llvm::StringMap<Value> &refMap) {
   allocSymbol(rewriter, loc, variable->name, symbolMap);
-  Value eVal = expr->codegen(rewriter, loc, symbolMap);
-
-  if (eVal.getType().isInteger(64)) {
-    createStore(rewriter, loc, eVal, symbolMap[variable->name], {});
-    return nullptr;
-  }
-
-  Value cVal = createExtSI(rewriter, loc, rewriter.getI64Type(), eVal);
-  createStore(rewriter, loc, cVal, symbolMap[variable->name], {});
+  Value eVal = expr->codegen(rewriter, loc, symbolMap, refMap);
+  createStore(rewriter, loc, eVal, symbolMap[variable->name], {});
   return nullptr;
 }
 
 // UnOpNode
 Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
-                        llvm::StringMap<memref::AllocOp> &symbolMap) {
-  Value eVal = expr->codegen(rewriter, loc, symbolMap);
+                        llvm::StringMap<memref::AllocOp> &symbolMap,
+                        llvm::StringMap<Value> &refMap) {
+  Value eVal = expr->codegen(rewriter, loc, symbolMap, refMap);
 
   switch (op) {
   case ADD:
@@ -126,7 +138,6 @@ Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
     Value zero = createConstantInt(rewriter, loc, 0, 1);
     return createCmpI(rewriter, loc, arith::CmpIPredicate::eq, zero, eVal);
   }
-
   case BIT_NOT: {
     Value negOne = createConstantInt(rewriter, loc, -1, 64);
     return createXOrI(rewriter, loc, negOne, eVal);
@@ -138,9 +149,10 @@ Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
 
 // BinOpNode
 Value BinOpNode::codegen(PatternRewriter &rewriter, Location loc,
-                         llvm::StringMap<memref::AllocOp> &symbolMap) {
-  Value lVal = left->codegen(rewriter, loc, symbolMap);
-  Value rVal = right->codegen(rewriter, loc, symbolMap);
+                         llvm::StringMap<memref::AllocOp> &symbolMap,
+                         llvm::StringMap<Value> &refMap) {
+  Value lVal = left->codegen(rewriter, loc, symbolMap, refMap);
+  Value rVal = right->codegen(rewriter, loc, symbolMap, refMap);
 
   switch (op) {
   case ADD:
