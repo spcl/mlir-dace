@@ -348,7 +348,7 @@ public:
 
     // HACK: Removes special function calls (cbrt, exit) and creates tasklet
     //  with annotation (LULESH)
-    if (callee == "cbrt" || callee == "exit") {
+    if (callee == "cbrt" || callee == "exit" || funcOp.isExternal()) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), callee);
 
       SmallVector<Value> operands = adaptor.getOperands();

@@ -65,6 +65,8 @@ std::string codeLanguageToString(CodeLanguage lang) {
   switch (lang) {
   case CodeLanguage::Python:
     return "Python";
+  case CodeLanguage::CPP:
+    return "CPP";
   case CodeLanguage::MLIR:
     return "MLIR";
   }

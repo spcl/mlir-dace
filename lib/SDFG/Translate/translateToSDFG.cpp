@@ -347,10 +347,25 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
       Code code(nameOut + " = " + nameIn + " ** (1. / 3.)",
                 CodeLanguage::Python);
       tasklet.setCode(code);
-    }
-
-    if (operation == "exit") {
+    } else if (operation == "exit") {
       Code code("sys.exit()", CodeLanguage::Python);
+      tasklet.setCode(code);
+    } else {
+      // TODO: Support inputs & outputs
+      if (tasklet.getOutConnectorCount() > 0) {
+        emitError(op.getLoc(), "return types not supported");
+        return failure();
+      }
+
+      if (tasklet.getInConnectorCount() > 0) {
+        emitError(op.getLoc(), "input types not supported");
+        return failure();
+      }
+
+      std::string codeString = operation + "();";
+      std::string declString = "extern \\\"C\\\"" + codeString;
+      std::string mainString = "int main(){" + codeString + "}";
+      Code code(declString + "\\n" + mainString, CodeLanguage::CPP);
       tasklet.setCode(code);
     }
 
