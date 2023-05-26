@@ -688,9 +688,26 @@ void StateImpl::emit(emitter::JsonEmitter &jemit) {
 //===----------------------------------------------------------------------===//
 
 void Tasklet::setCode(Code code) { ptr->setCode(code); }
+
+void Tasklet::setGlobalCode(Code code_global) {
+  ptr->setGlobalCode(code_global);
+}
+
+void Tasklet::setHasSideEffect(bool hasSideEffect) {
+  ptr->setHasSideEffect(hasSideEffect);
+}
+
 void Tasklet::emit(emitter::JsonEmitter &jemit) { ptr->emit(jemit); }
 
 void TaskletImpl::setCode(Code code) { this->code = code; }
+
+void TaskletImpl::setGlobalCode(Code code_global) {
+  this->code_global = code_global;
+}
+
+void TaskletImpl::setHasSideEffect(bool hasSideEffect) {
+  this->hasSideEffect = hasSideEffect;
+}
 
 void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.startObject();
@@ -707,6 +724,12 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("language", codeLanguageToString(code.language));
   jemit.endObject(); // code
 
+  jemit.startNamedObject("code_global");
+  jemit.printKVPair("string_data", code_global.data);
+  jemit.printKVPair("language", codeLanguageToString(code_global.language));
+  jemit.endObject(); // code_global
+
+  jemit.printKVPair("side_effects", hasSideEffect);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes
 

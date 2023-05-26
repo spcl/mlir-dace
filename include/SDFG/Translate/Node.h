@@ -511,17 +511,23 @@ public:
         ptr(std::static_pointer_cast<TaskletImpl>(ConnectorNode::ptr)) {}
 
   void setCode(Code code);
+  void setGlobalCode(Code code_global);
+  void setHasSideEffect(bool hasSideEffect);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
 class TaskletImpl : public ConnectorNodeImpl {
 private:
   Code code;
+  Code code_global;
+  bool hasSideEffect;
 
 public:
   TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
 
   void setCode(Code code);
+  void setGlobalCode(Code code_global);
+  void setHasSideEffect(bool hasSideEffect);
   void emit(emitter::JsonEmitter &jemit) override;
 };
 

@@ -362,11 +362,15 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
         return failure();
       }
 
+      std::string declString = "extern \\\"C\\\" void " + operation + "();\\n";
       std::string codeString = operation + "();";
-      std::string declString = "extern \\\"C\\\"" + codeString;
-      std::string mainString = "int main(){" + codeString + "}";
-      Code code(declString + "\\n" + mainString, CodeLanguage::CPP);
+
+      Code code_global(declString, CodeLanguage::CPP);
+      Code code(codeString, CodeLanguage::CPP);
+
+      tasklet.setGlobalCode(code_global);
       tasklet.setCode(code);
+      tasklet.setHasSideEffect(true);
     }
 
   } else {
