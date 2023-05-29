@@ -90,10 +90,11 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            sdfg::utils::valueToString(op.getOperand(0), op) + ")";
   }
 
-  if (arith::MaxFOp maxFOp = dyn_cast<arith::MaxFOp>(op)) {
+  if (isa<arith::MaxFOp>(op) || isa<arith::MaxSIOp>(op) ||
+      isa<arith::MaxUIOp>(op)) {
     return nameOut + " = max(" +
-           sdfg::utils::valueToString(maxFOp.getLhs(), op) + ", " +
-           sdfg::utils::valueToString(maxFOp.getRhs(), op) + ")";
+           sdfg::utils::valueToString(op.getOperand(0), op) + ", " +
+           sdfg::utils::valueToString(op.getOperand(1), op) + ")";
   }
 
   if (isa<arith::CmpIOp>(op) || isa<arith::CmpFOp>(op)) {

@@ -15,11 +15,17 @@ DType typeToDtype(Type t) {
   if (t.isInteger(8))
     return DType::int8;
 
+  if (t.isInteger(16))
+    return DType::int16;
+
   if (t.isInteger(32))
     return DType::int32;
 
   if (t.isInteger(64))
     return DType::int64;
+
+  if (t.isF16())
+    return DType::float16;
 
   if (t.isF32())
     return DType::float32;
@@ -46,10 +52,14 @@ std::string dtypeToString(DType t) {
     return "bool";
   case DType::int8:
     return "int8";
+  case DType::int16:
+    return "int16";
   case DType::int32:
     return "int32";
   case DType::int64:
     return "int64";
+  case DType::float16:
+    return "float16";
   case DType::float32:
     return "float32";
   case DType::float64:
