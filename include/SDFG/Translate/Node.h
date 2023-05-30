@@ -533,7 +533,8 @@ private:
   bool hasSideEffect;
 
 public:
-  TaskletImpl(Location location) : ConnectorNodeImpl(location) {}
+  TaskletImpl(Location location)
+      : ConnectorNodeImpl(location), hasSideEffect(false) {}
 
   void setCode(Code code);
   void setGlobalCode(Code code_global);

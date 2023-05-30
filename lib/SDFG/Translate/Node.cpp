@@ -739,7 +739,8 @@ void TaskletImpl::emit(emitter::JsonEmitter &jemit) {
   jemit.printKVPair("language", codeLanguageToString(code_global.language));
   jemit.endObject(); // code_global
 
-  jemit.printKVPair("side_effects", hasSideEffect);
+  jemit.printKVPair("side_effects", hasSideEffect ? "true" : "false",
+                    /*stringify=*/false);
   ConnectorNodeImpl::emit(jemit);
   jemit.endObject(); // attributes
 

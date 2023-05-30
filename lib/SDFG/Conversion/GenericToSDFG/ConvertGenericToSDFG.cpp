@@ -661,6 +661,28 @@ public:
   }
 };
 
+class MemrefCopyToSDFG : public OpConversionPattern<memref::CopyOp> {
+public:
+  using OpConversionPattern<memref::CopyOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::CopyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "copy");
+
+    Value source = createLoad(rewriter, op.getLoc(), adaptor.getSource());
+    Value target = createLoad(rewriter, op.getLoc(), adaptor.getTarget());
+    CopyOp::create(rewriter, op.getLoc(), source, target);
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 class MemrefGlobalToSDFG : public OpConversionPattern<memref::GlobalOp> {
 public:
   using OpConversionPattern<memref::GlobalOp>::OpConversionPattern;
@@ -1650,6 +1672,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
 
   patterns.add<MemrefLoadToSDFG>(converter, ctxt);
   patterns.add<MemrefStoreToSDFG>(converter, ctxt);
+  patterns.add<MemrefCopyToSDFG>(converter, ctxt);
   patterns.add<MemrefGlobalToSDFG>(converter, ctxt);
   patterns.add<MemrefGetGlobalToSDFG>(converter, ctxt);
   patterns.add<MemrefAllocToSDFG>(converter, ctxt);
