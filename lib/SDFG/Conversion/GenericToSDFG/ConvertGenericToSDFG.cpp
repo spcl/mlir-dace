@@ -43,12 +43,13 @@ public:
       SmallVector<StringAttr> symbols;
       SmallVector<bool> shape;
       for (int64_t dim : mem.getShape()) {
-        if (dim <= 0) {
+        if (dim < 0) {
           StringAttr sym =
               StringAttr::get(mem.getContext(), sdfg::utils::generateName("s"));
           symbols.push_back(sym);
           shape.push_back(false);
         } else {
+          dim = dim == 0 ? 1 : dim;
           ints.push_back(dim);
           shape.push_back(true);
         }
