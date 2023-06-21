@@ -1751,7 +1751,7 @@ llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
 void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
-  // TODO: Find a way to get func name via CLI instead of inferring
+  // FIXME: Find a way to get func name via CLI instead of inferring
   llvm::Optional<std::string> mainFuncNameOpt = getMainFunctionName(module);
   if (mainFuncNameOpt)
     mainFuncName = *mainFuncNameOpt;
