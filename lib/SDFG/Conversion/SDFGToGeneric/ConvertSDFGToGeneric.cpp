@@ -126,12 +126,19 @@ public:
     op.getEntryState()->setAttr("entry", rewriter.getBoolAttr(true));
 
     // Create a function and clone the sdfg body
+    SmallVector<Type> convertedTypes;
+    if (getTypeConverter()
+            ->convertTypes(op.getBody().getArgumentTypes(), convertedTypes)
+            .failed())
+      return failure();
+
     func::FuncOp funcOp =
-        createFunc(rewriter, op.getLoc(), "sdfg",
-                   op.getBody().getArgumentTypes(), {}, "public");
+        createFunc(rewriter, op.getLoc(), "sdfg", convertedTypes, {}, "public");
     funcOp.getBody().takeBody(op.getBody());
 
-    // TODO: Convert function signature
+    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
+                                           *getTypeConverter())))
+      return failure();
 
     rewriter.eraseOp(op);
     return success();
@@ -158,9 +165,9 @@ public:
       createBranch(rewriter, op.getLoc(), {}, newBlock);
     }
 
-    // Clone the operations from the sdfg.state's body into the new basic block
+    // Move the operations from the sdfg.state's body into the new basic block
     rewriter.setInsertionPointToStart(newBlock);
-
+    // FIXME: This clone is likely causing the erase bug
     for (Operation &operation : op.getBody().getOps()) {
       rewriter.clone(operation);
     }
@@ -263,8 +270,14 @@ public:
   LogicalResult
   matchAndRewrite(AllocOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for alloc
-    return failure();
+    Type memrefType = getTypeConverter()->convertType(op.getType());
+    if (!memrefType || !memrefType.isa<MemRefType>())
+      return failure();
+
+    memref::AllocOp allocOp =
+        createAlloc(rewriter, op.getLoc(), memrefType.cast<MemRefType>());
+    rewriter.replaceOp(op, {allocOp});
+    return success();
   }
 };
 
@@ -275,8 +288,10 @@ public:
   LogicalResult
   matchAndRewrite(LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for load
-    return failure();
+    memref::LoadOp loadOp = createLoad(rewriter, op.getLoc(), adaptor.getArr(),
+                                       adaptor.getIndices());
+    rewriter.replaceOp(op, {loadOp});
+    return success();
   }
 };
 
@@ -287,8 +302,10 @@ public:
   LogicalResult
   matchAndRewrite(StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for store
-    return failure();
+    createStore(rewriter, op.getLoc(), adaptor.getVal(), adaptor.getArr(),
+                adaptor.getIndices());
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -343,27 +360,30 @@ public:
   LogicalResult
   matchAndRewrite(TaskletNode op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Get top-level module
-    ModuleOp module = sdfg::utils::getTopModuleOp(op);
+    // Create call
+    std::string name = sdfg::utils::generateName("tasklet");
+    func::CallOp callOp = createCall(rewriter, op.getLoc(), op.getResultTypes(),
+                                     name, op.getOperands());
 
-    // Change insertion point to the beginning of module
-    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(module.getBody());
+    for (unsigned i = 0; i < op.getNumResults(); ++i) {
+      rewriter.replaceAllUsesWith(op.getResult(i), callOp.getResult(i));
+    }
+
+    // Set insertion point before the current func
+    Operation *parent = op->getParentOfType<func::FuncOp>();
+    if (parent == nullptr)
+      return failure();
+
+    rewriter.setInsertionPoint(parent);
 
     // Create function
-    std::string name = sdfg::utils::generateName("tasklet");
     func::FuncOp funcOp =
         createFunc(rewriter, op.getLoc(), name, op.getOperandTypes(),
                    op.getResultTypes(), "private");
+
     funcOp.getBody().takeBody(op.getBody());
 
-    // Restore insertion point
-    rewriter.restoreInsertionPoint(ip);
-
-    // Add call
-    func::CallOp callOp =
-        createCall(rewriter, op.getLoc(), funcOp, op.getOperands());
-    rewriter.replaceOp(op, callOp.getResults());
+    rewriter.eraseOp(op);
     return success();
   }
 };
