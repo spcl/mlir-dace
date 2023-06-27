@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: sdfg-opt --convert-to-sdfg %s | sdfg-opt
 func.func private @ex(i32, i32)
 
