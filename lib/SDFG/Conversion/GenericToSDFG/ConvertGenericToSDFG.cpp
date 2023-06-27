@@ -157,15 +157,6 @@ StateNode getFirstState(Operation *op) {
   return nullptr;
 }
 
-ModuleOp getTopModuleOp(Operation *op) {
-  Operation *parent = op->getParentOp();
-
-  if (isa<ModuleOp>(parent))
-    return cast<ModuleOp>(parent);
-
-  return getTopModuleOp(parent);
-}
-
 void linkToLastState(PatternRewriter &rewriter, Location loc,
                      StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
@@ -337,7 +328,7 @@ public:
     // TODO: Support external calls
     // TODO: Support return values
     std::string callee = op.getCallee().str();
-    ModuleOp mod = getTopModuleOp(op);
+    ModuleOp mod = sdfg::utils::getTopModuleOp(op);
     func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
 
     // HACK: The function call got replaced at `FuncToSDFG` (PolybenchC)

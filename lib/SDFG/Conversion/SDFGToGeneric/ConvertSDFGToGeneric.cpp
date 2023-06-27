@@ -122,13 +122,12 @@ public:
   LogicalResult
   matchAndRewrite(SDFGNode op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-
     // Mark the entry state
     op.getEntryState()->setAttr("entry", rewriter.getBoolAttr(true));
 
     // Create a function and clone the sdfg body
     func::FuncOp funcOp =
-        createFunc(rewriter, op.getLoc(), "sdfg_func",
+        createFunc(rewriter, op.getLoc(), "sdfg",
                    op.getBody().getArgumentTypes(), {}, "public");
     funcOp.getBody().takeBody(op.getBody());
 
@@ -344,8 +343,28 @@ public:
   LogicalResult
   matchAndRewrite(TaskletNode op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for tasklet
-    return failure();
+    // Get top-level module
+    ModuleOp module = sdfg::utils::getTopModuleOp(op);
+
+    // Change insertion point to the beginning of module
+    OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(module.getBody());
+
+    // Create function
+    std::string name = sdfg::utils::generateName("tasklet");
+    func::FuncOp funcOp =
+        createFunc(rewriter, op.getLoc(), name, op.getOperandTypes(),
+                   op.getResultTypes(), "private");
+    funcOp.getBody().takeBody(op.getBody());
+
+    // Restore insertion point
+    rewriter.restoreInsertionPoint(ip);
+
+    // Add call
+    func::CallOp callOp =
+        createCall(rewriter, op.getLoc(), funcOp, op.getOperands());
+    rewriter.replaceOp(op, callOp.getResults());
+    return success();
   }
 };
 
@@ -356,8 +375,9 @@ public:
   LogicalResult
   matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for return
-    return failure();
+    createReturn(rewriter, op.getLoc(), op.getOperands());
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 

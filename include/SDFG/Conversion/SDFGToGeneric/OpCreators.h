@@ -15,6 +15,9 @@ func::FuncOp createFunc(PatternRewriter &rewriter, Location loc, StringRef name,
                         TypeRange inputTypes, TypeRange resultTypes,
                         StringRef visibility);
 
+func::CallOp createCall(PatternRewriter &rewriter, Location loc,
+                        func::FuncOp callee, ValueRange operands);
+
 func::ReturnOp createReturn(PatternRewriter &rewriter, Location loc,
                             ValueRange operands);
 

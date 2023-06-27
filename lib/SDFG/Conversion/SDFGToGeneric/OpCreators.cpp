@@ -17,6 +17,15 @@ func::FuncOp conversion::createFunc(PatternRewriter &rewriter, Location loc,
   return cast<func::FuncOp>(rewriter.create(state));
 }
 
+func::CallOp conversion::createCall(PatternRewriter &rewriter, Location loc,
+                                    func::FuncOp callee, ValueRange operands) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, func::CallOp::getOperationName());
+
+  func::CallOp::build(builder, state, callee, operands);
+  return cast<func::CallOp>(rewriter.create(state));
+}
+
 func::ReturnOp conversion::createReturn(PatternRewriter &rewriter, Location loc,
                                         ValueRange operands) {
   OpBuilder builder(loc->getContext());

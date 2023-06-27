@@ -37,4 +37,17 @@ StateNode getParentState(Operation &op, bool ignoreSDFGs) {
   return nullptr;
 }
 
+// Returns top-level module operation
+ModuleOp getTopModuleOp(Operation *op) {
+  Operation *parent = op->getParentOp();
+
+  if (parent == nullptr)
+    return nullptr;
+
+  if (isa<ModuleOp>(parent))
+    return cast<ModuleOp>(parent);
+
+  return getTopModuleOp(parent);
+}
+
 } // namespace mlir::sdfg::utils
