@@ -167,9 +167,16 @@ public:
 
     // Move the operations from the sdfg.state's body into the new basic block
     rewriter.setInsertionPointToStart(newBlock);
-    // FIXME: This clone is likely causing the erase bug
+
+    // Collect all operations
+    SmallVector<Operation *> ops;
     for (Operation &operation : op.getBody().getOps()) {
-      rewriter.clone(operation);
+      ops.push_back(&operation);
+    }
+
+    // Move them
+    for (Operation *operation : ops) {
+      operation->moveBefore(newBlock, newBlock->end());
     }
 
     // If there is an outward edge, do not add a return op
@@ -364,10 +371,7 @@ public:
     std::string name = sdfg::utils::generateName("tasklet");
     func::CallOp callOp = createCall(rewriter, op.getLoc(), op.getResultTypes(),
                                      name, op.getOperands());
-
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      rewriter.replaceAllUsesWith(op.getResult(i), callOp.getResult(i));
-    }
+    rewriter.replaceOp(op, callOp.getResults());
 
     // Set insertion point before the current func
     Operation *parent = op->getParentOfType<func::FuncOp>();
@@ -382,8 +386,6 @@ public:
                    op.getResultTypes(), "private");
 
     funcOp.getBody().takeBody(op.getBody());
-
-    rewriter.eraseOp(op);
     return success();
   }
 };
