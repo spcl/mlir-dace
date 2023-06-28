@@ -323,8 +323,9 @@ public:
   LogicalResult
   matchAndRewrite(CopyOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for copy
-    return failure();
+    createCopy(rewriter, op.getLoc(), adaptor.getSrc(), adaptor.getDest());
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -339,8 +340,9 @@ public:
   LogicalResult
   matchAndRewrite(AllocSymbolOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for AllocSym
-    return failure();
+    allocSymbol(rewriter, op.getLoc(), op.getSym(), symbolMap);
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -351,8 +353,17 @@ public:
   LogicalResult
   matchAndRewrite(SymOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for sym
-    return failure();
+    Value val = symbolicExpressionToMLIR(rewriter, op.getLoc(), op.getExpr());
+
+    if (op.getType().isIndex())
+      val = createIndexCast(rewriter, op.getLoc(), op.getType(), val);
+
+    if (op.getType().isIntOrIndex() && !op.getType().isIndex() &&
+        !op.getType().isInteger(64))
+      val = createTruncI(rewriter, op.getLoc(), op.getType(), val);
+
+    rewriter.replaceOp(op, {val});
+    return success();
   }
 };
 

@@ -84,6 +84,15 @@ memref::StoreOp conversion::createStore(PatternRewriter &rewriter, Location loc,
   return cast<memref::StoreOp>(rewriter.create(state));
 }
 
+memref::CopyOp conversion::createCopy(PatternRewriter &rewriter, Location loc,
+                                      Value source, Value target) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, memref::CopyOp::getOperationName());
+
+  memref::CopyOp::build(builder, state, source, target);
+  return cast<memref::CopyOp>(rewriter.create(state));
+}
+
 // Allocates a symbol as a memref<i64> if it's not already allocated
 void conversion::allocSymbol(PatternRewriter &rewriter, Location loc,
                              StringRef symName,
@@ -233,6 +242,15 @@ arith::ExtSIOp conversion::createExtSI(PatternRewriter &rewriter, Location loc,
 
   arith::ExtSIOp::build(builder, state, out, in);
   return cast<arith::ExtSIOp>(rewriter.create(state));
+}
+
+arith::TruncIOp conversion::createTruncI(PatternRewriter &rewriter,
+                                         Location loc, Type out, Value in) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, arith::TruncIOp::getOperationName());
+
+  arith::TruncIOp::build(builder, state, out, in);
+  return cast<arith::TruncIOp>(rewriter.create(state));
 }
 
 arith::IndexCastOp conversion::createIndexCast(PatternRewriter &rewriter,

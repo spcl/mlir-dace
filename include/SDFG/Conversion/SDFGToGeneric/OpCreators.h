@@ -38,6 +38,9 @@ memref::LoadOp createLoad(PatternRewriter &rewriter, Location loc, Value memref,
 memref::StoreOp createStore(PatternRewriter &rewriter, Location loc,
                             Value value, Value memref, ValueRange indices);
 
+memref::CopyOp createCopy(PatternRewriter &rewriter, Location loc, Value source,
+                          Value target);
+
 void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName,
                  llvm::StringMap<memref::AllocOp> &symbolMap);
 
@@ -82,6 +85,9 @@ arith::CmpIOp createCmpI(PatternRewriter &rewriter, Location loc,
 
 arith::ExtSIOp createExtSI(PatternRewriter &rewriter, Location loc, Type out,
                            Value in);
+
+arith::TruncIOp createTruncI(PatternRewriter &rewriter, Location loc, Type out,
+                             Value in);
 
 arith::IndexCastOp createIndexCast(PatternRewriter &rewriter, Location loc,
                                    Type out, Value in);

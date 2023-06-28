@@ -96,7 +96,6 @@ Value VarNode::codegen(PatternRewriter &rewriter, Location loc,
   if (refMap.find(name) != refMap.end()) {
     Value val = refMap[name];
 
-    // BUG: Fails to legalize operation if this branch is taken
     if (val.getType().isIndex())
       return createIndexCast(rewriter, loc, rewriter.getI64Type(), val);
 
