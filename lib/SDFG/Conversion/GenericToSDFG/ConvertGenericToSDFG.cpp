@@ -93,8 +93,8 @@ public:
 // Helpers
 //===----------------------------------------------------------------------===//
 
-SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
-                               ArrayRef<Value> vals) {
+static SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
+                                      ArrayRef<Value> vals) {
   SmallVector<Value> loadedOps;
   for (Value operand : vals) {
     if (operand.getDefiningOp() != nullptr &&
@@ -116,12 +116,12 @@ SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
   return loadedOps;
 }
 
-Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
+static Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
   SmallVector<Value> loadedOps = {val};
   return createLoads(rewriter, loc, loadedOps)[0];
 }
 
-Operation *getParentSDFG(Operation *op) {
+static Operation *getParentSDFG(Operation *op) {
   Operation *parent = op->getParentOp();
 
   if (isa<SDFGNode>(parent))
@@ -133,7 +133,7 @@ Operation *getParentSDFG(Operation *op) {
   return getParentSDFG(parent);
 }
 
-uint32_t getSDFGNumArgs(Operation *op) {
+static uint32_t getSDFGNumArgs(Operation *op) {
   if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
     return sdfg.getNumArgs();
   }
@@ -145,7 +145,7 @@ uint32_t getSDFGNumArgs(Operation *op) {
   return -1;
 }
 
-StateNode getFirstState(Operation *op) {
+static StateNode getFirstState(Operation *op) {
   if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
     return sdfg.getFirstState();
   }
@@ -157,8 +157,8 @@ StateNode getFirstState(Operation *op) {
   return nullptr;
 }
 
-void linkToLastState(PatternRewriter &rewriter, Location loc,
-                     StateNode &state) {
+static void linkToLastState(PatternRewriter &rewriter, Location loc,
+                            StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
   rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
@@ -175,8 +175,8 @@ void linkToLastState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
-void linkToNextState(PatternRewriter &rewriter, Location loc,
-                     StateNode &state) {
+static void linkToNextState(PatternRewriter &rewriter, Location loc,
+                            StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
   rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
@@ -194,17 +194,17 @@ void linkToNextState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
-void markToLink(Operation &op) {
+static void markToLink(Operation &op) {
   BoolAttr boolAttr = BoolAttr::get(op.getContext(), true);
   op.setAttr("linkToNext", boolAttr);
 }
 
-bool markedToLink(Operation &op) {
+static bool markedToLink(Operation &op) {
   return op.hasAttr("linkToNext") &&
          op.getAttr("linkToNext").cast<BoolAttr>().getValue();
 }
 
-Value getTransientValue(Value val) {
+static Value getTransientValue(Value val) {
   if (val.getDefiningOp() != nullptr && isa<LoadOp>(val.getDefiningOp())) {
     LoadOp load = cast<LoadOp>(val.getDefiningOp());
     AllocOp alloc = cast<AllocOp>(load.getArr().getDefiningOp());

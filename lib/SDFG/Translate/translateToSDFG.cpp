@@ -13,8 +13,9 @@ using namespace sdfg;
 // Helpers
 //===----------------------------------------------------------------------===//
 
-void insertTransientArray(Location location, translation::Connector connector,
-                          Value value, translation::ScopeNode &scope) {
+static void insertTransientArray(Location location,
+                                 translation::Connector connector, Value value,
+                                 translation::ScopeNode &scope) {
   using namespace translation;
 
   Array array(sdfg::utils::generateName("tmp"), /*transient=*/true,
