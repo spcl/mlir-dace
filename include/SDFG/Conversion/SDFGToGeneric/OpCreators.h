@@ -5,6 +5,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
@@ -91,6 +92,12 @@ arith::TruncIOp createTruncI(PatternRewriter &rewriter, Location loc, Type out,
 
 arith::IndexCastOp createIndexCast(PatternRewriter &rewriter, Location loc,
                                    Type out, Value in);
+
+scf::ParallelOp createParallel(PatternRewriter &rewriter, Location loc,
+                               ValueRange lowerBounds, ValueRange upperBounds,
+                               ValueRange steps);
+
+scf::YieldOp createYield(PatternRewriter &rewriter, Location loc);
 
 } // namespace mlir::sdfg::conversion
 

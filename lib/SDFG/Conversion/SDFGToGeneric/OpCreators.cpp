@@ -262,3 +262,22 @@ arith::IndexCastOp conversion::createIndexCast(PatternRewriter &rewriter,
   arith::IndexCastOp::build(builder, state, out, in);
   return cast<arith::IndexCastOp>(rewriter.create(state));
 }
+
+scf::ParallelOp conversion::createParallel(PatternRewriter &rewriter,
+                                           Location loc, ValueRange lowerBounds,
+                                           ValueRange upperBounds,
+                                           ValueRange steps) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, scf::ParallelOp::getOperationName());
+
+  scf::ParallelOp::build(builder, state, lowerBounds, upperBounds, steps);
+  return cast<scf::ParallelOp>(rewriter.create(state));
+}
+
+scf::YieldOp conversion::createYield(PatternRewriter &rewriter, Location loc) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, scf::YieldOp::getOperationName());
+
+  scf::YieldOp::build(builder, state);
+  return cast<scf::YieldOp>(rewriter.create(state));
+}

@@ -43,7 +43,7 @@ llvm::DenseSet<EdgeOp> processedEdges;
 // Return -> func.return
 // Tasklet -> func.func + func.call
 //
-// Map -> affine.parallel, affine.for, scf.forall, scf.for
+// Map -> scf.parallel (or: affine.parallel, affine.for, scf.forall, scf.for)
 //
 // Consume -> TBD
 //
@@ -63,6 +63,7 @@ struct GenericTarget : public ConversionTarget {
     addLegalDialect<cf::ControlFlowDialect>();
     addLegalDialect<memref::MemRefDialect>();
     addLegalDialect<arith::ArithDialect>();
+    addLegalDialect<scf::SCFDialect>();
     // All other operations are illegal
     markUnknownOpDynamicallyLegal([](Operation *op) { return false; });
   }
@@ -101,14 +102,48 @@ public:
 //===----------------------------------------------------------------------===//
 
 // Creates operations that perform the symbolic expression
-Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
-                               StringRef symExpr,
-                               llvm::StringMap<Value> refMap = {}) {
+static Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
+                                      StringRef symExpr,
+                                      llvm::StringMap<Value> refMap = {}) {
   std::unique_ptr<ASTNode> ast = SymbolicParser().parse(symExpr);
   if (!ast)
     emitError(loc, "failed to parse symbolic expression");
 
   return ast->codegen(rewriter, loc, symbolMap, refMap);
+}
+
+// Converts a numberlist (symbol, integer, operand) to Values
+static SmallVector<Value> numberListToMLIR(PatternRewriter &rewriter,
+                                           Location loc, Operation *op,
+                                           StringRef attrName) {
+  ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
+  ArrayAttr numList =
+      op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
+  SmallVector<Value> values;
+
+  for (unsigned i = 0; i < numList.size(); ++i) {
+    IntegerAttr num = numList[i].cast<IntegerAttr>();
+
+    if (num.getValue().isNegative()) {
+      // Number is a symbol or integer
+      Attribute attr = attrList[-num.getInt() - 1];
+      std::string expression;
+
+      if (attr.isa<StringAttr>())
+        expression = attr.cast<StringAttr>().str();
+      else
+        expression = std::to_string(attr.cast<IntegerAttr>().getInt());
+
+      Value val = symbolicExpressionToMLIR(rewriter, loc, expression);
+      val = createIndexCast(rewriter, loc, rewriter.getIndexType(), val);
+      values.push_back(val);
+    } else {
+      // Number is a operand
+      values.push_back(op->getOperand(num.getInt()));
+    }
+  }
+
+  return values;
 }
 
 //===----------------------------------------------------------------------===//
@@ -425,8 +460,24 @@ public:
   LogicalResult
   matchAndRewrite(MapNode op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO: Write lowering for map nodes
-    return failure();
+    SmallVector<Value> lowerBounds =
+        numberListToMLIR(rewriter, op.getLoc(), op, "lowerBounds");
+    SmallVector<Value> upperBounds =
+        numberListToMLIR(rewriter, op.getLoc(), op, "upperBounds");
+    SmallVector<Value> steps =
+        numberListToMLIR(rewriter, op.getLoc(), op, "steps");
+
+    scf::ParallelOp parallelOp =
+        createParallel(rewriter, op.getLoc(), lowerBounds, upperBounds, steps);
+
+    if (!op.getBodyRegion().empty() && !op.getBodyRegion().front().empty()) {
+      parallelOp.getBodyRegion().takeBody(op.getBodyRegion());
+      rewriter.setInsertionPointToEnd(parallelOp.getBody());
+      createYield(rewriter, op.getLoc());
+    }
+
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 

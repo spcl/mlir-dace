@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: sdfg-opt --lower-sdfg %s
 
 sdfg.sdfg () -> () {

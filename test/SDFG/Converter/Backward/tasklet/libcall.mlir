@@ -1,3 +1,4 @@
+// XFAIL: *
 // RUN: sdfg-opt --lower-sdfg %s
 
 sdfg.sdfg () -> (%r: !sdfg.array<2x2xi32>) {

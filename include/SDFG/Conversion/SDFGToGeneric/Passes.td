@@ -10,7 +10,8 @@ def SDFGToGenericPass : Pass<"lower-sdfg", "ModuleOp"> {
   let dependentDialects = [
     "mlir::func::FuncDialect",
     "mlir::cf::ControlFlowDialect",
-    "mlir::memref::MemRefDialect"
+    "mlir::memref::MemRefDialect",
+    "mlir::scf::SCFDialect"
   ];
 }
 
