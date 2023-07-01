@@ -77,20 +77,20 @@ public:
   }
 
   static Optional<Type> convertArrayTypes(Type type) {
-    if (ArrayType arr = type.dyn_cast<ArrayType>()) {
-      SizedType sizedT = sdfg::utils::getSizedType(arr);
-
+    if (ArrayType array = type.dyn_cast<ArrayType>()) {
       SmallVector<int64_t> shape;
       unsigned intIdx = 0;
 
-      for (unsigned i = 0; i < sizedT.getShape().size(); ++i) {
-        if (sizedT.getShape()[i])
-          shape.push_back(sizedT.getIntegers()[intIdx++]);
-        else
-          shape.push_back(-1);
+      for (unsigned i = 0; i < array.getShape().size(); ++i) {
+        int64_t val = array.getShape()[i] ? array.getIntegers()[intIdx++]
+                                          : ShapedType::kDynamic;
+
+        if (val < 0)
+          val = ShapedType::kDynamic;
+        shape.push_back(val);
       }
 
-      return MemRefType::get(shape, sizedT.getElementType());
+      return MemRefType::get(shape, array.getElementType());
     }
 
     return std::nullopt;
@@ -317,7 +317,8 @@ public:
       return failure();
 
     memref::AllocOp allocOp =
-        createAlloc(rewriter, op.getLoc(), memrefType.cast<MemRefType>());
+        createAlloc(rewriter, op.getLoc(), memrefType.cast<MemRefType>(),
+                    adaptor.getOperands());
     rewriter.replaceOp(op, {allocOp});
     return success();
   }
@@ -330,8 +331,11 @@ public:
   LogicalResult
   matchAndRewrite(LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    memref::LoadOp loadOp = createLoad(rewriter, op.getLoc(), adaptor.getArr(),
-                                       adaptor.getIndices());
+    SmallVector<Value> indices =
+        numberListToMLIR(rewriter, op.getLoc(), op, "indices");
+
+    memref::LoadOp loadOp =
+        createLoad(rewriter, op.getLoc(), adaptor.getArr(), indices);
     rewriter.replaceOp(op, {loadOp});
     return success();
   }
@@ -344,8 +348,10 @@ public:
   LogicalResult
   matchAndRewrite(StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> indices =
+        numberListToMLIR(rewriter, op.getLoc(), op, "indices");
     createStore(rewriter, op.getLoc(), adaptor.getVal(), adaptor.getArr(),
-                adaptor.getIndices());
+                indices);
     rewriter.eraseOp(op);
     return success();
   }

@@ -54,7 +54,7 @@ static ParseResult parseDimensionList(AsmParser &parser, Type &elemType,
       continue;
     }
 
-    int32_t num = -1;
+    int64_t num = -1;
     OptionalParseResult intOPR = parser.parseOptionalInteger(num);
     if (intOPR.has_value() && intOPR.value().succeeded()) {
       integers.push_back(num);
@@ -116,6 +116,18 @@ void ArrayType::print(::mlir::AsmPrinter &odsPrinter) const {
 
   printDimensionList(odsPrinter, elemType, symbols, integers, shape);
 }
+
+Type ArrayType::getElementType() { return getDimensions().getElementType(); }
+
+ArrayRef<StringAttr> ArrayType::getSymbols() {
+  return getDimensions().getSymbols();
+}
+
+ArrayRef<int64_t> ArrayType::getIntegers() {
+  return getDimensions().getIntegers();
+}
+
+ArrayRef<bool> ArrayType::getShape() { return getDimensions().getShape(); }
 
 ::mlir::Type StreamType::parse(::mlir::AsmParser &odsParser) {
   Type elementType;

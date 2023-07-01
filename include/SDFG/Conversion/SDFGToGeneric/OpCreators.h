@@ -31,7 +31,7 @@ cf::CondBranchOp createCondBranch(PatternRewriter &rewriter, Location loc,
                                   Block *falseDest);
 
 memref::AllocOp createAlloc(PatternRewriter &rewriter, Location loc,
-                            MemRefType memreftype);
+                            MemRefType memrefType, ValueRange dynamicSizes);
 
 memref::LoadOp createLoad(PatternRewriter &rewriter, Location loc, Value memref,
                           ValueRange indices);

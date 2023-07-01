@@ -57,11 +57,12 @@ cf::CondBranchOp conversion::createCondBranch(PatternRewriter &rewriter,
 }
 
 memref::AllocOp conversion::createAlloc(PatternRewriter &rewriter, Location loc,
-                                        MemRefType memreftype) {
+                                        MemRefType memrefType,
+                                        ValueRange dynamicSizes) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, memref::AllocOp::getOperationName());
 
-  memref::AllocOp::build(builder, state, memreftype);
+  memref::AllocaOp::build(builder, state, memrefType, dynamicSizes);
   return cast<memref::AllocOp>(rewriter.create(state));
 }
 
@@ -107,7 +108,7 @@ void conversion::allocSymbol(PatternRewriter &rewriter, Location loc,
 
   IntegerType intType = IntegerType::get(loc->getContext(), 64);
   MemRefType memrefType = MemRefType::get({}, intType);
-  memref::AllocOp allocOp = createAlloc(rewriter, loc, memrefType);
+  memref::AllocOp allocOp = createAlloc(rewriter, loc, memrefType, {});
 
   // Update symbol map
   symbolMap[symName] = allocOp;

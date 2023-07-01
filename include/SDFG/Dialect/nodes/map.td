@@ -24,7 +24,7 @@ def SDFG_MapNode : SDFG_Op<"map", [
     let arguments = (ins 
         I32Attr:$entryID,
         I32Attr:$exitID,
-        Variadic<Index>:$ranges,
+        Variadic<Index>:$ranges, // FIXME: This seems unused
         ArrayAttr:$lowerBounds,
         ArrayAttr:$upperBounds,
         ArrayAttr:$steps

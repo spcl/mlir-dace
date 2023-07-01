@@ -44,7 +44,7 @@ def SDFG_SizedType : SDFG_Type<"Sized">{
 
         size_t getUndefRank(){ 
             size_t undefSize = 0;
-            for(int64_t dim : getIntegers()) if(dim == -1) undefSize++;
+            for(int64_t dim : getIntegers()) if(dim < 0) undefSize++;
             return undefSize;
         }
 
@@ -68,6 +68,13 @@ def SDFG_ArrayType : SDFG_Type<"Array">{
 
     let parameters = (ins SDFG_SizedType:$dimensions);
     let hasCustomAssemblyFormat = 1;
+
+    let extraClassDeclaration = [{
+        Type getElementType();
+        ArrayRef<StringAttr> getSymbols();
+        ArrayRef<int64_t> getIntegers();
+        ArrayRef<bool> getShape();
+    }];
 }
 
 //===----------------------------------------------------------------------===//
