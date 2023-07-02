@@ -316,9 +316,36 @@ public:
     if (!memrefType || !memrefType.isa<MemRefType>())
       return failure();
 
-    memref::AllocOp allocOp =
-        createAlloc(rewriter, op.getLoc(), memrefType.cast<MemRefType>(),
-                    adaptor.getOperands());
+    SmallVector<Value> operands;
+
+    if (ArrayType array = op.getType().dyn_cast<ArrayType>()) {
+      unsigned intIdx = 0;
+      unsigned symIdx = 0;
+      unsigned opIdx = 0;
+
+      for (unsigned i = 0; i < array.getShape().size(); ++i) {
+        Value val;
+        if (array.getShape()[i] && array.getIntegers()[intIdx] < 0) {
+          intIdx++;
+          val = op.getOperand(opIdx++);
+        } else if (array.getShape()[i]) {
+          intIdx++;
+          continue;
+        } else {
+          val = symbolicExpressionToMLIR(rewriter, op.getLoc(),
+                                         array.getSymbols()[symIdx++]);
+          val = createIndexCast(rewriter, op.getLoc(), rewriter.getIndexType(),
+                                val);
+        }
+        operands.push_back(val);
+      }
+
+    } else {
+      operands = adaptor.getOperands();
+    }
+
+    memref::AllocOp allocOp = createAlloc(
+        rewriter, op.getLoc(), memrefType.cast<MemRefType>(), operands);
     rewriter.replaceOp(op, {allocOp});
     return success();
   }
