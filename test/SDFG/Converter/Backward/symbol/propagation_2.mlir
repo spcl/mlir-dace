@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: sdfg-opt --lower-sdfg %s
 
 module  {

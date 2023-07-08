@@ -43,7 +43,7 @@ memref::CopyOp createCopy(PatternRewriter &rewriter, Location loc, Value source,
                           Value target);
 
 void allocSymbol(PatternRewriter &rewriter, Location loc, StringRef symName,
-                 llvm::StringMap<memref::AllocOp> &symbolMap);
+                 llvm::StringMap<Value> &symbolMap);
 
 arith::ConstantIntOp createConstantInt(PatternRewriter &rewriter, Location loc,
                                        int val, int width);

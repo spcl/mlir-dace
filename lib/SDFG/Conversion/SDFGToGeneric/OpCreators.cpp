@@ -97,7 +97,7 @@ memref::CopyOp conversion::createCopy(PatternRewriter &rewriter, Location loc,
 // Allocates a symbol as a memref<i64> if it's not already allocated
 void conversion::allocSymbol(PatternRewriter &rewriter, Location loc,
                              StringRef symName,
-                             llvm::StringMap<memref::AllocOp> &symbolMap) {
+                             llvm::StringMap<Value> &symbolMap) {
   if (symbolMap.find(symName) != symbolMap.end())
     return;
 

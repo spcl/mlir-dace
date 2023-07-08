@@ -77,21 +77,21 @@ namespace mlir::sdfg::conversion {
 
 // IntNode
 Value IntNode::codegen(PatternRewriter &rewriter, Location loc,
-                       llvm::StringMap<memref::AllocOp> &symbolMap,
+                       llvm::StringMap<Value> &symbolMap,
                        llvm::StringMap<Value> &refMap) {
   return createConstantInt(rewriter, loc, value, 64);
 }
 
 // BoolNode
 Value BoolNode::codegen(PatternRewriter &rewriter, Location loc,
-                        llvm::StringMap<memref::AllocOp> &symbolMap,
+                        llvm::StringMap<Value> &symbolMap,
                         llvm::StringMap<Value> &refMap) {
   return createConstantInt(rewriter, loc, value, 1);
 }
 
 // VarNode
 Value VarNode::codegen(PatternRewriter &rewriter, Location loc,
-                       llvm::StringMap<memref::AllocOp> &symbolMap,
+                       llvm::StringMap<Value> &symbolMap,
                        llvm::StringMap<Value> &refMap) {
   if (refMap.find(name) != refMap.end()) {
     Value val = refMap[name];
@@ -112,7 +112,7 @@ Value VarNode::codegen(PatternRewriter &rewriter, Location loc,
 
 // AssignNode
 Value AssignNode::codegen(PatternRewriter &rewriter, Location loc,
-                          llvm::StringMap<memref::AllocOp> &symbolMap,
+                          llvm::StringMap<Value> &symbolMap,
                           llvm::StringMap<Value> &refMap) {
   allocSymbol(rewriter, loc, variable->name, symbolMap);
   Value eVal = expr->codegen(rewriter, loc, symbolMap, refMap);
@@ -122,7 +122,7 @@ Value AssignNode::codegen(PatternRewriter &rewriter, Location loc,
 
 // UnOpNode
 Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
-                        llvm::StringMap<memref::AllocOp> &symbolMap,
+                        llvm::StringMap<Value> &symbolMap,
                         llvm::StringMap<Value> &refMap) {
   Value eVal = expr->codegen(rewriter, loc, symbolMap, refMap);
 
@@ -148,7 +148,7 @@ Value UnOpNode::codegen(PatternRewriter &rewriter, Location loc,
 
 // BinOpNode
 Value BinOpNode::codegen(PatternRewriter &rewriter, Location loc,
-                         llvm::StringMap<memref::AllocOp> &symbolMap,
+                         llvm::StringMap<Value> &symbolMap,
                          llvm::StringMap<Value> &refMap) {
   Value lVal = left->codegen(rewriter, loc, symbolMap, refMap);
   Value rVal = right->codegen(rewriter, loc, symbolMap, refMap);

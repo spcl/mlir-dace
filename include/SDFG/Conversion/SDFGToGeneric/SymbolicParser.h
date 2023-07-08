@@ -10,7 +10,7 @@ class ASTNode {
 public:
   virtual ~ASTNode() = default;
   virtual Value codegen(PatternRewriter &rewriter, Location loc,
-                        llvm::StringMap<memref::AllocOp> &symbolMap,
+                        llvm::StringMap<Value> &symbolMap,
                         llvm::StringMap<Value> &refMap) = 0;
 };
 
@@ -21,7 +21,7 @@ public:
   IntNode(int value) : value(value){};
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
 };
 
@@ -32,7 +32,7 @@ public:
   BoolNode(bool value) : value(value) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
 };
 
@@ -43,7 +43,7 @@ public:
   VarNode(std::string name) : name(name) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
 };
 
@@ -56,7 +56,7 @@ public:
       : variable(std::move(variable)), expr(std::move(expr)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
 };
 
@@ -70,7 +70,7 @@ public:
       : op(op), expr(std::move(expr)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
 };
 
@@ -108,7 +108,7 @@ public:
       : left(std::move(left)), op(op), right(std::move(right)) {}
 
   Value codegen(PatternRewriter &rewriter, Location loc,
-                llvm::StringMap<memref::AllocOp> &symbolMap,
+                llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
 };
 

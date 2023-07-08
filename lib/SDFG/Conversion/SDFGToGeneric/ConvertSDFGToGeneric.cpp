@@ -17,8 +17,11 @@ using namespace conversion;
 
 // Maps state name to their generated block
 llvm::StringMap<Block *> blockMap;
-// Maps symbols to the generated allocation operation
-llvm::StringMap<memref::AllocOp> symbolMap;
+
+// For each function scope, map symbols to values
+// Function scope is determined by the function name
+llvm::StringMap<llvm::StringMap<Value>> symbolMap;
+
 // HACK: Keeps track of processed EdgeOps
 llvm::DenseSet<EdgeOp> processedEdges;
 
@@ -101,21 +104,30 @@ public:
 // Helpers
 //===----------------------------------------------------------------------===//
 
+// Gets the current function scope
+llvm::StringRef getFunctionScope(Operation *op) {
+  Operation *parent = op->getParentOfType<func::FuncOp>();
+  if (parent == nullptr)
+    return "";
+
+  return cast<func::FuncOp>(parent).getName();
+}
+
 // Creates operations that perform the symbolic expression
-static Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Location loc,
+static Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Operation *op,
                                       StringRef symExpr,
                                       llvm::StringMap<Value> refMap = {}) {
   std::unique_ptr<ASTNode> ast = SymbolicParser().parse(symExpr);
   if (!ast)
-    emitError(loc, "failed to parse symbolic expression");
+    emitError(op->getLoc(), "failed to parse symbolic expression");
 
-  return ast->codegen(rewriter, loc, symbolMap, refMap);
+  return ast->codegen(rewriter, op->getLoc(), symbolMap[getFunctionScope(op)],
+                      refMap);
 }
 
 // Converts a numberlist (symbol, integer, operand) to Values
 static SmallVector<Value> numberListToMLIR(PatternRewriter &rewriter,
-                                           Location loc, Operation *op,
-                                           StringRef attrName) {
+                                           Operation *op, StringRef attrName) {
   ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
   ArrayAttr numList =
       op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
@@ -134,8 +146,9 @@ static SmallVector<Value> numberListToMLIR(PatternRewriter &rewriter,
       else
         expression = std::to_string(attr.cast<IntegerAttr>().getInt());
 
-      Value val = symbolicExpressionToMLIR(rewriter, loc, expression);
-      val = createIndexCast(rewriter, loc, rewriter.getIndexType(), val);
+      Value val = symbolicExpressionToMLIR(rewriter, op, expression);
+      val =
+          createIndexCast(rewriter, op->getLoc(), rewriter.getIndexType(), val);
       values.push_back(val);
     } else {
       // Number is a operand
@@ -189,7 +202,13 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     // Create call
     std::string name = sdfg::utils::generateName("nested_sdfg");
-    createCall(rewriter, op.getLoc(), {}, name, adaptor.getOperands());
+
+    // Propagate symbols
+    SmallVector<Value> operands = adaptor.getOperands();
+    for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
+      operands.push_back(v.getValue());
+
+    createCall(rewriter, op.getLoc(), {}, name, operands);
 
     // Set insertion point before the current func
     Operation *parent = op->getParentOfType<func::FuncOp>();
@@ -208,6 +227,10 @@ public:
             .failed())
       return failure();
 
+    // Add symbols to signature
+    for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
+      operandTypes.push_back(v.getValue().getType());
+
     func::FuncOp funcOp =
         createFunc(rewriter, op.getLoc(), name, operandTypes, {}, "private");
     funcOp.getBody().takeBody(op.getBody());
@@ -215,6 +238,11 @@ public:
     if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
                                            *getTypeConverter())))
       return failure();
+
+    // Add symbols to scope
+    for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
+      symbolMap[name][v.getKey()] =
+          funcOp.getBody().addArgument(v.getValue().getType(), op.getLoc());
 
     rewriter.eraseOp(op);
     return success();
@@ -296,7 +324,7 @@ public:
       rewriter.setInsertionPointToEnd(blockMap[adaptor.getSrc()]);
       // Compute condition
       Value condition = symbolicExpressionToMLIR(
-          rewriter, op.getLoc(), adaptor.getCondition(), refMap);
+          rewriter, op, adaptor.getCondition(), refMap);
       // Add conditional branch
       createCondBranch(rewriter, op.getLoc(), condition, takenBlock,
                        notTakenBlock);
@@ -330,8 +358,8 @@ public:
     rewriter.setInsertionPointToStart(takenBlock);
 
     for (Attribute assignment : adaptor.getAssign())
-      symbolicExpressionToMLIR(rewriter, op.getLoc(),
-                               cast<StringAttr>(assignment), refMap);
+      symbolicExpressionToMLIR(rewriter, op, cast<StringAttr>(assignment),
+                               refMap);
 
     // Create simple branch to destination
     createBranch(rewriter, op.getLoc(), {}, blockMap[adaptor.getDest()]);
@@ -373,7 +401,7 @@ public:
           intIdx++;
           continue;
         } else {
-          val = symbolicExpressionToMLIR(rewriter, op.getLoc(),
+          val = symbolicExpressionToMLIR(rewriter, op,
                                          array.getSymbols()[symIdx++]);
           val = createIndexCast(rewriter, op.getLoc(), rewriter.getIndexType(),
                                 val);
@@ -399,8 +427,7 @@ public:
   LogicalResult
   matchAndRewrite(LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> indices =
-        numberListToMLIR(rewriter, op.getLoc(), op, "indices");
+    SmallVector<Value> indices = numberListToMLIR(rewriter, op, "indices");
 
     memref::LoadOp loadOp =
         createLoad(rewriter, op.getLoc(), adaptor.getArr(), indices);
@@ -416,8 +443,7 @@ public:
   LogicalResult
   matchAndRewrite(StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> indices =
-        numberListToMLIR(rewriter, op.getLoc(), op, "indices");
+    SmallVector<Value> indices = numberListToMLIR(rewriter, op, "indices");
     createStore(rewriter, op.getLoc(), adaptor.getVal(), adaptor.getArr(),
                 indices);
     rewriter.eraseOp(op);
@@ -449,7 +475,8 @@ public:
   LogicalResult
   matchAndRewrite(AllocSymbolOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    allocSymbol(rewriter, op.getLoc(), op.getSym(), symbolMap);
+    allocSymbol(rewriter, op.getLoc(), op.getSym(),
+                symbolMap[getFunctionScope(op)]);
     rewriter.eraseOp(op);
     return success();
   }
@@ -462,7 +489,7 @@ public:
   LogicalResult
   matchAndRewrite(SymOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value val = symbolicExpressionToMLIR(rewriter, op.getLoc(), op.getExpr());
+    Value val = symbolicExpressionToMLIR(rewriter, op, op.getExpr());
 
     if (op.getType().isIndex())
       val = createIndexCast(rewriter, op.getLoc(), op.getType(), val);
@@ -496,8 +523,13 @@ public:
             .failed())
       return failure();
 
-    func::CallOp callOp = createCall(rewriter, op.getLoc(), resultTypes, name,
-                                     adaptor.getOperands());
+    // Propagate symbols
+    SmallVector<Value> operands = adaptor.getOperands();
+    for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
+      operands.push_back(v.getValue());
+
+    func::CallOp callOp =
+        createCall(rewriter, op.getLoc(), resultTypes, name, operands);
     rewriter.replaceOp(op, callOp.getResults());
 
     // Set insertion point before the current func
@@ -514,6 +546,10 @@ public:
             .failed())
       return failure();
 
+    // Add symbols to signature
+    for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
+      operandTypes.push_back(v.getValue().getType());
+
     func::FuncOp funcOp = createFunc(rewriter, op.getLoc(), name, operandTypes,
                                      resultTypes, "private");
     funcOp.getBody().takeBody(op.getBody());
@@ -521,6 +557,11 @@ public:
     if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
                                            *getTypeConverter())))
       return failure();
+
+    // Add symbols to scope
+    for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
+      symbolMap[name][v.getKey()] =
+          funcOp.getBody().addArgument(v.getValue().getType(), op.getLoc());
 
     return success();
   }
@@ -551,11 +592,10 @@ public:
   matchAndRewrite(MapNode op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> lowerBounds =
-        numberListToMLIR(rewriter, op.getLoc(), op, "lowerBounds");
+        numberListToMLIR(rewriter, op, "lowerBounds");
     SmallVector<Value> upperBounds =
-        numberListToMLIR(rewriter, op.getLoc(), op, "upperBounds");
-    SmallVector<Value> steps =
-        numberListToMLIR(rewriter, op.getLoc(), op, "steps");
+        numberListToMLIR(rewriter, op, "upperBounds");
+    SmallVector<Value> steps = numberListToMLIR(rewriter, op, "steps");
 
     scf::ParallelOp parallelOp =
         createParallel(rewriter, op.getLoc(), lowerBounds, upperBounds, steps);
