@@ -180,6 +180,47 @@ public:
   }
 };
 
+class NestedSDFGToFunc : public OpConversionPattern<NestedSDFGNode> {
+public:
+  using OpConversionPattern<NestedSDFGNode>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(NestedSDFGNode op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Create call
+    std::string name = sdfg::utils::generateName("nested_sdfg");
+    createCall(rewriter, op.getLoc(), {}, name, adaptor.getOperands());
+
+    // Set insertion point before the current func
+    Operation *parent = op->getParentOfType<func::FuncOp>();
+    if (parent == nullptr)
+      return failure();
+
+    rewriter.setInsertionPoint(parent);
+
+    // Mark the entry state
+    op.getEntryState()->setAttr("entry", rewriter.getBoolAttr(true));
+
+    // Create a function and clone the sdfg body
+    SmallVector<Type> operandTypes;
+    if (getTypeConverter()
+            ->convertTypes(op.getOperandTypes(), operandTypes)
+            .failed())
+      return failure();
+
+    func::FuncOp funcOp =
+        createFunc(rewriter, op.getLoc(), name, operandTypes, {}, "private");
+    funcOp.getBody().takeBody(op.getBody());
+
+    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
+                                           *getTypeConverter())))
+      return failure();
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 class StateToBlock : public OpConversionPattern<StateNode> {
 public:
   using OpConversionPattern<StateNode>::OpConversionPattern;
@@ -448,8 +489,15 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     // Create call
     std::string name = sdfg::utils::generateName("tasklet");
-    func::CallOp callOp = createCall(rewriter, op.getLoc(), op.getResultTypes(),
-                                     name, op.getOperands());
+
+    SmallVector<Type> resultTypes;
+    if (getTypeConverter()
+            ->convertTypes(op.getResultTypes(), resultTypes)
+            .failed())
+      return failure();
+
+    func::CallOp callOp = createCall(rewriter, op.getLoc(), resultTypes, name,
+                                     adaptor.getOperands());
     rewriter.replaceOp(op, callOp.getResults());
 
     // Set insertion point before the current func
@@ -460,11 +508,20 @@ public:
     rewriter.setInsertionPoint(parent);
 
     // Create function
-    func::FuncOp funcOp =
-        createFunc(rewriter, op.getLoc(), name, op.getOperandTypes(),
-                   op.getResultTypes(), "private");
+    SmallVector<Type> operandTypes;
+    if (getTypeConverter()
+            ->convertTypes(op.getOperandTypes(), operandTypes)
+            .failed())
+      return failure();
 
+    func::FuncOp funcOp = createFunc(rewriter, op.getLoc(), name, operandTypes,
+                                     resultTypes, "private");
     funcOp.getBody().takeBody(op.getBody());
+
+    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
+                                           *getTypeConverter())))
+      return failure();
+
     return success();
   }
 };
@@ -535,6 +592,7 @@ void populateSDFGToGenericConversionPatterns(RewritePatternSet &patterns,
   MLIRContext *ctxt = patterns.getContext();
 
   patterns.add<SDFGToFunc>(converter, ctxt);
+  patterns.add<NestedSDFGToFunc>(converter, ctxt);
   patterns.add<StateToBlock>(converter, ctxt);
   patterns.add<EdgeToBranch>(converter, ctxt);
   patterns.add<AllocToAlloc>(converter, ctxt);

@@ -1,4 +1,3 @@
-// XFAIL: *
 // RUN: sdfg-opt --lower-sdfg %s
 
 sdfg.sdfg () -> (%r: !sdfg.array<i32>) {
