@@ -180,9 +180,25 @@ public:
             .failed())
       return failure();
 
+    // Add symbols to signature
+    SmallVector<StringAttr> symbols;
+
+    for (Type t : op.getBody().getArgumentTypes())
+      if (ArrayType arrayT = t.dyn_cast<ArrayType>())
+        for (StringAttr sym : arrayT.getSymbols())
+          if (find(symbols, sym) == symbols.end()) {
+            convertedTypes.push_back(rewriter.getIndexType());
+            symbols.push_back(sym);
+          }
+
     func::FuncOp funcOp =
         createFunc(rewriter, op.getLoc(), "sdfg", convertedTypes, {}, "public");
     funcOp.getBody().takeBody(op.getBody());
+
+    // Add symbols to scope
+    for (StringAttr sym : symbols)
+      symbolMap[getFunctionScope(op)][sym] =
+          funcOp.getBody().addArgument(rewriter.getIndexType(), op.getLoc());
 
     if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
                                            *getTypeConverter())))
@@ -235,14 +251,14 @@ public:
         createFunc(rewriter, op.getLoc(), name, operandTypes, {}, "private");
     funcOp.getBody().takeBody(op.getBody());
 
-    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
-                                           *getTypeConverter())))
-      return failure();
-
     // Add symbols to scope
     for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
       symbolMap[name][v.getKey()] =
           funcOp.getBody().addArgument(v.getValue().getType(), op.getLoc());
+
+    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
+                                           *getTypeConverter())))
+      return failure();
 
     rewriter.eraseOp(op);
     return success();
@@ -554,14 +570,14 @@ public:
                                      resultTypes, "private");
     funcOp.getBody().takeBody(op.getBody());
 
-    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
-                                           *getTypeConverter())))
-      return failure();
-
     // Add symbols to scope
     for (llvm::StringMapEntry<Value> &v : symbolMap[getFunctionScope(op)])
       symbolMap[name][v.getKey()] =
           funcOp.getBody().addArgument(v.getValue().getType(), op.getLoc());
+
+    if (failed(rewriter.convertRegionTypes(&funcOp.getBody(),
+                                           *getTypeConverter())))
+      return failure();
 
     return success();
   }
