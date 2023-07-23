@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
 #include "SDFG/Conversion/SDFGToGeneric/PassDetail.h"
 #include "SDFG/Conversion/SDFGToGeneric/Passes.h"

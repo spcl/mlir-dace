@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #include "SDFG/Utils/GetSizedType.h"
 
 namespace mlir::sdfg::utils {

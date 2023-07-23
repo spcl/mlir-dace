@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #ifndef SDFG_Conversion_SDFGToGeneric_Op_Creators_H
 #define SDFG_Conversion_SDFGToGeneric_Op_Creators_H
 

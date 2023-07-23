@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #ifndef SDFG_Translation_H
 #define SDFG_Translation_H
 

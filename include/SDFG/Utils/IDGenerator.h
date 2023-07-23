@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #ifndef SDFG_Utils_IDGenerator_H
 #define SDFG_Utils_IDGenerator_H
 

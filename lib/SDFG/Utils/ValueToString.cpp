@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #include "SDFG/Utils/ValueToString.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/IR/AsmState.h"

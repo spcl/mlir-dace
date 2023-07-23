@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #ifndef SDFG_Conversion_LinalgToSDFG
 #define SDFG_Conversion_LinalgToSDFG
 

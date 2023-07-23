@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 # Executes given SDFG with three-filled arrays and prints all output to stdout
 
 import json

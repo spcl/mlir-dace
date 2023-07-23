@@ -1,3 +1,5 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 #include "SDFG/Translate/Node.h"
 #include "SDFG/Translate/Translation.h"
 #include "SDFG/Translate/liftToPython.h"
