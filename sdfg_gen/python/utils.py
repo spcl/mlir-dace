@@ -1,3 +1,6 @@
+# Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+
 def export_sdfg(sdfg, name=None):
     if name is None: name = sdfg.name
     else: name = sdfg.name + "_" + name

@@ -1,4 +1,5 @@
 #!/bin/bash
+
 cd "$(dirname "$0")" || exit
 rm -rf gen/json/*
 rm -rf gen/sdfg/*

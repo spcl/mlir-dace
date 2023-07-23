@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 # This file was used to create the images for the design of SDFG
 
 import dace
@@ -95,10 +97,10 @@ tasklet = state.add_tasklet(name='add',
                             language=dace.Language.Python)
 
 tasklet2 = state.add_tasklet(name='add',
-                            inputs={'b'},
-                            outputs={'a'},
-                            code='a = b + 1',
-                            language=dace.Language.Python)
+                             inputs={'b'},
+                             outputs={'a'},
+                             code='a = b + 1',
+                             language=dace.Language.Python)
 
 state.add_edge(A, None, tasklet, 'a', dace.Memlet('A[0]'))
 state.add_edge(tasklet, 'c', C, None, dace.Memlet('C[0]'))
@@ -114,12 +116,11 @@ B = state.add_read('B')
 C = state.add_write('C')
 
 tasklet, map_entry, map_exit = state.add_mapped_tasklet(
-    name='add',                                         
-    map_ranges=dict(i='0:2', j='0:2'),                             
-    inputs=dict(a=dace.Memlet('A[i, j]'), b=dace.Memlet('B[i, j]')), 
-    code='c = a + b',                                   
-    outputs=dict(c=dace.Memlet('C[i, j]'))
-)
+    name='add',
+    map_ranges=dict(i='0:2', j='0:2'),
+    inputs=dict(a=dace.Memlet('A[i, j]'), b=dace.Memlet('B[i, j]')),
+    code='c = a + b',
+    outputs=dict(c=dace.Memlet('C[i, j]')))
 
 state.add_edge(A, None, map_entry, None, memlet=dace.Memlet('A[0:2,0:2]'))
 state.add_edge(B, None, map_entry, None, memlet=dace.Memlet('B[0:2,0:2]'))
@@ -128,14 +129,17 @@ state.add_edge(map_exit, None, C, None, memlet=dace.Memlet('C[0:2,0:2]'))
 sdfg.fill_scope_connectors()
 export_sdfg(sdfg, "map")
 
+
 # nested & lib
 @dace.program
 def design_mmm(A, B):
     return A @ B
 
+
 @dace.program
 def design_nested(A, B):
     C = design_mmm(A, B)
+
 
 a = np.random.rand(2, 2)
 sdfg = design_nested.to_sdfg(a, a)
@@ -151,12 +155,11 @@ A = state.add_read('A')
 C = state.add_write('C')
 
 tasklet, map_entry, map_exit = state.add_mapped_tasklet(
-    name='add',                                         
-    map_ranges=dict(i='0:N'),                             
-    inputs=dict(a=dace.Memlet('A[i]')), 
-    code='c = a + 1',                                   
-    outputs=dict(c=dace.Memlet('C[i]'))
-)
+    name='add',
+    map_ranges=dict(i='0:N'),
+    inputs=dict(a=dace.Memlet('A[i]')),
+    code='c = a + 1',
+    outputs=dict(c=dace.Memlet('C[i]')))
 
 state.add_edge(A, None, map_entry, None, memlet=dace.Memlet('A[0:N]'))
 state.add_edge(map_exit, None, C, None, memlet=dace.Memlet('C[0:N]'))
@@ -171,7 +174,6 @@ state2 = sdfg.add_state_after(state)
 state3 = sdfg.add_state_after(state2)
 state4 = sdfg.add_state()
 
-
 sdfg.add_edge(state2, state4, dace.InterstateEdge())
 
 export_sdfg(sdfg, "multistate")
@@ -182,7 +184,7 @@ state = sdfg.add_state()
 A = state.add_stream('A', dtypes.int32)
 C = state.add_write('C')
 
-consEntry, consExit = state.add_consume("add_one", ("p","P"), "len(A) == 0")
+consEntry, consExit = state.add_consume("add_one", ("p", "P"), "len(A) == 0")
 
 tasklet = state.add_tasklet(name='add',
                             inputs={'a'},
@@ -197,8 +199,9 @@ state.add_edge(consExit, None, C, None, memlet=dace.Memlet('C[0:2]'))
 
 export_sdfg(sdfg, "stream")
 
+
 @dace.program
-def design_ex(in1: dtypes.vector(dtypes.int32,5)):
+def design_ex(in1: dtypes.vector(dtypes.int32, 5)):
     sum = 0
 
     for i in range(5):
@@ -206,9 +209,9 @@ def design_ex(in1: dtypes.vector(dtypes.int32,5)):
 
     return sum
 
+
 sdfg = design_ex.to_sdfg()
 export_sdfg(sdfg)
-
 '''
 @dace.program
 def design_fail(in1: dtypes.vector(dtypes.int32,5)):
