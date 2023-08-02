@@ -6,6 +6,7 @@
 include "mlir/Pass/PassBase.td"
 include "SDFG/Dialect/Dialect.td"
 
+/// Define Linalg to SDFG Pass.
 def LinalgToSDFGPass : Pass<"linalg-to-sdfg", "ModuleOp"> {
   let summary = "Convert Linalg dialect to SDFG dialect";
   let constructor = "mlir::sdfg::conversion::createLinalgToSDFGPass()";

@@ -10,6 +10,7 @@ namespace mlir {
 namespace sdfg {
 namespace conversion {
 
+/// Generate the code for base classes.
 #define GEN_PASS_CLASSES
 #include "SDFG/Conversion/GenericToSDFG/Passes.h.inc"
 

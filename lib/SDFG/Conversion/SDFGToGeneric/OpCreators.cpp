@@ -114,7 +114,6 @@ void conversion::allocSymbol(PatternRewriter &rewriter, Location loc,
 
   // Update symbol map
   symbolMap[symName] = allocOp;
-
   rewriter.restoreInsertionPoint(insertionPoint);
 }
 
