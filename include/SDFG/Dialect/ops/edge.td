@@ -3,6 +3,7 @@
 #ifndef SDFG_EdgeOp
 #define SDFG_EdgeOp
 
+/// Defining the SDFG edges.
 def SDFG_EdgeOp : SDFG_Op<"edge", [
     ParentOneOf<["SDFGNode", "NestedSDFGNode"]>,
     DeclareOpInterfaceMethods<SymbolUserOpInterface>

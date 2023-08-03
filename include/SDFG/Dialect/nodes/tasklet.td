@@ -3,6 +3,7 @@
 #ifndef SDFG_TaskletNode
 #define SDFG_TaskletNode
 
+/// Defining the SDFG tasklet scope.
 def SDFG_TaskletNode : SDFG_Op<"tasklet", [
     ParentOneOf<["StateNode","MapNode","ConsumeNode"]>,
     AffineScope, 

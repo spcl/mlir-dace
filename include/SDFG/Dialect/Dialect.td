@@ -13,6 +13,7 @@ include "mlir/Interfaces/LoopLikeInterface.td"
 // SDFG Dialect
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG dialect.
 def SDFG_Dialect : Dialect{
     let name = "sdfg";
     let summary = "A high-level dialect for representing SDFGs.";
@@ -26,6 +27,7 @@ def SDFG_Dialect : Dialect{
 // SDFG Types
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG base type.
 class SDFG_Type<string name, list<Trait> traits = []> : 
                                         TypeDef<SDFG_Dialect, name, traits>{}
 
@@ -33,6 +35,7 @@ class SDFG_Type<string name, list<Trait> traits = []> :
 // SizedType
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG sizes type.
 def SDFG_SizedType : SDFG_Type<"Sized">{
     let parameters = (ins
         "Type":$elementType,
@@ -61,6 +64,7 @@ def SDFG_SizedType : SDFG_Type<"Sized">{
 // ArrayType
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG array type.
 def SDFG_ArrayType : SDFG_Type<"Array">{
     let mnemonic = "array";
     let summary = "A array type";
@@ -83,6 +87,7 @@ def SDFG_ArrayType : SDFG_Type<"Array">{
 // StreamType
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG stream type.
 def SDFG_StreamType : SDFG_Type<"Stream">{
     let mnemonic = "stream";
     let summary = "A stream type";

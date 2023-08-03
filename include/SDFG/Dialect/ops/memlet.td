@@ -7,6 +7,7 @@
 // AllocOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG containers.
 def SDFG_AllocOp : SDFG_Op<"alloc", [
     ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode"]>
 ]> {
@@ -44,6 +45,7 @@ def SDFG_AllocOp : SDFG_Op<"alloc", [
 // LoadOp
 //===----------------------------------------------------------------------===//
 
+/// Defining part of the SDFG memlet.
 def SDFG_LoadOp : SDFG_Op<"load", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"result type matches element type of 'memlet'", "arr", "res",
@@ -81,6 +83,7 @@ def SDFG_LoadOp : SDFG_Op<"load", [
 // StoreOp
 //===----------------------------------------------------------------------===//
 
+/// Defining part of the SDFG memlet.
 def SDFG_StoreOp : SDFG_Op<"store", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     TypesMatchWith<"value type matches element type of 'memlet'", "arr", "val",
@@ -121,6 +124,7 @@ def SDFG_StoreOp : SDFG_Op<"store", [
 // CopyOp
 //===----------------------------------------------------------------------===//
 
+/// Combines load and store operations.
 def SDFG_CopyOp : SDFG_Op<"copy", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     SameTypeOperands
@@ -150,6 +154,7 @@ def SDFG_CopyOp : SDFG_Op<"copy", [
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG viewcast operation.
 def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
     ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
@@ -179,6 +184,7 @@ def SDFG_ViewCastOp : SDFG_Op<"view_cast", [
 // SubviewOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG subview operation.
 def SDFG_SubviewOp : SDFG_Op<"subview", [
     ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {

@@ -3,6 +3,7 @@
 #ifndef SDFG_SDFGNode
 #define SDFG_SDFGNode
 
+/// Defining the SDFG top-level SDFG.
 def SDFG_SDFGNode : SDFG_Op<"sdfg", [
     ParentOneOf<["ModuleOp"]>,
     NoTerminator,
@@ -44,6 +45,7 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
     }];
 }
 
+/// Defining the SDFG nested SDFG scopes.
 def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
     ParentOneOf<["StateNode","MapNode","ConsumeNode"]>,
     NoTerminator,

@@ -3,6 +3,7 @@
 #ifndef SDFG_MapNode
 #define SDFG_MapNode
 
+/// Defining the SDFG map scope.
 def SDFG_MapNode : SDFG_Op<"map", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     SingleBlock,
@@ -17,7 +18,7 @@ def SDFG_MapNode : SDFG_Op<"map", [
         ```mlir
         sdfg.map (%i, %j) = (0, 0) to (2, 2) step (1, 1) {
             ...
-            %a = sdfg.load %A[%i, %j] : !sdfg.memlet<12x34xi32>
+            %a = sdfg.load %A[%i, %j] : !sdfg.array<12x34xi32>
             ...
         } 
         ```

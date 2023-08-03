@@ -3,6 +3,7 @@
 #ifndef SDFG_StateNode
 #define SDFG_StateNode
 
+/// Defining the SDFG state scope.
 def SDFG_StateNode : SDFG_Op<"state", [
     ParentOneOf<["SDFGNode","NestedSDFGNode"]>,
     SingleBlock,

@@ -3,6 +3,7 @@
 #ifndef SDFG_ConsumeNode
 #define SDFG_ConsumeNode
 
+/// Defining the SDFG consume scope.
 def SDFG_ConsumeNode : SDFG_Op<"consume", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     SingleBlock,
@@ -19,7 +20,6 @@ def SDFG_ConsumeNode : SDFG_Op<"consume", [
         ```mlir
         sdfg.consume{num_pes=5} (%a : !sdfg.stream<i32>) -> (pe: %p, elem: %e) {
                 %c = sdfg.call @add_one(%a) : i32 -> i32
-                sdfg.store(wcr="add") %c, %C[] : i32 -> !sdfg.memlet<i32>
             ...
         } 
         ```

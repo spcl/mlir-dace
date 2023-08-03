@@ -7,6 +7,7 @@
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG tasklet terminator.
 def SDFG_ReturnOp : SDFG_Op<"return", [
     HasParent<"TaskletNode">,
     Terminator
@@ -39,6 +40,7 @@ def SDFG_ReturnOp : SDFG_Op<"return", [
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG library call.
 def SDFG_LibCallOp : SDFG_Op<"libcall", [
     ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>,
     CallOpInterface
