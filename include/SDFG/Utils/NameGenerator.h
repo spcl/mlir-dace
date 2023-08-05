@@ -7,8 +7,9 @@
 
 namespace mlir::sdfg::utils {
 
+/// Converts the provided string to a globally unique one.
 std::string generateName(std::string base);
 
-}
+} // namespace mlir::sdfg::utils
 
 #endif // SDFG_Utils_NameGenerator_H

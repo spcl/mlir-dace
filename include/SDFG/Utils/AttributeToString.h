@@ -9,6 +9,7 @@
 
 namespace mlir::sdfg::utils {
 
+/// Prints an attribute to a string.
 std::string attributeToString(Attribute attribute, Operation &op);
 
 } // namespace mlir::sdfg::utils

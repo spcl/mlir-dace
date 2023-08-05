@@ -7,7 +7,9 @@
 
 namespace mlir::sdfg::utils {
 
+/// Extracts the sized type from an array or stream type.
 SizedType getSizedType(Type t);
+/// Returns true if the provided type is a sized type.
 bool isSizedType(Type t);
 
 } // namespace mlir::sdfg::utils

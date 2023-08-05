@@ -8,6 +8,7 @@
 
 namespace mlir::sdfg::utils {
 
+/// Prints an operation to a string.
 std::string operationToString(Operation &op);
 
 } // namespace mlir::sdfg::utils

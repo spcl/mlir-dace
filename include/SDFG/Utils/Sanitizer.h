@@ -7,8 +7,10 @@
 
 namespace mlir::sdfg::utils {
 
+/// Sanitizes the provided string to only include alphanumericals and
+/// underscores.
 void sanitizeName(std::string &name);
 
-}
+} // namespace mlir::sdfg::utils
 
 #endif // SDFG_Utils_Sanitizer_H

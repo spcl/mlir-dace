@@ -5,7 +5,9 @@
 
 namespace mlir::sdfg::utils {
 
+/// Returns a globally unique ID.
 unsigned generateID();
+/// Resets the ID generator.
 void resetIDGenerator();
 
 } // namespace mlir::sdfg::utils
