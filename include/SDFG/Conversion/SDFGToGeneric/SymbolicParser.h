@@ -27,8 +27,9 @@ public:
 
   IntNode(int value) : value(value){};
 
-  /// Converts the node into MLIR code. SymbolMap is used for permanent mapping
-  /// of symbols to values. RefMap is a temporary mapping overriding SymbolMap.
+  /// Converts the integer node into MLIR code. SymbolMap is used for permanent
+  /// mapping of symbols to values. RefMap is a temporary mapping overriding
+  /// SymbolMap.
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
@@ -41,8 +42,9 @@ public:
 
   BoolNode(bool value) : value(value) {}
 
-  /// Converts the node into MLIR code. SymbolMap is used for permanent mapping
-  /// of symbols to values. RefMap is a temporary mapping overriding SymbolMap.
+  /// Converts the boolean node into MLIR code. SymbolMap is used for permanent
+  /// mapping of symbols to values. RefMap is a temporary mapping overriding
+  /// SymbolMap.
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
@@ -55,8 +57,9 @@ public:
 
   VarNode(std::string name) : name(name) {}
 
-  /// Converts the node into MLIR code. SymbolMap is used for permanent mapping
-  /// of symbols to values. RefMap is a temporary mapping overriding SymbolMap.
+  /// Converts the variable node into MLIR code. SymbolMap is used for permanent
+  /// mapping of symbols to values. RefMap is a temporary mapping overriding
+  /// SymbolMap.
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
@@ -72,8 +75,9 @@ public:
   AssignNode(std::unique_ptr<VarNode> variable, std::unique_ptr<ASTNode> expr)
       : variable(std::move(variable)), expr(std::move(expr)) {}
 
-  /// Converts the node into MLIR code. SymbolMap is used for permanent mapping
-  /// of symbols to values. RefMap is a temporary mapping overriding SymbolMap.
+  /// Converts the assignment node into MLIR code. SymbolMap is used for
+  /// permanent mapping of symbols to values. RefMap is a temporary mapping
+  /// overriding SymbolMap.
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
@@ -92,8 +96,9 @@ public:
   UnOpNode(UnOp op, std::unique_ptr<ASTNode> expr)
       : op(op), expr(std::move(expr)) {}
 
-  /// Converts the node into MLIR code. SymbolMap is used for permanent mapping
-  /// of symbols to values. RefMap is a temporary mapping overriding SymbolMap.
+  /// Converts the unary operation node into MLIR code. SymbolMap is used for
+  /// permanent mapping of symbols to values. RefMap is a temporary mapping
+  /// overriding SymbolMap.
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
@@ -135,8 +140,9 @@ public:
             std::unique_ptr<ASTNode> right)
       : left(std::move(left)), op(op), right(std::move(right)) {}
 
-  /// Converts the node into MLIR code. SymbolMap is used for permanent mapping
-  /// of symbols to values. RefMap is a temporary mapping overriding SymbolMap.
+  /// Converts the binary operation node into MLIR code. SymbolMap is used for
+  /// permanent mapping of symbols to values. RefMap is a temporary mapping
+  /// overriding SymbolMap.
   Value codegen(PatternRewriter &rewriter, Location loc,
                 llvm::StringMap<Value> &symbolMap,
                 llvm::StringMap<Value> &refMap) override;
@@ -197,10 +203,10 @@ private:
   Optional<SmallVector<Token>> tokenize(StringRef input);
 
   /// Attempts to parse a statement:
-  /// stmt ::= assignment | log_or_expr.
+  /// stmt ::= assignment | log_or_expr
   std::unique_ptr<ASTNode> stmt();
   /// Attempts to parse an assignment:
-  /// assignment ::= IDENT ASSIGN log_or_expr.
+  /// assignment ::= IDENT ASSIGN log_or_expr
   std::unique_ptr<ASTNode> assignment();
 
   /// Attempts to parse a logical OR expression:

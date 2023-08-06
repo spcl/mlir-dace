@@ -17,11 +17,11 @@ using namespace mlir;
 using namespace sdfg;
 using namespace conversion;
 
-// Maps state name to their generated block
+/// Maps state name to their generated block
 llvm::StringMap<Block *> blockMap;
 
-// For each function scope, map symbols to values
-// Function scope is determined by the function name
+/// For each function scope, map symbols to values
+/// Function scope is determined by the function name
 llvm::StringMap<llvm::StringMap<Value>> symbolMap;
 
 // HACK: Keeps track of processed EdgeOps
@@ -57,6 +57,7 @@ llvm::DenseSet<EdgeOp> processedEdges;
 // Target & Type Converter
 //===----------------------------------------------------------------------===//
 
+/// Defines the target to convert to.
 struct GenericTarget : public ConversionTarget {
   GenericTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
     // Every Op in the SDFG Dialect is illegal
@@ -74,6 +75,7 @@ struct GenericTarget : public ConversionTarget {
   }
 };
 
+/// Defines a type converter, converting input types to MemRef types.
 class ToMemrefConverter : public TypeConverter {
 public:
   ToMemrefConverter() {
@@ -81,6 +83,7 @@ public:
     addConversion(convertArrayTypes);
   }
 
+  /// Attempts to convert array types to MemRef types.
   static Optional<Type> convertArrayTypes(Type type) {
     if (ArrayType array = type.dyn_cast<ArrayType>()) {
       SmallVector<int64_t> shape;
@@ -106,7 +109,7 @@ public:
 // Helpers
 //===----------------------------------------------------------------------===//
 
-// Gets the current function scope
+/// Gets the current function scope.
 llvm::StringRef getFunctionScope(Operation *op) {
   Operation *parent = op->getParentOfType<func::FuncOp>();
   if (parent == nullptr)
@@ -115,7 +118,7 @@ llvm::StringRef getFunctionScope(Operation *op) {
   return cast<func::FuncOp>(parent).getName();
 }
 
-// Creates operations that perform the symbolic expression
+/// Creates operations that perform the symbolic expression.
 static Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Operation *op,
                                       StringRef symExpr,
                                       llvm::StringMap<Value> refMap = {}) {
@@ -127,7 +130,7 @@ static Value symbolicExpressionToMLIR(PatternRewriter &rewriter, Operation *op,
                       refMap);
 }
 
-// Converts a numberlist (symbol, integer, operand) to Values
+/// Converts a numberlist (symbol, integer, operand) to Values.
 static SmallVector<Value> numberListToMLIR(PatternRewriter &rewriter,
                                            Operation *op, StringRef attrName) {
   ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
@@ -165,6 +168,7 @@ static SmallVector<Value> numberListToMLIR(PatternRewriter &rewriter,
 // SDFG, State & Edge Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a SDFG node to func::FuncOp.
 class SDFGToFunc : public OpConversionPattern<SDFGNode> {
 public:
   using OpConversionPattern<SDFGNode>::OpConversionPattern;
@@ -211,6 +215,7 @@ public:
   }
 };
 
+/// Converts a nested SDFG node to func::FuncOp and func::CallOp.
 class NestedSDFGToFunc : public OpConversionPattern<NestedSDFGNode> {
 public:
   using OpConversionPattern<NestedSDFGNode>::OpConversionPattern;
@@ -267,6 +272,7 @@ public:
   }
 };
 
+/// Converts a state to a basic block.
 class StateToBlock : public OpConversionPattern<StateNode> {
 public:
   using OpConversionPattern<StateNode>::OpConversionPattern;
@@ -315,6 +321,8 @@ public:
   }
 };
 
+/// Converts an edge to basic blocks (for assignments and conditions) and
+/// (conditional) branches.
 class EdgeToBranch : public OpConversionPattern<EdgeOp> {
 public:
   using OpConversionPattern<EdgeOp>::OpConversionPattern;
@@ -392,6 +400,7 @@ public:
 // Access Node Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts an allocation operation to memref::AllocOp.
 class AllocToAlloc : public OpConversionPattern<AllocOp> {
 public:
   using OpConversionPattern<AllocOp>::OpConversionPattern;
@@ -438,6 +447,7 @@ public:
   }
 };
 
+/// Converts a load operation to memref::LoadOp.
 class LoadToLoad : public OpConversionPattern<LoadOp> {
 public:
   using OpConversionPattern<LoadOp>::OpConversionPattern;
@@ -454,6 +464,7 @@ public:
   }
 };
 
+/// Converts a store operation to memref::StoreOp.
 class StoreToStore : public OpConversionPattern<StoreOp> {
 public:
   using OpConversionPattern<StoreOp>::OpConversionPattern;
@@ -469,6 +480,7 @@ public:
   }
 };
 
+/// Converts a copy operation to memref::CopyOp.
 class CopyToCopy : public OpConversionPattern<CopyOp> {
 public:
   using OpConversionPattern<CopyOp>::OpConversionPattern;
@@ -486,6 +498,7 @@ public:
 // Symbol Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a symbol allocation operation to memref::AllocOp.
 class AllocSymbolToAlloc : public OpConversionPattern<AllocSymbolOp> {
 public:
   using OpConversionPattern<AllocSymbolOp>::OpConversionPattern;
@@ -500,6 +513,7 @@ public:
   }
 };
 
+/// Converts a symbolic expression to multiple builtin operations.
 class SymToOps : public OpConversionPattern<SymOp> {
 public:
   using OpConversionPattern<SymOp>::OpConversionPattern;
@@ -525,6 +539,7 @@ public:
 // Tasklet Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a tasklet to func::FuncOp and func::CallOp.
 class TaskletToFunc : public OpConversionPattern<TaskletNode> {
 public:
   using OpConversionPattern<TaskletNode>::OpConversionPattern;
@@ -585,6 +600,7 @@ public:
   }
 };
 
+/// Converts a return operation to func::ReturnOp.
 class ReturnToReturn : public OpConversionPattern<ReturnOp> {
 public:
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
@@ -602,6 +618,7 @@ public:
 // Map & Consume Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a map scope to scf::ParallelOp.
 class MapToParallel : public OpConversionPattern<MapNode> {
 public:
   using OpConversionPattern<MapNode>::OpConversionPattern;
@@ -629,6 +646,7 @@ public:
   }
 };
 
+/// Converts a consume scope to TBD.
 class ConsumeToTODO : public OpConversionPattern<ConsumeNode> {
 public:
   using OpConversionPattern<ConsumeNode>::OpConversionPattern;
@@ -645,6 +663,7 @@ public:
 // Pass
 //===----------------------------------------------------------------------===//
 
+/// Registers all the patterns above in a RewritePatternSet.
 void populateSDFGToGenericConversionPatterns(RewritePatternSet &patterns,
                                              TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
@@ -672,6 +691,7 @@ struct SDFGToGenericPass
 };
 } // namespace
 
+/// Runs the pass on the top-level module operation.
 void SDFGToGenericPass::runOnOperation() {
   ModuleOp module = getOperation();
 
@@ -685,6 +705,7 @@ void SDFGToGenericPass::runOnOperation() {
     signalPassFailure();
 }
 
+/// Returns a unique pointer to this pass.
 std::unique_ptr<Pass> conversion::createSDFGToGenericPass() {
   return std::make_unique<SDFGToGenericPass>();
 }

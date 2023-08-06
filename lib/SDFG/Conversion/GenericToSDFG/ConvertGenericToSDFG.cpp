@@ -19,6 +19,7 @@ using namespace conversion;
 // Target & Type Converter
 //===----------------------------------------------------------------------===//
 
+/// Defines the target to convert to.
 struct SDFGTarget : public ConversionTarget {
   SDFGTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
     // Every Op in the SDFG Dialect is legal
@@ -31,6 +32,7 @@ struct SDFGTarget : public ConversionTarget {
   }
 };
 
+/// Defines a type converter, converting input types to array types.
 class ToArrayConverter : public TypeConverter {
 public:
   ToArrayConverter() {
@@ -39,6 +41,7 @@ public:
     addConversion(convertLLVMPtrTypes);
   }
 
+  /// Attempts to convert MemRef types to array types.
   static Optional<Type> convertMemrefTypes(Type type) {
     if (MemRefType mem = type.dyn_cast<MemRefType>()) {
       SmallVector<int64_t> ints;
@@ -64,6 +67,7 @@ public:
     return std::nullopt;
   }
 
+  /// Attempts to convert LLVM Ptr types to array types.
   static Optional<Type> convertLLVMPtrTypes(Type type) {
     if (mlir::LLVM::LLVMPointerType ptrType =
             type.dyn_cast<mlir::LLVM::LLVMPointerType>()) {
@@ -95,6 +99,8 @@ public:
 // Helpers
 //===----------------------------------------------------------------------===//
 
+/// Checks for each value if it originates from an allocation operation. If so,
+/// inserts load operations to access the stored value.
 static SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
                                       ArrayRef<Value> vals) {
   SmallVector<Value> loadedOps;
@@ -118,11 +124,14 @@ static SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
   return loadedOps;
 }
 
+/// Wrapper function for the above helper function. Instead of a list of values
+/// this function instead just takes a single value.
 static Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
   SmallVector<Value> loadedOps = {val};
   return createLoads(rewriter, loc, loadedOps)[0];
 }
 
+/// Returns the closest SDFG node or nested SDFG node.
 static Operation *getParentSDFG(Operation *op) {
   Operation *parent = op->getParentOp();
 
@@ -135,6 +144,7 @@ static Operation *getParentSDFG(Operation *op) {
   return getParentSDFG(parent);
 }
 
+/// Returns the number of arguments for a SDFG node or nested SDFG node.
 static uint32_t getSDFGNumArgs(Operation *op) {
   if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
     return sdfg.getNumArgs();
@@ -147,6 +157,7 @@ static uint32_t getSDFGNumArgs(Operation *op) {
   return -1;
 }
 
+/// Returns the first state of a SDFG node or nested SDFG node.
 static StateNode getFirstState(Operation *op) {
   if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
     return sdfg.getFirstState();
@@ -159,6 +170,9 @@ static StateNode getFirstState(Operation *op) {
   return nullptr;
 }
 
+/// Searches for the state appearing before the provided state and inserts an
+/// edge without assignemnts or conditions from the previous state to the
+/// current state.
 static void linkToLastState(PatternRewriter &rewriter, Location loc,
                             StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
@@ -177,6 +191,9 @@ static void linkToLastState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
+/// Searches for the state appearing after the provided state and inserts an
+/// edge without assignments or condition from the current state to the next
+/// one.
 static void linkToNextState(PatternRewriter &rewriter, Location loc,
                             StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
@@ -196,16 +213,22 @@ static void linkToNextState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
+/// Marks (using a boolean attribute) an operation (i.e. state) to be connected
+/// to the next state with an edge.
 static void markToLink(Operation &op) {
   BoolAttr boolAttr = BoolAttr::get(op.getContext(), true);
   op.setAttr("linkToNext", boolAttr);
 }
 
+/// Checks if a operation (i.e. state) is marked (using a boolean attribute) to
+/// be connected to the next state with an edge.
 static bool markedToLink(Operation &op) {
   return op.hasAttr("linkToNext") &&
          op.getAttr("linkToNext").cast<BoolAttr>().getValue();
 }
 
+/// Returns the allocation operation from a value originating from a load
+/// operation.
 static Value getTransientValue(Value val) {
   if (val.getDefiningOp() != nullptr && isa<LoadOp>(val.getDefiningOp())) {
     LoadOp load = cast<LoadOp>(val.getDefiningOp());
@@ -220,6 +243,7 @@ static Value getTransientValue(Value val) {
 // Func Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a func::FuncOp to a SDFG node.
 class FuncToSDFG : public OpConversionPattern<func::FuncOp> {
 public:
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -319,6 +343,8 @@ public:
   }
 };
 
+/// Converts a func::CallOp to a nested SDFG node or to a tasklet in special
+/// cases.
 class CallToSDFG : public OpConversionPattern<func::CallOp> {
 public:
   using OpConversionPattern<func::CallOp>::OpConversionPattern;
@@ -454,6 +480,7 @@ public:
   }
 };
 
+/// Converts a func::ReturnOp to copy and store operations.
 class ReturnToSDFG : public OpConversionPattern<func::ReturnOp> {
 public:
   using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
@@ -500,6 +527,7 @@ public:
 // Arith & Math Patterns
 //===----------------------------------------------------------------------===//
 
+/// Wraps any arith and math operation into a tasklet.
 class OpToTasklet : public ConversionPattern {
 public:
   OpToTasklet(TypeConverter &converter, MLIRContext *context)
@@ -588,6 +616,7 @@ public:
 // Memref Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a memref::LoadOp to a sdfg::LoadOp.
 class MemrefLoadToSDFG : public OpConversionPattern<memref::LoadOp> {
 public:
   using OpConversionPattern<memref::LoadOp>::OpConversionPattern;
@@ -629,6 +658,7 @@ public:
   }
 };
 
+/// Converts a memref::StoreOp to a sdfg::StoreOp.
 class MemrefStoreToSDFG : public OpConversionPattern<memref::StoreOp> {
 public:
   using OpConversionPattern<memref::StoreOp>::OpConversionPattern;
@@ -655,6 +685,7 @@ public:
   }
 };
 
+/// Converts a memref::CopyOp to a sdfg::CopyOp.
 class MemrefCopyToSDFG : public OpConversionPattern<memref::CopyOp> {
 public:
   using OpConversionPattern<memref::CopyOp>::OpConversionPattern;
@@ -677,6 +708,7 @@ public:
   }
 };
 
+/// Erases memref::GlobalOp.
 class MemrefGlobalToSDFG : public OpConversionPattern<memref::GlobalOp> {
 public:
   using OpConversionPattern<memref::GlobalOp>::OpConversionPattern;
@@ -689,6 +721,7 @@ public:
   }
 };
 
+/// Converts a memref::GetGlobalOp to an allocation operation.
 class MemrefGetGlobalToSDFG : public OpConversionPattern<memref::GetGlobalOp> {
 public:
   using OpConversionPattern<memref::GetGlobalOp>::OpConversionPattern;
@@ -714,6 +747,7 @@ public:
   }
 };
 
+/// Converts a memref::AllocOp to a sdfg::AllocOp.
 class MemrefAllocToSDFG : public OpConversionPattern<memref::AllocOp> {
 public:
   using OpConversionPattern<memref::AllocOp>::OpConversionPattern;
@@ -761,6 +795,7 @@ public:
   }
 };
 
+/// Converts a memref::AllocaOp to a sdfg::AllocOp.
 class MemrefAllocaToSDFG : public OpConversionPattern<memref::AllocaOp> {
 public:
   using OpConversionPattern<memref::AllocaOp>::OpConversionPattern;
@@ -808,6 +843,7 @@ public:
   }
 };
 
+/// Erases memref::DeallocOp.
 class MemrefDeallocToSDFG : public OpConversionPattern<memref::DeallocOp> {
 public:
   using OpConversionPattern<memref::DeallocOp>::OpConversionPattern;
@@ -820,6 +856,7 @@ public:
   }
 };
 
+/// Converts a memref::CastOp to an allocation and copy operation.
 class MemrefCastToSDFG : public OpConversionPattern<memref::CastOp> {
 public:
   using OpConversionPattern<memref::CastOp>::OpConversionPattern;
@@ -866,6 +903,8 @@ public:
 // SCF Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a scf::ForOp to multiple states, modeling a for loop with
+/// assignment and conditional edges.
 class SCFForToSDFG : public OpConversionPattern<scf::ForOp> {
 public:
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
@@ -1033,6 +1072,8 @@ public:
   }
 };
 
+/// Converts a scf::WhileOp to multiple states, modeling a while loop with
+/// assignment and conditional edges.
 class SCFWhileToSDFG : public OpConversionPattern<scf::WhileOp> {
 public:
   using OpConversionPattern<scf::WhileOp>::OpConversionPattern;
@@ -1193,6 +1234,8 @@ public:
   }
 };
 
+/// Converts a scf::ConditionOp to store operations, storing the condition and
+/// arguments.
 class SCFConditionToSDFG : public OpConversionPattern<scf::ConditionOp> {
 public:
   using OpConversionPattern<scf::ConditionOp>::OpConversionPattern;
@@ -1228,6 +1271,8 @@ public:
   }
 };
 
+/// Converts a scf::IfOp to multiple states, modeling an if-clause with
+/// conditional edges.
 class SCFIfToSDFG : public OpConversionPattern<scf::IfOp> {
 public:
   using OpConversionPattern<scf::IfOp>::OpConversionPattern;
@@ -1339,6 +1384,8 @@ public:
   }
 };
 
+/// Converts a scf::YieldOp to store operations, storing the values being
+/// yielded in for/while/if clauses.
 class SCFYieldToSDFG : public OpConversionPattern<scf::YieldOp> {
 public:
   using OpConversionPattern<scf::YieldOp>::OpConversionPattern;
@@ -1381,6 +1428,7 @@ public:
 // LLVM Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a LLVM::AllocaOp to sdfg::AllocOp.
 class LLVMAllocaToSDFG : public OpConversionPattern<mlir::LLVM::AllocaOp> {
 public:
   using OpConversionPattern<mlir::LLVM::AllocaOp>::OpConversionPattern;
@@ -1428,6 +1476,7 @@ public:
   }
 };
 
+/// Converts a LLVM::BitcastOp to sdfg::ViewCastOp.
 class LLVMBitcastToSDFG : public OpConversionPattern<mlir::LLVM::BitcastOp> {
 public:
   using OpConversionPattern<mlir::LLVM::BitcastOp>::OpConversionPattern;
@@ -1447,6 +1496,7 @@ public:
   }
 };
 
+/// Converts a LLVM::GEPOp to an index computation.
 class LLVMGEPToSDFG : public OpConversionPattern<mlir::LLVM::GEPOp> {
 public:
   using OpConversionPattern<mlir::LLVM::GEPOp>::OpConversionPattern;
@@ -1478,6 +1528,7 @@ public:
   }
 };
 
+/// Converts a LLVM::LoadOp to sdfg::LoadOp.
 class LLVMLoadToSDFG : public OpConversionPattern<mlir::LLVM::LoadOp> {
 public:
   using OpConversionPattern<mlir::LLVM::LoadOp>::OpConversionPattern;
@@ -1525,6 +1576,7 @@ public:
   }
 };
 
+/// Converts a LLVM::StoreOp to sdfg::StoreOp.
 class LLVMStoreToSDFG : public OpConversionPattern<mlir::LLVM::StoreOp> {
 public:
   using OpConversionPattern<mlir::LLVM::StoreOp>::OpConversionPattern;
@@ -1554,6 +1606,7 @@ public:
   }
 };
 
+/// Erases LLVM::GlobalOp.
 class LLVMGlobalToSDFG : public OpConversionPattern<mlir::LLVM::GlobalOp> {
 public:
   using OpConversionPattern<mlir::LLVM::GlobalOp>::OpConversionPattern;
@@ -1567,6 +1620,7 @@ public:
   }
 };
 
+/// Erases LLVM::LLVMFuncOp.
 class LLVMFuncToSDFG : public OpConversionPattern<mlir::LLVM::LLVMFuncOp> {
 public:
   using OpConversionPattern<mlir::LLVM::LLVMFuncOp>::OpConversionPattern;
@@ -1580,6 +1634,7 @@ public:
   }
 };
 
+/// Wraps LLVM::UndefOp into tasklets.
 class LLVMUndefToSDFG : public OpConversionPattern<mlir::LLVM::UndefOp> {
 public:
   using OpConversionPattern<mlir::LLVM::UndefOp>::OpConversionPattern;
@@ -1655,6 +1710,7 @@ public:
 // Pass
 //===----------------------------------------------------------------------===//
 
+/// Registers all the patterns above in a RewritePatternSet.
 void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
                                              TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
@@ -1704,7 +1760,7 @@ struct GenericToSDFGPass
 };
 } // namespace
 
-// Gets the name of the first function that isn't called by any other function
+/// Gets the name of the first function that isn't called by any other function.
 llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
   for (func::FuncOp mainFuncOp : moduleOp.getOps<func::FuncOp>()) {
     // No need to check function declarations
@@ -1741,6 +1797,7 @@ llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
   return std::nullopt;
 }
 
+/// Runs the pass on the top-level module operation.
 void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
@@ -1763,6 +1820,7 @@ void GenericToSDFGPass::runOnOperation() {
     signalPassFailure();
 }
 
+/// Returns a unique pointer to this pass.
 std::unique_ptr<Pass>
 conversion::createGenericToSDFGPass(StringRef getMainFuncName) {
   return std::make_unique<GenericToSDFGPass>(getMainFuncName);
