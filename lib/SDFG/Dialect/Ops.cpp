@@ -1829,6 +1829,8 @@ LogicalResult sdfg::ReturnOp::verify() {
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a library call operation using the provided
+/// PatternRewriter.
 LibCallOp LibCallOp::create(PatternRewriter &rewriter, Location loc,
                             TypeRange result, StringRef callee,
                             ValueRange operands) {
@@ -1838,6 +1840,7 @@ LibCallOp LibCallOp::create(PatternRewriter &rewriter, Location loc,
   return cast<LibCallOp>(rewriter.create(state));
 }
 
+/// Attempts to parse a library call operation.
 ParseResult LibCallOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1866,6 +1869,7 @@ ParseResult LibCallOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a library call operation in human-readable form.
 void LibCallOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(),
                           /*elidedAttrs=*/{"callee"});
@@ -1877,8 +1881,10 @@ void LibCallOp::print(OpAsmPrinter &p) {
                         getOperation()->getResultTypes());
 }
 
+/// Verifies the correct structure of a library call operation.
 LogicalResult LibCallOp::verify() { return success(); }
 
+/// Returns the input name of the provided index.
 std::string LibCallOp::getInputName(unsigned idx) {
   if (getOperation()->hasAttr("inputs")) {
     if (ArrayAttr inputs =
@@ -1892,6 +1898,7 @@ std::string LibCallOp::getInputName(unsigned idx) {
   return utils::valueToString(getOperand(idx), *getOperation());
 }
 
+/// Returns the output name of the provided index.
 std::string LibCallOp::getOutputName(unsigned idx) {
   if (getOperation()->hasAttr("outputs")) {
     if (ArrayAttr outputs =
@@ -1909,6 +1916,8 @@ std::string LibCallOp::getOutputName(unsigned idx) {
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a symbol allocation operation using the
+/// provided PatternRewriter.
 AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
                                     StringRef sym) {
   OpBuilder builder(loc->getContext());
@@ -1917,6 +1926,8 @@ AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
   return cast<AllocSymbolOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts a symbol allocation operation using
+/// Operation::create.
 AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -1924,6 +1935,7 @@ AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
   return cast<AllocSymbolOp>(Operation::create(state));
 }
 
+/// Attempts to parse a symbol allocation operation.
 ParseResult AllocSymbolOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr symAttr;
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1940,6 +1952,7 @@ ParseResult AllocSymbolOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a symbol allocation operation in human-readable form.
 void AllocSymbolOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"sym"});
   p << " (";
@@ -1947,6 +1960,7 @@ void AllocSymbolOp::print(OpAsmPrinter &p) {
   p << ")";
 }
 
+/// Verifies the correct structure of a symbol allocation operation.
 LogicalResult AllocSymbolOp::verify() {
   if (getSym().empty())
     return emitOpError("failed to verify that input string is not empty");
@@ -1967,6 +1981,8 @@ LogicalResult AllocSymbolOp::verify() {
 // SymOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a symbolic expression operation using the
+/// provided PatternRewriter.
 SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
                     StringRef expr) {
   OpBuilder builder(loc->getContext());
@@ -1975,6 +1991,8 @@ SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
   return cast<SymOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts a symbolic expression operation using
+/// Operation::create.
 SymOp SymOp::create(Location loc, Type type, StringRef expr) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -1982,6 +2000,7 @@ SymOp SymOp::create(Location loc, Type type, StringRef expr) {
   return cast<SymOp>(Operation::create(state));
 }
 
+/// Attempts to parse a symbolic expression operation.
 ParseResult SymOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -2000,6 +2019,7 @@ ParseResult SymOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a symbolic expression operation in human-readable form.
 void SymOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"expr"});
   p << " (";
@@ -2007,6 +2027,7 @@ void SymOp::print(OpAsmPrinter &p) {
   p << ") : " << getOperation()->getResultTypes();
 }
 
+/// Verifies the correct structure of a symbolic expression operation.
 LogicalResult SymOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
