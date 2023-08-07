@@ -15,6 +15,7 @@ using namespace sdfg;
 // Helpers
 //===----------------------------------------------------------------------===//
 
+/// Parses a non-empty region.
 static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
                                SmallVector<OpAsmParser::Argument, 4> &args,
                                bool enableShadowing) {
@@ -28,6 +29,7 @@ static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+/// Parses a list of arguments.
 static ParseResult parseArgsList(OpAsmParser &parser,
                                  SmallVector<OpAsmParser::Argument, 4> &args) {
   if (parser.parseLParen())
@@ -48,6 +50,7 @@ static ParseResult parseArgsList(OpAsmParser &parser,
   return success();
 }
 
+/// Prints a list of arguments in human-readable form.
 static void printArgsList(OpAsmPrinter &p, Region::BlockArgListType args,
                           unsigned lb, unsigned ub) {
   p << " (";
@@ -61,6 +64,8 @@ static void printArgsList(OpAsmPrinter &p, Region::BlockArgListType args,
   p << ")";
 }
 
+/// Parses arguments with an optional "as" keyword to compactly represent
+/// arguments and parameters.
 static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
                                SmallVector<OpAsmParser::Argument, 4> &args) {
   if (parser.parseLParen())
@@ -99,6 +104,8 @@ static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+/// Prints a list of arguments with an optional "as" keyword in human-readable
+/// form.
 static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
                         Region::BlockArgListType args, unsigned lb,
                         unsigned ub) {
@@ -117,13 +124,13 @@ static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
 // InlineSymbol
 //===----------------------------------------------------------------------===//
 
-// There are 3 possible values that can be used as a number: symbols, integers
-// and operands. Operands are stored as regular operands. Symbols as stringAttr
-// and integers as int32 Attr. In order to encode the correct order of values
-// we use an auxiliary attr called [attrName]_numList.
-// The numList contains int32 Attrs with the following encoding:
-// Positive int n: nth operand
-// Negative int n: -nth - 1 Attribute (symbol or integer) in [attrName]
+/// There are 3 possible values that can be used as a number: symbols, integers
+/// and operands. Operands are stored as regular operands. Symbols as stringAttr
+/// and integers as int32 Attr. In order to encode the correct order of values
+/// we use an auxiliary attr called [attrName]_numList.
+/// The numList contains int32 Attrs with the following encoding:
+/// Positive int n: nth operand
+/// Negative int n: -nth - 1 Attribute (symbol or integer) in [attrName]
 static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
                                    StringRef attrName) {
   SmallVector<OpAsmParser::UnresolvedOperand> opList;
@@ -183,6 +190,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+/// Prints a list of number arguments in human-readable form.
 static void printNumberList(OpAsmPrinter &p, Operation *op,
                             StringRef attrName) {
   ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
@@ -211,6 +219,8 @@ static void printNumberList(OpAsmPrinter &p, Operation *op,
   }
 }
 
+/// Prints a list of optional attributes excluding the number list in
+/// human-readable form.
 static void
 printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
                                ArrayRef<StringRef> elidedAttrs = {}) {
@@ -223,6 +233,8 @@ printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
   p.printOptionalAttrDict(attrs, /*elidedAttrs=*/numListAttrs);
 }
 
+/// Returns the length of the number list, which is equivalent to the number of
+/// numeric arguments.
 static size_t getNumListSize(Operation *op, StringRef attrName) {
   ArrayAttr numList =
       op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
@@ -233,10 +245,7 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
-  return create(rewriter, loc, 0, {});
-}
-
+/// Builds, creates and inserts a SDFG node using the provided PatternRewriter.
 SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
                           unsigned num_args, TypeRange args) {
   OpBuilder builder(loc->getContext());
@@ -252,6 +261,12 @@ SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
   return sdfg;
 }
 
+/// Builds, creates and inserts a SDFG node using the provided PatternRewriter.
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, 0, {});
+}
+
+/// Attempts to parse a SDFG node.
 ParseResult SDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -277,6 +292,7 @@ ParseResult SDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a SDFG node in human-readable form.
 void SDFGNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
@@ -290,6 +306,7 @@ void SDFGNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
+/// Verifies the correct structure of a SDFG node.
 LogicalResult SDFGNode::verify() {
   // Verify that no other dialect is used in the body
   for (Operation &oper : getBody().getOps())
@@ -303,6 +320,7 @@ LogicalResult SDFGNode::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in a SDFG node.
 LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the entry attribute references valid state
   FlatSymbolRefAttr entryAttr =
@@ -319,15 +337,18 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+/// Returns the first state in the SDFG node.
 StateNode SDFGNode::getFirstState() {
   return *getBody().getOps<StateNode>().begin();
 }
 
+/// Returns the state with the provided name (symbol) in the SDFG node.
 StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
   Operation *op = lookupSymbol(symRef);
   return dyn_cast<StateNode>(op);
 }
 
+/// Returns the entry state of the SDFG node.
 StateNode SDFGNode::getEntryState() {
   if (this->getEntry().has_value())
     return getStateBySymRef(this->getEntry().value());
@@ -335,10 +356,12 @@ StateNode SDFGNode::getEntryState() {
   return this->getFirstState();
 }
 
+/// Returns the list of arguments in the SDFG node.
 Block::BlockArgListType SDFGNode::getArgs() {
   return this->getBody().getArguments().take_front(getNumArgs());
 }
 
+/// Returns a list of argument types in the SDFG node.
 TypeRange SDFGNode::getArgTypes() {
   SmallVector<Type> types = {};
   for (BlockArgument BArg : getArgs()) {
@@ -347,10 +370,12 @@ TypeRange SDFGNode::getArgTypes() {
   return TypeRange(types);
 }
 
+/// Returns the list of results in the SDFG node.
 Block::BlockArgListType SDFGNode::getResults() {
   return this->getBody().getArguments().drop_front(getNumArgs());
 }
 
+/// Returns a list of result types in the SDFG node.
 TypeRange SDFGNode::getResultTypes() {
   SmallVector<Type> types = {};
   for (BlockArgument BArg : getResults()) {
@@ -363,10 +388,8 @@ TypeRange SDFGNode::getResultTypes() {
 // NestedSDFGNode
 //===----------------------------------------------------------------------===//
 
-NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc) {
-  return create(rewriter, loc, 0, {});
-}
-
+/// Builds, creates and inserts a nested SDFG node using the provided
+/// PatternRewriter.
 NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc,
                                       unsigned num_args, ValueRange args) {
   OpBuilder builder(loc->getContext());
@@ -383,6 +406,13 @@ NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc,
   return sdfg;
 }
 
+/// Builds, creates and inserts a nested SDFG node using the provided
+/// PatternRewriter.
+NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, 0, {});
+}
+
+/// Attempts to parse a nested SDFG node.
 ParseResult NestedSDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -409,6 +439,7 @@ ParseResult NestedSDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a nested SDFG node in human-readable form.
 void NestedSDFGNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
@@ -422,6 +453,7 @@ void NestedSDFGNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
+/// Verifies the correct structure of a nested SDFG node.
 LogicalResult NestedSDFGNode::verify() {
   // Verify that no other dialect is used in the body
   for (Operation &oper : getBody().getOps())
@@ -439,6 +471,7 @@ LogicalResult NestedSDFGNode::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in a nested SDFG node.
 LogicalResult
 NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the entry attribute references valid state
@@ -456,15 +489,18 @@ NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+/// Returns the first state in the nested SDFG node.
 StateNode NestedSDFGNode::getFirstState() {
   return *getBody().getOps<StateNode>().begin();
 }
 
+/// Returns the state with the provided name (symbol) in the nested SDFG node.
 StateNode NestedSDFGNode::getStateBySymRef(StringRef symRef) {
   Operation *op = lookupSymbol(symRef);
   return dyn_cast<StateNode>(op);
 }
 
+/// Returns the entry state of the nested SDFG node.
 StateNode NestedSDFGNode::getEntryState() {
   if (this->getEntry().has_value())
     return getStateBySymRef(this->getEntry().value());
@@ -472,10 +508,12 @@ StateNode NestedSDFGNode::getEntryState() {
   return this->getFirstState();
 }
 
+/// Returns the list of arguments in the nested SDFG node.
 ValueRange NestedSDFGNode::getArgs() {
   return this->getOperands().take_front(getNumArgs());
 }
 
+/// Returns the list of results in the nested SDFG node.
 ValueRange NestedSDFGNode::getResults() {
   return this->getOperands().drop_front(getNumArgs());
 }
@@ -484,10 +522,7 @@ ValueRange NestedSDFGNode::getResults() {
 // StateNode
 //===----------------------------------------------------------------------===//
 
-StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
-  return create(rewriter, loc, "state");
-}
-
+/// Builds, creates and inserts a state node using the provided PatternRewriter.
 StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
                             StringRef name) {
   OpBuilder builder(loc->getContext());
@@ -498,6 +533,12 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
   return stateNode;
 }
 
+/// Builds, creates and inserts a state node using the provided PatternRewriter.
+StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, "state");
+}
+
+/// Builds, creates and inserts a state node using Operation::create.
 StateNode StateNode::create(Location loc, StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -505,6 +546,7 @@ StateNode StateNode::create(Location loc, StringRef name) {
   return cast<StateNode>(Operation::create(state));
 }
 
+/// Attempts to parse a state node.
 ParseResult StateNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -527,6 +569,7 @@ ParseResult StateNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a state node in human-readable form.
 void StateNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "sym_name"});
@@ -535,6 +578,7 @@ void StateNode::print(OpAsmPrinter &p) {
   p.printRegion(getBody());
 }
 
+/// Verifies the correct structure of a state node.
 LogicalResult StateNode::verify() {
   // Verify that no other dialect is used in the body
   // Except func operations
@@ -549,6 +593,42 @@ LogicalResult StateNode::verify() {
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a tasklet node using the provided
+/// PatternRewriter.
+TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+                                ValueRange operands, TypeRange results) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  build(builder, state, results, utils::generateID(), operands);
+
+  TaskletNode task = cast<TaskletNode>(rewriter.create(state));
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < operands.size(); ++i)
+    locs.push_back(location);
+
+  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes(), locs);
+  return task;
+}
+
+/// Builds, creates and inserts a tasklet node using Operation::create.
+TaskletNode TaskletNode::create(Location location, ValueRange operands,
+                                TypeRange results) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  build(builder, state, results, utils::generateID(), operands);
+
+  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < operands.size(); ++i)
+    locs.push_back(location);
+
+  builder.createBlock(&task.getBody(), {}, operands.getTypes(), locs);
+  return task;
+}
+
+/// Attempts to parse a tasklet node.
 ParseResult TaskletNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -571,6 +651,7 @@ ParseResult TaskletNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a tasklet node in human-readable form.
 void TaskletNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"ID"});
   printAsArgs(p, getOperands(), getBody().getArguments(), 0, getNumOperands());
@@ -579,6 +660,7 @@ void TaskletNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
+/// Verifies the correct structure of a tasklet node.
 LogicalResult TaskletNode::verify() {
   // Verify that operands and arguments line up
   if (getNumOperands() != getBody().getNumArguments())
@@ -587,42 +669,12 @@ LogicalResult TaskletNode::verify() {
   return success();
 }
 
-TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
-                                ValueRange operands, TypeRange results) {
-  OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
-  build(builder, state, results, utils::generateID(), operands);
-
-  TaskletNode task = cast<TaskletNode>(rewriter.create(state));
-
-  std::vector<Location> locs = {};
-  for (unsigned i = 0; i < operands.size(); ++i)
-    locs.push_back(location);
-
-  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes(), locs);
-  return task;
-}
-
-TaskletNode TaskletNode::create(Location location, ValueRange operands,
-                                TypeRange results) {
-  OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
-  build(builder, state, results, utils::generateID(), operands);
-
-  TaskletNode task = cast<TaskletNode>(Operation::create(state));
-
-  std::vector<Location> locs = {};
-  for (unsigned i = 0; i < operands.size(); ++i)
-    locs.push_back(location);
-
-  builder.createBlock(&task.getBody(), {}, operands.getTypes(), locs);
-  return task;
-}
-
+/// Returns the input name of the provided index.
 std::string TaskletNode::getInputName(unsigned idx) {
   return utils::valueToString(getBody().getArgument(idx), *getOperation());
 }
 
+/// Returns the output name of the provided index.
 std::string TaskletNode::getOutputName(unsigned idx) {
   return "__out" + std::to_string(idx);
 }
@@ -631,6 +683,7 @@ std::string TaskletNode::getOutputName(unsigned idx) {
 // MapNode
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a map node.
 ParseResult MapNode::parse(OpAsmParser &parser, OperationState &result) {
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
@@ -676,6 +729,7 @@ ParseResult MapNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a map node in human-readable form.
 void MapNode::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(
       p, (*this)->getAttrs(),
@@ -699,6 +753,7 @@ void MapNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/false);
 }
 
+/// Verifies the correct structure of a map node.
 LogicalResult MapNode::verify() {
   size_t var_count = getBody().getArguments().size();
 
@@ -722,12 +777,14 @@ LogicalResult MapNode::verify() {
   return success();
 }
 
+/// Returns the body of the map node.
 Region &MapNode::getLoopBody() { return getBody(); }
 
 //===----------------------------------------------------------------------===//
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a consume node.
 ParseResult ConsumeNode::parse(OpAsmParser &parser, OperationState &result) {
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
@@ -780,6 +837,7 @@ ParseResult ConsumeNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a consume node in human-readable form.
 void ConsumeNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"entryID", "exitID"});
@@ -790,6 +848,7 @@ void ConsumeNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/false);
 }
 
+/// Verifies the correct structure of a consume node.
 LogicalResult ConsumeNode::verify() {
   if (getNumPes().has_value() && getNumPes().value().isNonPositive())
     return emitOpError("failed to verify that number of "
@@ -803,6 +862,7 @@ LogicalResult ConsumeNode::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in a consume node.
 LogicalResult
 ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the condition attribute is specified.
@@ -828,14 +888,18 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+/// Returns the body of the consume node.
 Region &ConsumeNode::getLoopBody() { return getBody(); }
+/// Returns the argument corresponding to the processing element.
 BlockArgument ConsumeNode::pe() { return getBody().getArgument(0); }
+/// Returns the argument corresponding to the popped element.
 BlockArgument ConsumeNode::elem() { return getBody().getArgument(1); }
 
 //===----------------------------------------------------------------------===//
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts an edge using the provided PatternRewriter.
 EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to, ArrayAttr &assign, StringAttr &condition,
                       Value ref) {
@@ -846,6 +910,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   return cast<EdgeOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts an edge using the provided PatternRewriter.
 EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to) {
   OpBuilder builder(loc->getContext());
@@ -855,6 +920,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   return cast<EdgeOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts an edge using Operation::create.
 EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
                       ArrayAttr &assign, StringAttr &condition, Value ref) {
   OpBuilder builder(loc->getContext());
@@ -864,6 +930,7 @@ EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
   return cast<EdgeOp>(Operation::create(state));
 }
 
+/// Attempts to parse a edge operation.
 ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
   FlatSymbolRefAttr srcAttr;
   FlatSymbolRefAttr destAttr;
@@ -896,6 +963,7 @@ ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a edge operation in human-readable form.
 void EdgeOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
   p << ' ';
@@ -906,6 +974,7 @@ void EdgeOp::print(OpAsmPrinter &p) {
   p.printAttributeWithoutType(getDestAttr());
 }
 
+/// Verifies the correct structure of an edge operation.
 LogicalResult EdgeOp::verify() {
   // Check that condition is non-empty
   if (getCondition().empty())
@@ -914,6 +983,7 @@ LogicalResult EdgeOp::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in an edge operation.
 LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the src/dest attributes are specified.
   FlatSymbolRefAttr srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
@@ -1881,5 +1951,6 @@ LogicalResult SymOp::verify() { return success(); }
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
 
+/// Generate the code for operation definitions.
 #define GET_OP_CLASSES
 #include "SDFG/Dialect/Ops.cpp.inc"

@@ -101,7 +101,7 @@ static void printDimensionList(AsmPrinter &printer, Type &elemType,
   printer << elemType << ">";
 }
 
-/// Parses an array type.
+/// Attempts to parse an array type.
 ::mlir::Type ArrayType::parse(::mlir::AsmParser &odsParser) {
   Type elementType;
   SmallVector<StringAttr> symbols;
@@ -142,7 +142,7 @@ ArrayRef<int64_t> ArrayType::getIntegers() {
 /// (false = symbolic size, true = integer constant)
 ArrayRef<bool> ArrayType::getShape() { return getDimensions().getShape(); }
 
-/// Parses a stream type.
+/// Attempts to parse a stream type.
 ::mlir::Type StreamType::parse(::mlir::AsmParser &odsParser) {
   Type elementType;
   SmallVector<StringAttr> symbols;
