@@ -150,6 +150,7 @@ public:
   Array(StringRef name, bool transient, bool stream, SizedType shape)
       : name(name), transient(transient), stream(stream), shape(shape) {}
 
+  /// Emits this array to the output stream.
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -164,6 +165,7 @@ public:
   Range(StringRef start, StringRef end, StringRef step, StringRef tile)
       : start(start), end(end), step(step), tile(tile) {}
 
+  /// Emits this range to the output stream.
   void emit(emitter::JsonEmitter &jemit) override;
 };
 
@@ -184,24 +186,24 @@ public:
 
   bool operator==(const Node other) const { return other.ptr == ptr; }
 
-  /// ID setter.
+  /// Sets the ID of the node.
   void setID(unsigned id);
-  /// ID getter.
+  /// Returns the ID of the node.
   unsigned getID();
 
-  /// Source code location getter.
+  /// Returns the source code location.
   Location getLocation();
-  /// Node type getter.
+  /// Returns the type of the node.
   NType getType();
 
-  /// Name setter.
+  /// Sets the name of the node.
   void setName(StringRef name);
-  /// Name getter.
+  /// Returns the name of the node.
   StringRef getName();
 
-  /// Parent node setter.
+  /// Sets the parent of the node.
   void setParent(Node parent);
-  /// Parent node getter.
+  /// Returns the parent of the node.
   Node getParent();
   /// Return true if this node has a parent node.
   bool hasParent();
@@ -807,9 +809,9 @@ public:
   void addParam(StringRef param);
   /// Adds a range for a parameter.
   void addRange(Range range);
-  /// Set the map exit this map entry belongs to.
+  /// Sets the map exit this map entry belongs to.
   void setExit(MapExit exit);
-  /// Get the matching map exit.
+  /// Returns the matching map exit.
   MapExit getExit();
   /// Adds a connector node to the scope.
   void addNode(ConnectorNode node) override;
@@ -841,7 +843,7 @@ public:
 
   MapExit() : ConnectorNode(nullptr) {}
 
-  /// Set the map entry this map exit belongs to.
+  /// Sets the map entry this map exit belongs to.
   void setEntry(MapEntry entry);
 
   /// Emits the map exit to the output stream.
@@ -865,9 +867,9 @@ public:
   void addParam(StringRef param);
   /// Adds a range for a parameter.
   void addRange(Range range);
-  /// Set the map exit this map entry belongs to.
+  /// Sets the map exit this map entry belongs to.
   void setExit(MapExit exit);
-  /// Get the matching map exit.
+  /// Returns the matching map exit.
   MapExit getExit();
   /// Adds a connector node to the scope.
   void addNode(ConnectorNode node) override;
@@ -894,7 +896,7 @@ private:
 public:
   MapExitImpl(Location location) : ConnectorNodeImpl(location) {}
 
-  /// Set the map entry this map exit belongs to.
+  /// Sets the map entry this map exit belongs to.
   void setEntry(MapEntry entry);
 
   /// Emits the map exit to the output stream.
@@ -925,9 +927,9 @@ public:
 
   ConsumeEntry() : ScopeNode(nullptr) {}
 
-  /// Set the consume exit this consume entry belongs to.
+  /// Sets the consume exit this consume entry belongs to.
   void setExit(ConsumeExit exit);
-  /// Get the matching consume exit.
+  /// Returns the matching consume exit.
   ConsumeExit getExit();
   /// Adds a connector node to the scope.
   void addNode(ConnectorNode node) override;
@@ -942,11 +944,11 @@ public:
   /// connectors when needed.
   Connector lookup(Value value) override;
 
-  /// Set the number of processing elements.
+  /// Sets the number of processing elements.
   void setNumPes(StringRef pes);
-  /// Set the name of the processing element index.
+  /// Sets the name of the processing element index.
   void setPeIndex(StringRef pe);
-  /// Set the condition to continue stream consumption.
+  /// Sets the condition to continue stream consumption.
   void setCondition(Code condition);
 
   /// Emits the consume entry to the output stream.
@@ -967,7 +969,7 @@ public:
 
   ConsumeExit() : ConnectorNode(nullptr) {}
 
-  /// Set the consume entry this consume exit belongs to.
+  /// Sets the consume entry this consume exit belongs to.
   void setEntry(ConsumeEntry entry);
 
   /// Emits the consume exit to the output stream.
@@ -989,9 +991,9 @@ private:
 public:
   ConsumeEntryImpl(Location location) : ScopeNodeImpl(location) {}
 
-  /// Set the consume exit this consume entry belongs to.
+  /// Sets the consume exit this consume entry belongs to.
   void setExit(ConsumeExit exit);
-  /// Get the matching consume exit.
+  /// Returns the matching consume exit.
   ConsumeExit getExit();
   /// Adds a connector node to the scope.
   void addNode(ConnectorNode node) override;
@@ -1006,11 +1008,11 @@ public:
   /// connectors when needed.
   Connector lookup(Value value) override;
 
-  /// Set the number of processing elements.
+  /// Sets the number of processing elements.
   void setNumPes(StringRef pes);
-  /// Set the name of the processing element index.
+  /// Sets the name of the processing element index.
   void setPeIndex(StringRef pe);
-  /// Set the condition to continue stream consumption.
+  /// Sets the condition to continue stream consumption.
   void setCondition(Code condition);
 
   /// Emits the consume entry to the output stream.
@@ -1026,7 +1028,7 @@ private:
 public:
   ConsumeExitImpl(Location location) : ConnectorNodeImpl(location) {}
 
-  /// Set the consume entry this consume exit belongs to.
+  /// Sets the consume entry this consume exit belongs to.
   void setEntry(ConsumeEntry entry);
 
   /// Emits the consume exit to the output stream.

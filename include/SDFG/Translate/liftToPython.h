@@ -7,7 +7,8 @@
 
 namespace mlir::sdfg::translation {
 
-/// Converts the operations in the first region of op to Python code.
+/// Converts the operations in the first region of op to Python code. If
+/// successful, returns Python code as a string.
 Optional<std::string> liftToPython(Operation &op);
 /// Provides a name for the tasklet.
 std::string getTaskletName(Operation &op);

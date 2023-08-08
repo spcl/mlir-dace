@@ -60,6 +60,7 @@ struct JsonEmitter {
   /// into string.
   void printKVPair(StringRef key, Attribute val, bool stringify = true);
 
+  /// Prints a list of NamedAttributes as key-value pairs.
   void printAttributes(ArrayRef<NamedAttribute> arr,
                        ArrayRef<StringRef> elidedAttrs = {});
 

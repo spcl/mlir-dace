@@ -7,6 +7,8 @@ using namespace mlir;
 using namespace sdfg;
 
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
+/// Converts a single operation to a single line of Python code. If successful,
+/// returns Python code as s string.
 Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   // FIXME: Support multiple return values
   if (op.getNumResults() > 1)
@@ -345,7 +347,8 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   return std::nullopt;
 }
 
-// If successful returns Python code as string
+/// Converts the operations in the first region of op to Python code. If
+/// successful, returns Python code as a string.
 Optional<std::string> translation::liftToPython(Operation &op) {
   std::string code = "";
 
@@ -363,6 +366,7 @@ Optional<std::string> translation::liftToPython(Operation &op) {
   return code;
 }
 
+/// Provides a name for the tasklet.
 std::string translation::getTaskletName(Operation &op) {
   Operation &firstOp = *op.getRegion(0).getOps().begin();
   return sdfg::utils::operationToString(firstOp);
