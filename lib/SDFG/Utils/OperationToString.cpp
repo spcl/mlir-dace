@@ -6,6 +6,7 @@
 
 namespace mlir::sdfg::utils {
 
+/// Prints an operation to a string.
 std::string operationToString(Operation &op) {
   std::string name = op.getName().stripDialect().str();
   utils::sanitizeName(name);

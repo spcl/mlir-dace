@@ -5,6 +5,8 @@
 using namespace mlir;
 using namespace sdfg;
 
+/// Sanitizes the provided string to only include alphanumericals and
+/// underscores.
 void utils::sanitizeName(std::string &name) {
   for (unsigned i = 0; i < name.size(); ++i) {
     if (!(name[i] >= 'a' && name[i] <= 'z') &&

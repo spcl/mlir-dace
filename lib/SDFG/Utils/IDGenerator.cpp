@@ -7,8 +7,10 @@ namespace {
 unsigned idGeneratorID = 0;
 }
 
+/// Returns a globally unique ID.
 unsigned generateID() { return idGeneratorID++; }
 
+/// Resets the ID generator.
 void resetIDGenerator() { idGeneratorID = 0; }
 
 } // namespace mlir::sdfg::utils

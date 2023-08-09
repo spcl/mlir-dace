@@ -30,10 +30,10 @@ LogicalResult collect(AllocSymbolOp &op, SDFG &sdfg);
 LogicalResult collect(AllocOp &op, ScopeNode &scope);
 /// Collects tasklet information in a scope.
 LogicalResult collect(TaskletNode &op, ScopeNode &scope);
-/// Collects nested SDFG node information in a scope.
-LogicalResult collect(NestedSDFGNode &op, ScopeNode &scope);
 /// Collects library call information in a scope.
 LogicalResult collect(LibCallOp &op, ScopeNode &scope);
+/// Collects nested SDFG node information in a scope.
+LogicalResult collect(NestedSDFGNode &op, ScopeNode &scope);
 
 /// Collects map node information in a scope.
 LogicalResult collect(MapNode &op, ScopeNode &scope);

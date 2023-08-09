@@ -4,8 +4,8 @@
 
 namespace mlir::sdfg::utils {
 
-// Returns the parent SDFG node, NestedSDFG node or nullptr if a parent does not
-// exist
+/// Returns the parent SDFG node, NestedSDFG node or nullptr if a parent does
+/// not exist.
 Operation *getParentSDFG(Operation &op) {
   Operation *parent = op.getParentOp();
 
@@ -22,7 +22,7 @@ Operation *getParentSDFG(Operation &op) {
   return nullptr;
 }
 
-// Returns the parent State node or nullptr if a parent does not exist
+/// Returns the parent State node or nullptr if a parent does not exist.
 StateNode getParentState(Operation &op, bool ignoreSDFGs) {
   Operation *parent = op.getParentOp();
 
@@ -39,7 +39,7 @@ StateNode getParentState(Operation &op, bool ignoreSDFGs) {
   return nullptr;
 }
 
-// Returns top-level module operation
+/// Returns top-level module operation or nullptr if a parent does not exist.
 ModuleOp getTopModuleOp(Operation *op) {
   Operation *parent = op->getParentOp();
 

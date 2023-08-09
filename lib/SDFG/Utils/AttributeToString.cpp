@@ -5,6 +5,7 @@
 
 namespace mlir::sdfg::utils {
 
+/// Prints an attribute to a string.
 std::string attributeToString(Attribute attribute, Operation &op) {
   std::string name;
   llvm::raw_string_ostream nameStream(name);

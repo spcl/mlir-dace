@@ -7,6 +7,7 @@ namespace {
 int nameGeneratorID = 0;
 }
 
+/// Converts the provided string to a globally unique one.
 std::string generateName(std::string base) {
   return base + "_" + std::to_string(nameGeneratorID++);
 }

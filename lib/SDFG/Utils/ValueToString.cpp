@@ -6,6 +6,7 @@
 
 namespace mlir::sdfg::utils {
 
+/// Prints a value to a string. Optionally takes a context operation.
 std::string valueToString(Value value) {
   if (value.getDefiningOp() != nullptr)
     return valueToString(value, *value.getDefiningOp());
@@ -13,6 +14,7 @@ std::string valueToString(Value value) {
   return valueToString(value, *value.getParentBlock()->getParentOp());
 }
 
+/// Prints a value to a string. Optionally takes a context operation.
 std::string valueToString(Value value, Operation &op) {
   Operation *sdfg;
 

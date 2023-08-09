@@ -8,6 +8,7 @@
 // SDFG registration
 //===----------------------------------------------------------------------===//
 
+/// Registers SDFG to SDFG IR translation.
 void mlir::sdfg::translation::registerToSDFGTranslation() {
   mlir::TranslateFromMLIRRegistration registration(
       "mlir-to-sdfg", "Generates a SDFG JSON",
