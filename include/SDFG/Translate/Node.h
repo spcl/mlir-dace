@@ -883,7 +883,7 @@ public:
   void mapConnector(Value value, Connector connector) override;
   /// Returns the connector associated with a MLIR value, inserting map
   /// connectors when needed.
-  Connector lookup(Value value) override;
+  Connector lookup(Value value, MapEntry mapEntry);
 
   /// Emits the map entry to the output stream.
   void emit(emitter::JsonEmitter &jemit) override;
@@ -1008,7 +1008,7 @@ public:
   void mapConnector(Value value, Connector connector) override;
   /// Returns the connector associated with a MLIR value, inserting consume
   /// connectors when needed.
-  Connector lookup(Value value) override;
+  Connector lookup(Value value, ConsumeEntry entry);
 
   /// Sets the number of processing elements.
   void setNumPes(StringRef pes);
