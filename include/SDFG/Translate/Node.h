@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for the internal IR of the translator.
+
 #ifndef SDFG_Translation_Node_H
 #define SDFG_Translation_Node_H
 

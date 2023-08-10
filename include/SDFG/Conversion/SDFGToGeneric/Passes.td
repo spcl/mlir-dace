@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Table-driven file for SDFG to Generic conversion passes.
+
 #ifndef SDFG_Conversion_SDFGToGeneric
 #define SDFG_Conversion_SDFGToGeneric
 

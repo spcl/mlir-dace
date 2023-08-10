@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for JSON emitter in SDFG translation.
+
 #ifndef SDFG_JsonEmitter_H
 #define SDFG_JsonEmitter_H
 

@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Table-driven file for edge operations.
+
 #ifndef SDFG_EdgeOp
 #define SDFG_EdgeOp
 

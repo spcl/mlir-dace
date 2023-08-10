@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Table-driven file for symbol operations.
+
 #ifndef SDFG_SymbolOps
 #define SDFG_SymbolOps
 

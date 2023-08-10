@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Table-driven file for SDFG operations.
+
 #ifndef SDFG_OPS
 #define SDFG_OPS
 

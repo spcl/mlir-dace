@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Table-driven file for Linalg to SDFG conversion passes.
+
 #ifndef SDFG_Conversion_LinalgToSDFG
 #define SDFG_Conversion_LinalgToSDFG
 

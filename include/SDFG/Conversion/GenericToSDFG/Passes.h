@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for Generic to SDFG conversion passes.
+
 #ifndef SDFG_Conversion_GenericToSDFG_H
 #define SDFG_Conversion_GenericToSDFG_H
 

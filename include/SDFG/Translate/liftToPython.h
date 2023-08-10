@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for lifting operations to Python.
+
 #ifndef SDFG_Translation_LiftToPython_H
 #define SDFG_Translation_LiftToPython_H
 

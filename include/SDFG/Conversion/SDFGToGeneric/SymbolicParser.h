@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for a simple LL(1) parser, parsing symbolic expressions.
+
 #ifndef SDFG_Conversion_SDFGToGeneric_Symbolic_Parser_H
 #define SDFG_Conversion_SDFGToGeneric_Symbolic_Parser_H
 

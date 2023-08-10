@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for SDFG dialect.
+
 #ifndef SDFG_DIALECT_DIALECT_H
 #define SDFG_DIALECT_DIALECT_H
 

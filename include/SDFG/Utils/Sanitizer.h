@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// Header for the sanitizer utility functions.
+
 #ifndef SDFG_Utils_Sanitizer_H
 #define SDFG_Utils_Sanitizer_H
 
