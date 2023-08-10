@@ -1,5 +1,8 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains a Python lifter, which lifts MLIR operations to Python
+/// code.
+
 #include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
 

@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains the sanitizer utility functions.
+
 #include "SDFG/Utils/Sanitizer.h"
 
 using namespace mlir;

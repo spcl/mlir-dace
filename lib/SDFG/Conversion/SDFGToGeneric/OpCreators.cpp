@@ -1,5 +1,8 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains convenience functions that build, create and insert
+/// various operations.
+
 #include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
 
 using namespace mlir;

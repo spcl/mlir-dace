@@ -1,31 +1,6 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
-#include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
-#include "SDFG/Conversion/SDFGToGeneric/PassDetail.h"
-#include "SDFG/Conversion/SDFGToGeneric/Passes.h"
-#include "SDFG/Conversion/SDFGToGeneric/SymbolicParser.h"
-#include "SDFG/Dialect/Dialect.h"
-#include "SDFG/Utils/Utils.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/AsmState.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/Transforms/DialectConversion.h"
-
-using namespace mlir;
-using namespace sdfg;
-using namespace conversion;
-
-/// Maps state name to their generated block
-llvm::StringMap<Block *> blockMap;
-
-/// For each function scope, map symbols to values
-/// Function scope is determined by the function name
-llvm::StringMap<llvm::StringMap<Value>> symbolMap;
-
-// HACK: Keeps track of processed EdgeOps
-llvm::DenseSet<EdgeOp> processedEdges;
+/// This file defines a converter from the SDFG dialect to the builtin dialects.
 
 //
 // SDFG -> func.func
@@ -52,6 +27,33 @@ llvm::DenseSet<EdgeOp> processedEdges;
 //
 // Consume -> TBD
 //
+
+#include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
+#include "SDFG/Conversion/SDFGToGeneric/PassDetail.h"
+#include "SDFG/Conversion/SDFGToGeneric/Passes.h"
+#include "SDFG/Conversion/SDFGToGeneric/SymbolicParser.h"
+#include "SDFG/Dialect/Dialect.h"
+#include "SDFG/Utils/Utils.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/AsmState.h"
+#include "mlir/IR/IRMapping.h"
+#include "mlir/Transforms/DialectConversion.h"
+
+using namespace mlir;
+using namespace sdfg;
+using namespace conversion;
+
+/// Maps state name to their generated block
+llvm::StringMap<Block *> blockMap;
+
+/// For each function scope, map symbols to values
+/// Function scope is determined by the function name
+llvm::StringMap<llvm::StringMap<Value>> symbolMap;
+
+// HACK: Keeps track of processed EdgeOps
+llvm::DenseSet<EdgeOp> processedEdges;
 
 //===----------------------------------------------------------------------===//
 // Target & Type Converter

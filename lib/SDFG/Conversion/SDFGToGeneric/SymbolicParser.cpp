@@ -1,15 +1,9 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
-#include "SDFG/Conversion/SDFGToGeneric/SymbolicParser.h"
-#include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
-#include <regex>
-
-using namespace mlir;
-using namespace sdfg::conversion;
-
-// Implements a simple LL(1) parser for symbolic expressions
+/// This file implements a simple LL(1) parser for symbolic expressions.
 
 /*
+// Grammar
 stmt         ::= assignment | log_or_expr
 assignment   ::= IDENT ASSIGN log_or_expr
 
@@ -70,6 +64,13 @@ DIGIT       ::= [0-9];
 LETTER      ::= [_a-zA-Z];
 
 */
+
+#include "SDFG/Conversion/SDFGToGeneric/SymbolicParser.h"
+#include "SDFG/Conversion/SDFGToGeneric/OpCreators.h"
+#include <regex>
+
+using namespace mlir;
+using namespace sdfg::conversion;
 
 namespace mlir::sdfg::conversion {
 

@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains the parent utility functions.
+
 #include "SDFG/Utils/GetParents.h"
 
 namespace mlir::sdfg::utils {

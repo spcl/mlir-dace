@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file defines a converter from builtin dialects to the SDFG dialect.
+
 #include "SDFG/Conversion/GenericToSDFG/PassDetail.h"
 #include "SDFG/Conversion/GenericToSDFG/Passes.h"
 #include "SDFG/Dialect/Dialect.h"

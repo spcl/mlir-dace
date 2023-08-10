@@ -1,5 +1,8 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains SDFG operation definitions, such as parsing, printing and
+/// utility functions.
+
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"

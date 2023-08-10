@@ -1,5 +1,8 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains the SDFG dialect initializer and the type definitions,
+/// such as parsing, printing and utility functions.
+
 #include "SDFG/Dialect/Dialect.h"
 #include "mlir/IR/Builders.h"
 #include "llvm/ADT/TypeSwitch.h"

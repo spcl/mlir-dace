@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains the sized type utility functions.
+
 #include "SDFG/Utils/GetSizedType.h"
 
 namespace mlir::sdfg::utils {

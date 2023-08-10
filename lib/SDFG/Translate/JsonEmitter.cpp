@@ -1,5 +1,8 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains a JSON emitter, which constraints the generated output
+/// stream to valid JSON.
+
 #include "SDFG/Translate/JsonEmitter.h"
 #include "mlir/IR/Types.h"
 

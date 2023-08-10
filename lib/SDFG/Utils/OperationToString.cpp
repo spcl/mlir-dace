@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains the operation to string utility functions.
+
 #include "SDFG/Utils/OperationToString.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/IR/AsmState.h"

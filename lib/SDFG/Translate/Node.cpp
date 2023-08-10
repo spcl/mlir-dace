@@ -1,5 +1,7 @@
 // Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
 
+/// This file contains the nodes of the internal IR used by the translator.
+
 #include "SDFG/Translate/Node.h"
 
 using namespace mlir;
