@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 @LIT_SITE_CFG_IN_HEADER@
 
 import sys

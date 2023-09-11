@@ -1,3 +1,7 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file contains the SDFG optimizer with the conversion passes.
+
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
@@ -7,12 +11,14 @@
 
 #include "SDFG/Conversion/GenericToSDFG/Passes.h"
 #include "SDFG/Conversion/LinalgToSDFG/Passes.h"
+#include "SDFG/Conversion/SDFGToGeneric/Passes.h"
 #include "SDFG/Dialect/Dialect.h"
 
 int main(int argc, char **argv) {
   // Register SDFG passes
   mlir::sdfg::conversion::registerGenericToSDFGPasses();
   mlir::sdfg::conversion::registerLinalgToSDFGPasses();
+  mlir::sdfg::conversion::registerSDFGToGenericPasses();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::sdfg::SDFGDialect>();

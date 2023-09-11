@@ -1,3 +1,7 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// Table-driven file for SDFG dialect.
+
 #ifndef SDFG_Dialect
 #define SDFG_Dialect
 
@@ -11,6 +15,7 @@ include "mlir/Interfaces/LoopLikeInterface.td"
 // SDFG Dialect
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG dialect.
 def SDFG_Dialect : Dialect{
     let name = "sdfg";
     let summary = "A high-level dialect for representing SDFGs.";
@@ -24,6 +29,7 @@ def SDFG_Dialect : Dialect{
 // SDFG Types
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG base type.
 class SDFG_Type<string name, list<Trait> traits = []> : 
                                         TypeDef<SDFG_Dialect, name, traits>{}
 
@@ -31,6 +37,7 @@ class SDFG_Type<string name, list<Trait> traits = []> :
 // SizedType
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG sizes type.
 def SDFG_SizedType : SDFG_Type<"Sized">{
     let parameters = (ins
         "Type":$elementType,
@@ -44,7 +51,7 @@ def SDFG_SizedType : SDFG_Type<"Sized">{
 
         size_t getUndefRank(){ 
             size_t undefSize = 0;
-            for(int64_t dim : getIntegers()) if(dim == -1) undefSize++;
+            for(int64_t dim : getIntegers()) if(dim < 0) undefSize++;
             return undefSize;
         }
 
@@ -59,6 +66,7 @@ def SDFG_SizedType : SDFG_Type<"Sized">{
 // ArrayType
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG array type.
 def SDFG_ArrayType : SDFG_Type<"Array">{
     let mnemonic = "array";
     let summary = "A array type";
@@ -68,12 +76,20 @@ def SDFG_ArrayType : SDFG_Type<"Array">{
 
     let parameters = (ins SDFG_SizedType:$dimensions);
     let hasCustomAssemblyFormat = 1;
+
+    let extraClassDeclaration = [{
+        Type getElementType();
+        ArrayRef<StringAttr> getSymbols();
+        ArrayRef<int64_t> getIntegers();
+        ArrayRef<bool> getShape();
+    }];
 }
 
 //===----------------------------------------------------------------------===//
 // StreamType
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG stream type.
 def SDFG_StreamType : SDFG_Type<"Stream">{
     let mnemonic = "stream";
     let summary = "A stream type";

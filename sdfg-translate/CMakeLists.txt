@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 set(LLVM_LINK_COMPONENTS Support)
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

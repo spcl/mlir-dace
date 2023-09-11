@@ -1,3 +1,8 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file contains a Python lifter, which lifts MLIR operations to Python
+/// code.
+
 #include "SDFG/Translate/liftToPython.h"
 #include "SDFG/Utils/Utils.h"
 
@@ -5,6 +10,8 @@ using namespace mlir;
 using namespace sdfg;
 
 // TODO(later): Temporary auto-lifting. Will be included into DaCe
+/// Converts a single operation to a single line of Python code. If successful,
+/// returns Python code as s string.
 Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   // FIXME: Support multiple return values
   if (op.getNumResults() > 1)
@@ -90,10 +97,11 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
            sdfg::utils::valueToString(op.getOperand(0), op) + ")";
   }
 
-  if (arith::MaxFOp maxFOp = dyn_cast<arith::MaxFOp>(op)) {
+  if (isa<arith::MaxFOp>(op) || isa<arith::MaxSIOp>(op) ||
+      isa<arith::MaxUIOp>(op)) {
     return nameOut + " = max(" +
-           sdfg::utils::valueToString(maxFOp.getLhs(), op) + ", " +
-           sdfg::utils::valueToString(maxFOp.getRhs(), op) + ")";
+           sdfg::utils::valueToString(op.getOperand(0), op) + ", " +
+           sdfg::utils::valueToString(op.getOperand(1), op) + ")";
   }
 
   if (isa<arith::CmpIOp>(op) || isa<arith::CmpFOp>(op)) {
@@ -342,7 +350,8 @@ Optional<std::string> liftOperationToPython(Operation &op, Operation &source) {
   return std::nullopt;
 }
 
-// If successful returns Python code as string
+/// Converts the operations in the first region of op to Python code. If
+/// successful, returns Python code as a string.
 Optional<std::string> translation::liftToPython(Operation &op) {
   std::string code = "";
 
@@ -360,6 +369,7 @@ Optional<std::string> translation::liftToPython(Operation &op) {
   return code;
 }
 
+/// Provides a name for the tasklet.
 std::string translation::getTaskletName(Operation &op) {
   Operation &firstOp = *op.getRegion(0).getOps().begin();
   return sdfg::utils::operationToString(firstOp);

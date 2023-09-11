@@ -1,3 +1,7 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file defines a converter from the linalg dialect to the SDFG dialect.
+
 #include "SDFG/Conversion/LinalgToSDFG/PassDetail.h"
 #include "SDFG/Conversion/LinalgToSDFG/Passes.h"
 #include "SDFG/Dialect/Dialect.h"
@@ -17,6 +21,7 @@ using namespace conversion;
 // Target & Type Converter
 //===----------------------------------------------------------------------===//
 
+/// Defines the target to convert to.
 struct SDFGTarget : public ConversionTarget {
   SDFGTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
     // Every operation is legal (best effort)
@@ -28,6 +33,7 @@ struct SDFGTarget : public ConversionTarget {
 // Pass
 //===----------------------------------------------------------------------===//
 
+/// Registers all the patterns above in a RewritePatternSet.
 void populateLinalgToSDFGConversionPatterns(RewritePatternSet &patterns) {}
 
 namespace {
@@ -39,6 +45,7 @@ struct LinalgToSDFGPass
 };
 } // namespace
 
+/// Runs the pass on the top-level module operation.
 void LinalgToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
@@ -51,6 +58,7 @@ void LinalgToSDFGPass::runOnOperation() {
     signalPassFailure();
 }
 
+/// Returns a unique pointer to this pass.
 std::unique_ptr<Pass> conversion::createLinalgToSDFGPass() {
   return std::make_unique<LinalgToSDFGPass>();
 }

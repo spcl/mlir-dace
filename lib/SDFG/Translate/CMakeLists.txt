@@ -1,3 +1,5 @@
+# Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
 add_mlir_translation_library(
   MLIRTargetSDFG
   registration.cpp

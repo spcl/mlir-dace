@@ -1,3 +1,8 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file contains a JSON emitter, which constraints the generated output
+/// stream to valid JSON.
+
 #include "SDFG/Translate/JsonEmitter.h"
 #include "mlir/IR/Types.h"
 
@@ -5,6 +10,7 @@ using namespace mlir;
 using namespace sdfg;
 using namespace emitter;
 
+/// Creates a new JSON emitter.
 JsonEmitter::JsonEmitter(raw_ostream &os) : os(os) {
   indentation = 0;
   error = false;
@@ -13,6 +19,8 @@ JsonEmitter::JsonEmitter(raw_ostream &os) : os(os) {
   symStack.clear();
 }
 
+/// Checks for errors (open objects/lists) and adds trailing newline. Returns
+/// a LogicalResult indicating success or failure.
 LogicalResult JsonEmitter::finish() {
   while (!symStack.empty()) {
     SYM sym = symStack.pop_back_val();
@@ -31,11 +39,14 @@ LogicalResult JsonEmitter::finish() {
   return failure(error);
 }
 
+/// Increases the indentation level.
 void JsonEmitter::indent() { indentation += 2; }
+/// Decreases the indentation level.
 void JsonEmitter::unindent() {
   indentation = indentation >= 2 ? indentation - 2 : 0;
 }
 
+/// Starts a new line in the output stream.
 void JsonEmitter::newLine() {
   if (emptyLine)
     return;
@@ -43,6 +54,7 @@ void JsonEmitter::newLine() {
   emptyLine = true;
 }
 
+/// Prints a literal string to the output stream.
 void JsonEmitter::printLiteral(StringRef str) {
   if (emptyLine)
     os.indent(indentation);
@@ -50,18 +62,22 @@ void JsonEmitter::printLiteral(StringRef str) {
   emptyLine = false;
 }
 
+/// Prints a string to the output stream, surrounding it with quotation marks.
 void JsonEmitter::printString(StringRef str) {
   printLiteral("\"");
   printLiteral(str);
   printLiteral("\"");
 }
 
+/// Prints an integer to the output stream, surrounding it with quotation
+/// marks.
 void JsonEmitter::printInt(int i) {
   printLiteral("\"");
   os << i;
   printLiteral("\"");
 }
 
+/// Starts a new JSON object.
 void JsonEmitter::startObject() {
   startEntry();
   printLiteral("{");
@@ -78,6 +94,7 @@ void JsonEmitter::startObject() {
   firstEntry = true;
 }
 
+/// Starts a new named (keyed) JSON object.
 void JsonEmitter::startNamedObject(StringRef name) {
   startEntry();
   printString(name);
@@ -96,6 +113,7 @@ void JsonEmitter::startNamedObject(StringRef name) {
   firstEntry = true;
 }
 
+/// Ends the current JSON object.
 void JsonEmitter::endObject() {
   newLine();
   unindent();
@@ -104,48 +122,7 @@ void JsonEmitter::endObject() {
   firstEntry = false;
 }
 
-void JsonEmitter::startEntry() {
-  if (!firstEntry)
-    printLiteral(",");
-  firstEntry = false;
-  newLine();
-}
-
-void JsonEmitter::printKVPair(StringRef key, StringRef val, bool stringify) {
-  startEntry();
-  printString(key);
-  printLiteral(": ");
-  if (stringify)
-    printString(val);
-  else
-    printLiteral(val);
-}
-
-void JsonEmitter::printKVPair(StringRef key, int val, bool stringify) {
-  startEntry();
-  printString(key);
-  printLiteral(": ");
-  if (stringify)
-    printInt(val);
-  else
-    os << val;
-}
-
-void JsonEmitter::printKVPair(StringRef key, Attribute val, bool stringify) {
-  startEntry();
-  printString(key);
-  printLiteral(": ");
-  if (StringAttr strAttr = val.dyn_cast<StringAttr>()) {
-    strAttr.print(os);
-  } else {
-    if (stringify)
-      printLiteral("\"");
-    val.print(os);
-    if (stringify)
-      printLiteral("\"");
-  }
-}
-
+/// Starts a new named JSON list.
 void JsonEmitter::startNamedList(StringRef name) {
   startEntry();
   printString(name);
@@ -164,6 +141,7 @@ void JsonEmitter::startNamedList(StringRef name) {
   firstEntry = true;
 }
 
+/// Ends the current JSON list.
 void JsonEmitter::endList() {
   newLine();
   unindent();
@@ -172,6 +150,70 @@ void JsonEmitter::endList() {
   firstEntry = false;
 }
 
+/// Starts a new entry in the current JSON object or list.
+void JsonEmitter::startEntry() {
+  if (!firstEntry)
+    printLiteral(",");
+  firstEntry = false;
+  newLine();
+}
+
+/// Prints a key-value pair to the output stream. If desired, turns the value
+/// into string.
+void JsonEmitter::printKVPair(StringRef key, StringRef val, bool stringify) {
+  startEntry();
+  printString(key);
+  printLiteral(": ");
+  if (stringify)
+    printString(val);
+  else
+    printLiteral(val);
+}
+
+/// Prints a key-value pair to the output stream. If desired, turns the value
+/// into string.
+void JsonEmitter::printKVPair(StringRef key, int val, bool stringify) {
+  startEntry();
+  printString(key);
+  printLiteral(": ");
+  if (stringify)
+    printInt(val);
+  else
+    os << val;
+}
+
+/// Prints a key-value pair to the output stream. If desired, turns the value
+/// into string.
+void JsonEmitter::printKVPair(StringRef key, Attribute val, bool stringify) {
+  startEntry();
+  printString(key);
+  printLiteral(": ");
+  if (StringAttr strAttr = val.dyn_cast<StringAttr>()) {
+    strAttr.print(os);
+  } else {
+    if (stringify)
+      printLiteral("\"");
+    val.print(os);
+    if (stringify)
+      printLiteral("\"");
+  }
+}
+
+/// Prints a list of NamedAttributes as key-value pairs.
+void JsonEmitter::printAttributes(ArrayRef<NamedAttribute> arr,
+                                  ArrayRef<StringRef> elidedAttrs) {
+
+  llvm::SmallDenseSet<StringRef> elidedAttrsSet(elidedAttrs.begin(),
+                                                elidedAttrs.end());
+
+  for (NamedAttribute attr : arr) {
+    if (elidedAttrsSet.contains(attr.getName().strref()))
+      continue;
+    printKVPair(attr.getName().strref(), attr.getValue());
+  }
+}
+
+/// Tries to pop a symbol from the symStack, checking for matching symbols.
 void JsonEmitter::tryPop(SYM sym) {
   if (symStack.empty()) {
     if (sym == SYM::BRACE)
@@ -198,18 +240,5 @@ void JsonEmitter::tryPop(SYM sym) {
     symStack.pop_back();
   } else {
     symStack.pop_back();
-  }
-}
-
-void JsonEmitter::printAttributes(ArrayRef<NamedAttribute> arr,
-                                  ArrayRef<StringRef> elidedAttrs) {
-
-  llvm::SmallDenseSet<StringRef> elidedAttrsSet(elidedAttrs.begin(),
-                                                elidedAttrs.end());
-
-  for (NamedAttribute attr : arr) {
-    if (elidedAttrsSet.contains(attr.getName().strref()))
-      continue;
-    printKVPair(attr.getName().strref(), attr.getValue());
   }
 }

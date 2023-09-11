@@ -1,3 +1,8 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file contains SDFG operation definitions, such as parsing, printing and
+/// utility functions.
+
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -13,6 +18,7 @@ using namespace sdfg;
 // Helpers
 //===----------------------------------------------------------------------===//
 
+/// Parses a non-empty region.
 static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
                                SmallVector<OpAsmParser::Argument, 4> &args,
                                bool enableShadowing) {
@@ -26,6 +32,7 @@ static ParseResult parseRegion(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+/// Parses a list of arguments.
 static ParseResult parseArgsList(OpAsmParser &parser,
                                  SmallVector<OpAsmParser::Argument, 4> &args) {
   if (parser.parseLParen())
@@ -46,6 +53,7 @@ static ParseResult parseArgsList(OpAsmParser &parser,
   return success();
 }
 
+/// Prints a list of arguments in human-readable form.
 static void printArgsList(OpAsmPrinter &p, Region::BlockArgListType args,
                           unsigned lb, unsigned ub) {
   p << " (";
@@ -59,6 +67,8 @@ static void printArgsList(OpAsmPrinter &p, Region::BlockArgListType args,
   p << ")";
 }
 
+/// Parses arguments with an optional "as" keyword to compactly represent
+/// arguments and parameters.
 static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
                                SmallVector<OpAsmParser::Argument, 4> &args) {
   if (parser.parseLParen())
@@ -97,6 +107,8 @@ static ParseResult parseAsArgs(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+/// Prints a list of arguments with an optional "as" keyword in human-readable
+/// form.
 static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
                         Region::BlockArgListType args, unsigned lb,
                         unsigned ub) {
@@ -115,13 +127,13 @@ static void printAsArgs(OpAsmPrinter &p, OperandRange opRange,
 // InlineSymbol
 //===----------------------------------------------------------------------===//
 
-// There are 3 possible values that can be used as a number: symbols, integers
-// and operands. Operands are stored as regular operands. Symbols as stringAttr
-// and integers as int32 Attr. In order to encode the correct order of values
-// we use an auxiliary attr called [attrName]_numList.
-// The numList contains int32 Attrs with the following encoding:
-// Positive int n: nth operand
-// Negative int n: -nth - 1 Attribute (symbol or integer) in [attrName]
+/// There are 3 possible values that can be used as a number: symbols, integers
+/// and operands. Operands are stored as regular operands. Symbols as stringAttr
+/// and integers as int32 Attr. In order to encode the correct order of values
+/// we use an auxiliary attr called [attrName]_numList.
+/// The numList contains int32 Attrs with the following encoding:
+/// Positive int n: nth operand
+/// Negative int n: -nth - 1 Attribute (symbol or integer) in [attrName]
 static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
                                    StringRef attrName) {
   SmallVector<OpAsmParser::UnresolvedOperand> opList;
@@ -181,6 +193,7 @@ static ParseResult parseNumberList(OpAsmParser &parser, OperationState &result,
   return success();
 }
 
+/// Prints a list of number arguments in human-readable form.
 static void printNumberList(OpAsmPrinter &p, Operation *op,
                             StringRef attrName) {
   ArrayAttr attrList = op->getAttr(attrName).cast<ArrayAttr>();
@@ -209,6 +222,8 @@ static void printNumberList(OpAsmPrinter &p, Operation *op,
   }
 }
 
+/// Prints a list of optional attributes excluding the number list in
+/// human-readable form.
 static void
 printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
                                ArrayRef<StringRef> elidedAttrs = {}) {
@@ -221,6 +236,8 @@ printOptionalAttrDictNoNumList(OpAsmPrinter &p, ArrayRef<NamedAttribute> attrs,
   p.printOptionalAttrDict(attrs, /*elidedAttrs=*/numListAttrs);
 }
 
+/// Returns the length of the number list, which is equivalent to the number of
+/// numeric arguments.
 static size_t getNumListSize(Operation *op, StringRef attrName) {
   ArrayAttr numList =
       op->getAttr(attrName.str() + "_numList").cast<ArrayAttr>();
@@ -231,10 +248,7 @@ static size_t getNumListSize(Operation *op, StringRef attrName) {
 // SDFGNode
 //===----------------------------------------------------------------------===//
 
-SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
-  return create(rewriter, loc, 0, {});
-}
-
+/// Builds, creates and inserts a SDFG node using the provided PatternRewriter.
 SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
                           unsigned num_args, TypeRange args) {
   OpBuilder builder(loc->getContext());
@@ -250,6 +264,12 @@ SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc,
   return sdfg;
 }
 
+/// Builds, creates and inserts a SDFG node using the provided PatternRewriter.
+SDFGNode SDFGNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, 0, {});
+}
+
+/// Attempts to parse a SDFG node.
 ParseResult SDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -275,6 +295,7 @@ ParseResult SDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a SDFG node in human-readable form.
 void SDFGNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
@@ -288,6 +309,7 @@ void SDFGNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
+/// Verifies the correct structure of a SDFG node.
 LogicalResult SDFGNode::verify() {
   // Verify that no other dialect is used in the body
   for (Operation &oper : getBody().getOps())
@@ -301,6 +323,7 @@ LogicalResult SDFGNode::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in a SDFG node.
 LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the entry attribute references valid state
   FlatSymbolRefAttr entryAttr =
@@ -317,23 +340,59 @@ LogicalResult SDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+/// Returns the first state in the SDFG node.
 StateNode SDFGNode::getFirstState() {
   return *getBody().getOps<StateNode>().begin();
 }
 
+/// Returns the state with the provided name (symbol) in the SDFG node.
 StateNode SDFGNode::getStateBySymRef(StringRef symRef) {
   Operation *op = lookupSymbol(symRef);
   return dyn_cast<StateNode>(op);
+}
+
+/// Returns the entry state of the SDFG node.
+StateNode SDFGNode::getEntryState() {
+  if (this->getEntry().has_value())
+    return getStateBySymRef(this->getEntry().value());
+
+  return this->getFirstState();
+}
+
+/// Returns the list of arguments in the SDFG node.
+Block::BlockArgListType SDFGNode::getArgs() {
+  return this->getBody().getArguments().take_front(getNumArgs());
+}
+
+/// Returns a list of argument types in the SDFG node.
+TypeRange SDFGNode::getArgTypes() {
+  SmallVector<Type> types = {};
+  for (BlockArgument BArg : getArgs()) {
+    types.push_back(BArg.getType());
+  }
+  return TypeRange(types);
+}
+
+/// Returns the list of results in the SDFG node.
+Block::BlockArgListType SDFGNode::getResults() {
+  return this->getBody().getArguments().drop_front(getNumArgs());
+}
+
+/// Returns a list of result types in the SDFG node.
+TypeRange SDFGNode::getResultTypes() {
+  SmallVector<Type> types = {};
+  for (BlockArgument BArg : getResults()) {
+    types.push_back(BArg.getType());
+  }
+  return TypeRange(types);
 }
 
 //===----------------------------------------------------------------------===//
 // NestedSDFGNode
 //===----------------------------------------------------------------------===//
 
-NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc) {
-  return create(rewriter, loc, 0, {});
-}
-
+/// Builds, creates and inserts a nested SDFG node using the provided
+/// PatternRewriter.
 NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc,
                                       unsigned num_args, ValueRange args) {
   OpBuilder builder(loc->getContext());
@@ -350,6 +409,13 @@ NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc,
   return sdfg;
 }
 
+/// Builds, creates and inserts a nested SDFG node using the provided
+/// PatternRewriter.
+NestedSDFGNode NestedSDFGNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, 0, {});
+}
+
+/// Attempts to parse a nested SDFG node.
 ParseResult NestedSDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -376,6 +442,7 @@ ParseResult NestedSDFGNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a nested SDFG node in human-readable form.
 void NestedSDFGNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "num_args"});
@@ -389,6 +456,7 @@ void NestedSDFGNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
+/// Verifies the correct structure of a nested SDFG node.
 LogicalResult NestedSDFGNode::verify() {
   // Verify that no other dialect is used in the body
   for (Operation &oper : getBody().getOps())
@@ -406,6 +474,7 @@ LogicalResult NestedSDFGNode::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in a nested SDFG node.
 LogicalResult
 NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the entry attribute references valid state
@@ -423,23 +492,40 @@ NestedSDFGNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+/// Returns the first state in the nested SDFG node.
 StateNode NestedSDFGNode::getFirstState() {
   return *getBody().getOps<StateNode>().begin();
 }
 
+/// Returns the state with the provided name (symbol) in the nested SDFG node.
 StateNode NestedSDFGNode::getStateBySymRef(StringRef symRef) {
   Operation *op = lookupSymbol(symRef);
   return dyn_cast<StateNode>(op);
+}
+
+/// Returns the entry state of the nested SDFG node.
+StateNode NestedSDFGNode::getEntryState() {
+  if (this->getEntry().has_value())
+    return getStateBySymRef(this->getEntry().value());
+
+  return this->getFirstState();
+}
+
+/// Returns the list of arguments in the nested SDFG node.
+ValueRange NestedSDFGNode::getArgs() {
+  return this->getOperands().take_front(getNumArgs());
+}
+
+/// Returns the list of results in the nested SDFG node.
+ValueRange NestedSDFGNode::getResults() {
+  return this->getOperands().drop_front(getNumArgs());
 }
 
 //===----------------------------------------------------------------------===//
 // StateNode
 //===----------------------------------------------------------------------===//
 
-StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
-  return create(rewriter, loc, "state");
-}
-
+/// Builds, creates and inserts a state node using the provided PatternRewriter.
 StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
                             StringRef name) {
   OpBuilder builder(loc->getContext());
@@ -450,6 +536,12 @@ StateNode StateNode::create(PatternRewriter &rewriter, Location loc,
   return stateNode;
 }
 
+/// Builds, creates and inserts a state node using the provided PatternRewriter.
+StateNode StateNode::create(PatternRewriter &rewriter, Location loc) {
+  return create(rewriter, loc, "state");
+}
+
+/// Builds, creates and inserts a state node using Operation::create.
 StateNode StateNode::create(Location loc, StringRef name) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -457,6 +549,7 @@ StateNode StateNode::create(Location loc, StringRef name) {
   return cast<StateNode>(Operation::create(state));
 }
 
+/// Attempts to parse a state node.
 ParseResult StateNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -479,6 +572,7 @@ ParseResult StateNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a state node in human-readable form.
 void StateNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"ID", "sym_name"});
@@ -487,6 +581,7 @@ void StateNode::print(OpAsmPrinter &p) {
   p.printRegion(getBody());
 }
 
+/// Verifies the correct structure of a state node.
 LogicalResult StateNode::verify() {
   // Verify that no other dialect is used in the body
   // Except func operations
@@ -501,6 +596,42 @@ LogicalResult StateNode::verify() {
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a tasklet node using the provided
+/// PatternRewriter.
+TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
+                                ValueRange operands, TypeRange results) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  build(builder, state, results, utils::generateID(), operands);
+
+  TaskletNode task = cast<TaskletNode>(rewriter.create(state));
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < operands.size(); ++i)
+    locs.push_back(location);
+
+  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes(), locs);
+  return task;
+}
+
+/// Builds, creates and inserts a tasklet node using Operation::create.
+TaskletNode TaskletNode::create(Location location, ValueRange operands,
+                                TypeRange results) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  build(builder, state, results, utils::generateID(), operands);
+
+  TaskletNode task = cast<TaskletNode>(Operation::create(state));
+
+  std::vector<Location> locs = {};
+  for (unsigned i = 0; i < operands.size(); ++i)
+    locs.push_back(location);
+
+  builder.createBlock(&task.getBody(), {}, operands.getTypes(), locs);
+  return task;
+}
+
+/// Attempts to parse a tasklet node.
 ParseResult TaskletNode::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -523,6 +654,7 @@ ParseResult TaskletNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a tasklet node in human-readable form.
 void TaskletNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"ID"});
   printAsArgs(p, getOperands(), getBody().getArguments(), 0, getNumOperands());
@@ -531,6 +663,7 @@ void TaskletNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/true, /*printEmptyBlock=*/true);
 }
 
+/// Verifies the correct structure of a tasklet node.
 LogicalResult TaskletNode::verify() {
   // Verify that operands and arguments line up
   if (getNumOperands() != getBody().getNumArguments())
@@ -539,42 +672,12 @@ LogicalResult TaskletNode::verify() {
   return success();
 }
 
-TaskletNode TaskletNode::create(PatternRewriter &rewriter, Location location,
-                                ValueRange operands, TypeRange results) {
-  OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
-  build(builder, state, results, utils::generateID(), operands);
-
-  TaskletNode task = cast<TaskletNode>(rewriter.create(state));
-
-  std::vector<Location> locs = {};
-  for (unsigned i = 0; i < operands.size(); ++i)
-    locs.push_back(location);
-
-  rewriter.createBlock(&task.getRegion(), {}, operands.getTypes(), locs);
-  return task;
-}
-
-TaskletNode TaskletNode::create(Location location, ValueRange operands,
-                                TypeRange results) {
-  OpBuilder builder(location->getContext());
-  OperationState state(location, getOperationName());
-  build(builder, state, results, utils::generateID(), operands);
-
-  TaskletNode task = cast<TaskletNode>(Operation::create(state));
-
-  std::vector<Location> locs = {};
-  for (unsigned i = 0; i < operands.size(); ++i)
-    locs.push_back(location);
-
-  builder.createBlock(&task.getBody(), {}, operands.getTypes(), locs);
-  return task;
-}
-
+/// Returns the input name of the provided index.
 std::string TaskletNode::getInputName(unsigned idx) {
   return utils::valueToString(getBody().getArgument(idx), *getOperation());
 }
 
+/// Returns the output name of the provided index.
 std::string TaskletNode::getOutputName(unsigned idx) {
   return "__out" + std::to_string(idx);
 }
@@ -583,6 +686,7 @@ std::string TaskletNode::getOutputName(unsigned idx) {
 // MapNode
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a map node.
 ParseResult MapNode::parse(OpAsmParser &parser, OperationState &result) {
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
@@ -628,6 +732,7 @@ ParseResult MapNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a map node in human-readable form.
 void MapNode::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(
       p, (*this)->getAttrs(),
@@ -651,6 +756,7 @@ void MapNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/false);
 }
 
+/// Verifies the correct structure of a map node.
 LogicalResult MapNode::verify() {
   size_t var_count = getBody().getArguments().size();
 
@@ -674,12 +780,14 @@ LogicalResult MapNode::verify() {
   return success();
 }
 
+/// Returns the body of the map node.
 Region &MapNode::getLoopBody() { return getBody(); }
 
 //===----------------------------------------------------------------------===//
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a consume node.
 ParseResult ConsumeNode::parse(OpAsmParser &parser, OperationState &result) {
   IntegerAttr intAttr =
       parser.getBuilder().getI32IntegerAttr(utils::generateID());
@@ -732,6 +840,7 @@ ParseResult ConsumeNode::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a consume node in human-readable form.
 void ConsumeNode::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(),
                           /*elidedAttrs=*/{"entryID", "exitID"});
@@ -742,6 +851,7 @@ void ConsumeNode::print(OpAsmPrinter &p) {
                 /*printBlockTerminators=*/false);
 }
 
+/// Verifies the correct structure of a consume node.
 LogicalResult ConsumeNode::verify() {
   if (getNumPes().has_value() && getNumPes().value().isNonPositive())
     return emitOpError("failed to verify that number of "
@@ -755,6 +865,7 @@ LogicalResult ConsumeNode::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in a consume node.
 LogicalResult
 ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the condition attribute is specified.
@@ -780,14 +891,18 @@ ConsumeNode::verifySymbolUses(SymbolTableCollection &symbolTable) {
   return success();
 }
 
+/// Returns the body of the consume node.
 Region &ConsumeNode::getLoopBody() { return getBody(); }
+/// Returns the argument corresponding to the processing element.
 BlockArgument ConsumeNode::pe() { return getBody().getArgument(0); }
+/// Returns the argument corresponding to the popped element.
 BlockArgument ConsumeNode::elem() { return getBody().getArgument(1); }
 
 //===----------------------------------------------------------------------===//
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts an edge using the provided PatternRewriter.
 EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to, ArrayAttr &assign, StringAttr &condition,
                       Value ref) {
@@ -798,6 +913,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   return cast<EdgeOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts an edge using the provided PatternRewriter.
 EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
                       StateNode &to) {
   OpBuilder builder(loc->getContext());
@@ -807,6 +923,7 @@ EdgeOp EdgeOp::create(PatternRewriter &rewriter, Location loc, StateNode &from,
   return cast<EdgeOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts an edge using Operation::create.
 EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
                       ArrayAttr &assign, StringAttr &condition, Value ref) {
   OpBuilder builder(loc->getContext());
@@ -816,6 +933,7 @@ EdgeOp EdgeOp::create(Location loc, StateNode &from, StateNode &to,
   return cast<EdgeOp>(Operation::create(state));
 }
 
+/// Attempts to parse a edge operation.
 ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
   FlatSymbolRefAttr srcAttr;
   FlatSymbolRefAttr destAttr;
@@ -848,6 +966,7 @@ ParseResult EdgeOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a edge operation in human-readable form.
 void EdgeOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"src", "dest"});
   p << ' ';
@@ -858,6 +977,7 @@ void EdgeOp::print(OpAsmPrinter &p) {
   p.printAttributeWithoutType(getDestAttr());
 }
 
+/// Verifies the correct structure of an edge operation.
 LogicalResult EdgeOp::verify() {
   // Check that condition is non-empty
   if (getCondition().empty())
@@ -866,6 +986,7 @@ LogicalResult EdgeOp::verify() {
   return success();
 }
 
+/// Verifies the correct structure of symbols in an edge operation.
 LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the src/dest attributes are specified.
   FlatSymbolRefAttr srcAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("src");
@@ -896,6 +1017,41 @@ LogicalResult EdgeOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 // AllocOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts an allocation operation using the provided
+/// PatternRewriter.
+AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
+                        StringRef name, bool transient) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
+  build(builder, state, res, {}, nameAttr, transient);
+  return cast<AllocOp>(rewriter.create(state));
+}
+
+/// Builds, creates and inserts an allocation operation using the provided
+/// PatternRewriter.
+AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
+                        bool transient) {
+  return create(rewriter, loc, res, "arr", transient);
+}
+
+/// Builds, creates and inserts an allocation operation using Operation::create.
+AllocOp AllocOp::create(Location loc, Type res, StringRef name,
+                        bool transient) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  StringAttr nameAttr = builder.getStringAttr(name);
+
+  if (!res.isa<ArrayType>()) {
+    SizedType sized = SizedType::get(res.getContext(), res, {}, {}, {});
+    res = ArrayType::get(res.getContext(), sized);
+  }
+
+  build(builder, state, res, {}, nameAttr, transient);
+  return cast<AllocOp>(Operation::create(state));
+}
+
+/// Attempts to parse an allocation operation.
 ParseResult AllocOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -916,6 +1072,7 @@ ParseResult AllocOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints an allocation operation in human-readable form.
 void AllocOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << " (";
@@ -924,6 +1081,7 @@ void AllocOp::print(OpAsmPrinter &p) {
   p << getOperation()->getResultTypes();
 }
 
+/// Verifies the correct structure of an allocation operation.
 LogicalResult AllocOp::verify() {
   SizedType result = utils::getSizedType(getRes().getType());
 
@@ -938,49 +1096,25 @@ LogicalResult AllocOp::verify() {
   return success();
 }
 
-AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
-                        StringRef name, bool transient) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  StringAttr nameAttr = rewriter.getStringAttr(utils::generateName(name.str()));
-  build(builder, state, res, {}, nameAttr, transient);
-  return cast<AllocOp>(rewriter.create(state));
-}
-
-AllocOp AllocOp::create(PatternRewriter &rewriter, Location loc, Type res,
-                        bool transient) {
-  return create(rewriter, loc, res, "arr", transient);
-}
-
-AllocOp AllocOp::create(Location loc, Type res, StringRef name,
-                        bool transient) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  StringAttr nameAttr = builder.getStringAttr(name);
-
-  if (!res.isa<ArrayType>()) {
-    SizedType sized = SizedType::get(res.getContext(), res, {}, {}, {});
-    res = ArrayType::get(res.getContext(), sized);
-  }
-
-  build(builder, state, res, {}, nameAttr, transient);
-  return cast<AllocOp>(Operation::create(state));
-}
-
+/// Returns the type of the elements in the allocated data container.
 Type AllocOp::getElementType() {
   return utils::getSizedType(getType()).getElementType();
 }
 
+/// Returns true if the allocated data container is a scalar.
 bool AllocOp::isScalar() {
   return utils::getSizedType(getType()).getShape().empty();
 }
 
+/// Returns true if the allocated data container is a stream.
 bool AllocOp::isStream() { return getType().isa<StreamType>(); }
 
+/// Returns true if the allocation operation is inside a state.
 bool AllocOp::isInState() {
   return utils::getParentState(*this->getOperation()) != nullptr;
 }
 
+/// Returns the name of the allocated data container.
 std::string AllocOp::getContainerName() {
   if ((*this)->hasAttr("name")) {
     Attribute nameAttr = (*this)->getAttr("name");
@@ -998,11 +1132,8 @@ std::string AllocOp::getContainerName() {
 // LoadOp
 //===----------------------------------------------------------------------===//
 
-LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, AllocOp alloc,
-                      ValueRange indices) {
-  return create(rewriter, loc, alloc.getType(), alloc, indices);
-}
-
+/// Builds, creates and inserts a load operation using the provided
+/// PatternRewriter.
 LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
                       Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
@@ -1026,10 +1157,14 @@ LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, Type t,
   return cast<LoadOp>(rewriter.create(state));
 }
 
-LoadOp LoadOp::create(Location loc, AllocOp alloc, ValueRange indices) {
-  return create(loc, alloc.getType(), alloc, indices);
+/// Builds, creates and inserts a load operation using the provided
+/// PatternRewriter.
+LoadOp LoadOp::create(PatternRewriter &rewriter, Location loc, AllocOp alloc,
+                      ValueRange indices) {
+  return create(rewriter, loc, alloc.getType(), alloc, indices);
 }
 
+/// Builds, creates and inserts a load operation using Operation::create.
 LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -1050,6 +1185,12 @@ LoadOp LoadOp::create(Location loc, Type t, Value mem, ValueRange indices) {
   return cast<LoadOp>(Operation::create(state));
 }
 
+/// Builds, creates and inserts a load operation using Operation::create.
+LoadOp LoadOp::create(Location loc, AllocOp alloc, ValueRange indices) {
+  return create(loc, alloc.getType(), alloc, indices);
+}
+
+/// Attempts to parse a load operation.
 ParseResult LoadOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1085,6 +1226,7 @@ ParseResult LoadOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a load operation in human-readable form.
 void LoadOp::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  /*elidedAttrs*/ {"indices"});
@@ -1098,6 +1240,7 @@ void LoadOp::print(OpAsmPrinter &p) {
   p << ArrayRef<Type>(getRes().getType());
 }
 
+/// Verifies the correct structure of a load operation.
 LogicalResult LoadOp::verify() {
   size_t idx_size = getNumListSize(getOperation(), "indices");
   size_t mem_size = utils::getSizedType(getArr().getType()).getRank();
@@ -1108,12 +1251,15 @@ LogicalResult LoadOp::verify() {
   return success();
 }
 
+/// Returns true if the load operation has non-constant indices.
 bool LoadOp::isIndirect() { return !getIndices().empty(); }
 
 //===----------------------------------------------------------------------===//
 // StoreOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a store operation using the provided
+/// PatternRewriter.
 StoreOp StoreOp::create(PatternRewriter &rewriter, Location loc, Value val,
                         Value mem, ValueRange indices) {
   OpBuilder builder(loc->getContext());
@@ -1134,6 +1280,7 @@ StoreOp StoreOp::create(PatternRewriter &rewriter, Location loc, Value val,
   return cast<StoreOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts a store operation using Operation::create.
 StoreOp StoreOp::create(Location loc, Value val, Value mem,
                         ValueRange indices) {
   OpBuilder builder(loc->getContext());
@@ -1154,6 +1301,7 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem,
   return cast<StoreOp>(Operation::create(state));
 }
 
+/// Builds, creates and inserts a store operation using Operation::create.
 StoreOp StoreOp::create(Location loc, Value val, Value mem,
                         ArrayRef<StringRef> indices) {
   OpBuilder builder(loc->getContext());
@@ -1177,6 +1325,7 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem,
   return cast<StoreOp>(Operation::create(state));
 }
 
+/// Builds, creates and inserts a store operation using Operation::create.
 StoreOp StoreOp::create(Location loc, Value val, Value mem) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -1196,6 +1345,7 @@ StoreOp StoreOp::create(Location loc, Value val, Value mem) {
   return cast<StoreOp>(Operation::create(state));
 }
 
+/// Attempts to parse a store operation.
 ParseResult StoreOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1239,6 +1389,7 @@ ParseResult StoreOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a store operation in human-readable form.
 void StoreOp::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  /*elidedAttrs=*/{"indices"});
@@ -1252,6 +1403,7 @@ void StoreOp::print(OpAsmPrinter &p) {
   p << ArrayRef<Type>(getArr().getType());
 }
 
+/// Verifies the correct structure of a store operation.
 LogicalResult StoreOp::verify() {
   size_t idx_size = getNumListSize(getOperation(), "indices");
   size_t mem_size = utils::getSizedType(getArr().getType()).getRank();
@@ -1262,12 +1414,15 @@ LogicalResult StoreOp::verify() {
   return success();
 }
 
+/// Returns true if the store operation has non-constant indices.
 bool StoreOp::isIndirect() { return !getIndices().empty(); }
 
 //===----------------------------------------------------------------------===//
 // CopyOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a copy operation using the provided
+/// PatternRewriter.
 CopyOp CopyOp::create(PatternRewriter &rewriter, Location loc, Value src,
                       Value dst) {
   OpBuilder builder(loc->getContext());
@@ -1280,6 +1435,7 @@ CopyOp CopyOp::create(PatternRewriter &rewriter, Location loc, Value src,
   return cast<CopyOp>(rewriter.create(state));
 }
 
+/// Attempts to parse a copy operation.
 ParseResult CopyOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1308,6 +1464,7 @@ ParseResult CopyOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a copy operation in human-readable form.
 void CopyOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << ' ' << getSrc() << " -> " << getDest();
@@ -1315,12 +1472,15 @@ void CopyOp::print(OpAsmPrinter &p) {
   p << ArrayRef<Type>(getSrc().getType());
 }
 
+/// Verifies the correct structure of a copy operation.
 LogicalResult CopyOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // ViewCastOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a viewcast operation using the provided
+/// PatternRewriter.
 ViewCastOp ViewCastOp::create(PatternRewriter &rewriter, Location loc,
                               Value array, Type type) {
   OpBuilder builder(loc->getContext());
@@ -1329,6 +1489,7 @@ ViewCastOp ViewCastOp::create(PatternRewriter &rewriter, Location loc,
   return cast<ViewCastOp>(rewriter.create(state));
 }
 
+/// Attempts to parse a viewcast operation.
 ParseResult ViewCastOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1355,6 +1516,7 @@ ParseResult ViewCastOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a viewcast operation in human-readable form.
 void ViewCastOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << ' ' << getSrc();
@@ -1364,6 +1526,7 @@ void ViewCastOp::print(OpAsmPrinter &p) {
   p << getOperation()->getResultTypes();
 }
 
+/// Verifies the correct structure of a viewcast operation.
 LogicalResult ViewCastOp::verify() {
   size_t src_size = utils::getSizedType(getSrc().getType()).getRank();
   size_t res_size = utils::getSizedType(getRes().getType()).getRank();
@@ -1378,6 +1541,8 @@ LogicalResult ViewCastOp::verify() {
 // SubviewOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a subview operation using the provided
+/// PatternRewriter.
 SubviewOp SubviewOp::create(PatternRewriter &rewriter, Location loc, Type res,
                             Value src, ArrayAttr offsets, ArrayAttr sizes,
                             ArrayAttr strides) {
@@ -1394,6 +1559,7 @@ SubviewOp SubviewOp::create(PatternRewriter &rewriter, Location loc, Type res,
   return cast<SubviewOp>(rewriter.create(state));
 }
 
+/// Attempts to parse a subview operation.
 ParseResult SubviewOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1432,6 +1598,7 @@ ParseResult SubviewOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a subview operation in human-readable form.
 void SubviewOp::print(OpAsmPrinter &p) {
   printOptionalAttrDictNoNumList(p, (*this)->getAttrs(),
                                  {"offsets", "sizes", "strides"});
@@ -1448,12 +1615,14 @@ void SubviewOp::print(OpAsmPrinter &p) {
   p << getOperation()->getResultTypes();
 }
 
+/// Verifies the correct structure of a subview operation.
 LogicalResult SubviewOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamPopOp
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a stream pop operation.
 ParseResult StreamPopOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1480,6 +1649,7 @@ ParseResult StreamPopOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a stream pop operation in human-readable form.
 void StreamPopOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << ' ' << getStr();
@@ -1489,12 +1659,14 @@ void StreamPopOp::print(OpAsmPrinter &p) {
   p << ArrayRef<Type>(getRes().getType());
 }
 
+/// Verifies the correct structure of a stream pop operation.
 LogicalResult StreamPopOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamPushOp
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a stream push operation.
 ParseResult StreamPushOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1529,6 +1701,7 @@ ParseResult StreamPushOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a stream push operation in human-readable form.
 void StreamPushOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << ' ' << getVal() << ", " << getStr();
@@ -1538,12 +1711,14 @@ void StreamPushOp::print(OpAsmPrinter &p) {
   p << ArrayRef<Type>(getStr().getType());
 }
 
+/// Verifies the correct structure of a stream push operation.
 LogicalResult StreamPushOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // StreamLengthOp
 //===----------------------------------------------------------------------===//
 
+/// Attempts to parse a stream length operation.
 ParseResult StreamLengthOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1570,6 +1745,7 @@ ParseResult StreamLengthOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a stream length operation in human-readable form.
 void StreamLengthOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   p << ' ' << getStr();
@@ -1579,6 +1755,7 @@ void StreamLengthOp::print(OpAsmPrinter &p) {
   p << getOperation()->getResultTypes();
 }
 
+/// Verifies the correct structure of a stream length operation.
 LogicalResult StreamLengthOp::verify() {
   Operation *parent = (*this)->getParentOp();
   if (parent == nullptr)
@@ -1596,6 +1773,25 @@ LogicalResult StreamLengthOp::verify() {
 // ReturnOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a return operation using the provided
+/// PatternRewriter.
+sdfg::ReturnOp sdfg::ReturnOp::create(PatternRewriter &rewriter, Location loc,
+                                      mlir::ValueRange input) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, input);
+  return cast<sdfg::ReturnOp>(rewriter.create(state));
+}
+
+/// Builds, creates and inserts a return operation using Operation::create.
+sdfg::ReturnOp sdfg::ReturnOp::create(Location loc, mlir::ValueRange input) {
+  OpBuilder builder(loc->getContext());
+  OperationState state(loc, getOperationName());
+  build(builder, state, input);
+  return cast<sdfg::ReturnOp>(Operation::create(state));
+}
+
+/// Attempts to parse a return operation.
 ParseResult sdfg::ReturnOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1615,12 +1811,14 @@ ParseResult sdfg::ReturnOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a return operation in human-readable form.
 void sdfg::ReturnOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
   if (getNumOperands() > 0)
     p << ' ' << getInput() << " : " << getInput().getTypes();
 }
 
+/// Verifies the correct structure of a return operation.
 LogicalResult sdfg::ReturnOp::verify() {
   TaskletNode task = dyn_cast<TaskletNode>((*this)->getParentOp());
 
@@ -1630,25 +1828,12 @@ LogicalResult sdfg::ReturnOp::verify() {
   return success();
 }
 
-sdfg::ReturnOp sdfg::ReturnOp::create(PatternRewriter &rewriter, Location loc,
-                                      mlir::ValueRange input) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  build(builder, state, input);
-  return cast<sdfg::ReturnOp>(rewriter.create(state));
-}
-
-sdfg::ReturnOp sdfg::ReturnOp::create(Location loc, mlir::ValueRange input) {
-  OpBuilder builder(loc->getContext());
-  OperationState state(loc, getOperationName());
-  build(builder, state, input);
-  return cast<sdfg::ReturnOp>(Operation::create(state));
-}
-
 //===----------------------------------------------------------------------===//
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a library call operation using the provided
+/// PatternRewriter.
 LibCallOp LibCallOp::create(PatternRewriter &rewriter, Location loc,
                             TypeRange result, StringRef callee,
                             ValueRange operands) {
@@ -1658,6 +1843,7 @@ LibCallOp LibCallOp::create(PatternRewriter &rewriter, Location loc,
   return cast<LibCallOp>(rewriter.create(state));
 }
 
+/// Attempts to parse a library call operation.
 ParseResult LibCallOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1686,6 +1872,7 @@ ParseResult LibCallOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a library call operation in human-readable form.
 void LibCallOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(),
                           /*elidedAttrs=*/{"callee"});
@@ -1697,8 +1884,10 @@ void LibCallOp::print(OpAsmPrinter &p) {
                         getOperation()->getResultTypes());
 }
 
+/// Verifies the correct structure of a library call operation.
 LogicalResult LibCallOp::verify() { return success(); }
 
+/// Returns the input name of the provided index.
 std::string LibCallOp::getInputName(unsigned idx) {
   if (getOperation()->hasAttr("inputs")) {
     if (ArrayAttr inputs =
@@ -1712,6 +1901,7 @@ std::string LibCallOp::getInputName(unsigned idx) {
   return utils::valueToString(getOperand(idx), *getOperation());
 }
 
+/// Returns the output name of the provided index.
 std::string LibCallOp::getOutputName(unsigned idx) {
   if (getOperation()->hasAttr("outputs")) {
     if (ArrayAttr outputs =
@@ -1729,6 +1919,8 @@ std::string LibCallOp::getOutputName(unsigned idx) {
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a symbol allocation operation using the
+/// provided PatternRewriter.
 AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
                                     StringRef sym) {
   OpBuilder builder(loc->getContext());
@@ -1737,6 +1929,8 @@ AllocSymbolOp AllocSymbolOp::create(PatternRewriter &rewriter, Location loc,
   return cast<AllocSymbolOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts a symbol allocation operation using
+/// Operation::create.
 AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -1744,6 +1938,7 @@ AllocSymbolOp AllocSymbolOp::create(Location loc, StringRef sym) {
   return cast<AllocSymbolOp>(Operation::create(state));
 }
 
+/// Attempts to parse a symbol allocation operation.
 ParseResult AllocSymbolOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr symAttr;
   if (parser.parseOptionalAttrDict(result.attributes))
@@ -1760,6 +1955,7 @@ ParseResult AllocSymbolOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a symbol allocation operation in human-readable form.
 void AllocSymbolOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"sym"});
   p << " (";
@@ -1767,6 +1963,7 @@ void AllocSymbolOp::print(OpAsmPrinter &p) {
   p << ")";
 }
 
+/// Verifies the correct structure of a symbol allocation operation.
 LogicalResult AllocSymbolOp::verify() {
   if (getSym().empty())
     return emitOpError("failed to verify that input string is not empty");
@@ -1787,6 +1984,8 @@ LogicalResult AllocSymbolOp::verify() {
 // SymOp
 //===----------------------------------------------------------------------===//
 
+/// Builds, creates and inserts a symbolic expression operation using the
+/// provided PatternRewriter.
 SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
                     StringRef expr) {
   OpBuilder builder(loc->getContext());
@@ -1795,6 +1994,8 @@ SymOp SymOp::create(PatternRewriter &rewriter, Location loc, Type type,
   return cast<SymOp>(rewriter.create(state));
 }
 
+/// Builds, creates and inserts a symbolic expression operation using
+/// Operation::create.
 SymOp SymOp::create(Location loc, Type type, StringRef expr) {
   OpBuilder builder(loc->getContext());
   OperationState state(loc, getOperationName());
@@ -1802,6 +2003,7 @@ SymOp SymOp::create(Location loc, Type type, StringRef expr) {
   return cast<SymOp>(Operation::create(state));
 }
 
+/// Attempts to parse a symbolic expression operation.
 ParseResult SymOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDict(result.attributes))
     return failure();
@@ -1820,6 +2022,7 @@ ParseResult SymOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+/// Prints a symbolic expression operation in human-readable form.
 void SymOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict(getOperation()->getAttrs(), /*elidedAttrs=*/{"expr"});
   p << " (";
@@ -1827,11 +2030,13 @@ void SymOp::print(OpAsmPrinter &p) {
   p << ") : " << getOperation()->getResultTypes();
 }
 
+/// Verifies the correct structure of a symbolic expression operation.
 LogicalResult SymOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
 
+/// Generate the code for operation definitions.
 #define GET_OP_CLASSES
 #include "SDFG/Dialect/Ops.cpp.inc"

@@ -1,6 +1,11 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// Table-driven file for SDFG nodes.
+
 #ifndef SDFG_SDFGNode
 #define SDFG_SDFGNode
 
+/// Defining the SDFG top-level SDFG.
 def SDFG_SDFGNode : SDFG_Op<"sdfg", [
     ParentOneOf<["ModuleOp"]>,
     NoTerminator,
@@ -34,9 +39,15 @@ def SDFG_SDFGNode : SDFG_Op<"sdfg", [
         static SDFGNode create(PatternRewriter &rewriter, Location location);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
+        StateNode getEntryState();
+        Block::BlockArgListType getArgs();
+        TypeRange getArgTypes();
+        Block::BlockArgListType getResults();
+        TypeRange getResultTypes();
     }];
 }
 
+/// Defining the SDFG nested SDFG scopes.
 def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
     ParentOneOf<["StateNode","MapNode","ConsumeNode"]>,
     NoTerminator,
@@ -71,6 +82,9 @@ def SDFG_NestedSDFGNode : SDFG_Op<"nested_sdfg", [
         static NestedSDFGNode create(PatternRewriter &rewriter, Location location);
         StateNode getStateBySymRef(StringRef symRef);
         StateNode getFirstState();
+        StateNode getEntryState();
+        ValueRange getArgs();
+        ValueRange getResults();
     }];
 }
 

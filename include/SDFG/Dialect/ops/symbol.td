@@ -1,3 +1,7 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// Table-driven file for symbol operations.
+
 #ifndef SDFG_SymbolOps
 #define SDFG_SymbolOps
 
@@ -5,6 +9,7 @@
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG symbol definition operation.
 def SDFG_AllocSymbolOp : SDFG_Op<"alloc_symbol", [
 	ParentOneOf<["SDFGNode", "NestedSDFGNode", "StateNode", "MapNode", "ConsumeNode"]>
 ]> {
@@ -34,6 +39,7 @@ def SDFG_AllocSymbolOp : SDFG_Op<"alloc_symbol", [
 // SymOp
 //===----------------------------------------------------------------------===//
 
+/// Defining the SDFG symbolic expression.
 def SDFG_SymOp : SDFG_Op<"sym",[
 	ParentOneOf<["StateNode", "MapNode", "ConsumeNode"]>
 ]>{

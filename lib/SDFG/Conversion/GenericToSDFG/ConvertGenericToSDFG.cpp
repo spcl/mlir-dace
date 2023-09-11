@@ -1,14 +1,17 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file defines a converter from builtin dialects to the SDFG dialect.
+
 #include "SDFG/Conversion/GenericToSDFG/PassDetail.h"
 #include "SDFG/Conversion/GenericToSDFG/Passes.h"
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
-#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
-#include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
 using namespace sdfg;
@@ -18,6 +21,7 @@ using namespace conversion;
 // Target & Type Converter
 //===----------------------------------------------------------------------===//
 
+/// Defines the target to convert to.
 struct SDFGTarget : public ConversionTarget {
   SDFGTarget(MLIRContext &ctx) : ConversionTarget(ctx) {
     // Every Op in the SDFG Dialect is legal
@@ -30,26 +34,29 @@ struct SDFGTarget : public ConversionTarget {
   }
 };
 
-class MemrefToMemletConverter : public TypeConverter {
+/// Defines a type converter, converting input types to array types.
+class ToArrayConverter : public TypeConverter {
 public:
-  MemrefToMemletConverter() {
+  ToArrayConverter() {
     addConversion([](Type type) { return type; });
     addConversion(convertMemrefTypes);
     addConversion(convertLLVMPtrTypes);
   }
 
+  /// Attempts to convert MemRef types to array types.
   static Optional<Type> convertMemrefTypes(Type type) {
     if (MemRefType mem = type.dyn_cast<MemRefType>()) {
       SmallVector<int64_t> ints;
       SmallVector<StringAttr> symbols;
       SmallVector<bool> shape;
       for (int64_t dim : mem.getShape()) {
-        if (dim <= 0) {
+        if (dim < 0) {
           StringAttr sym =
               StringAttr::get(mem.getContext(), sdfg::utils::generateName("s"));
           symbols.push_back(sym);
           shape.push_back(false);
         } else {
+          dim = dim == 0 ? 1 : dim;
           ints.push_back(dim);
           shape.push_back(true);
         }
@@ -62,6 +69,7 @@ public:
     return std::nullopt;
   }
 
+  /// Attempts to convert LLVM Ptr types to array types.
   static Optional<Type> convertLLVMPtrTypes(Type type) {
     if (mlir::LLVM::LLVMPointerType ptrType =
             type.dyn_cast<mlir::LLVM::LLVMPointerType>()) {
@@ -93,8 +101,10 @@ public:
 // Helpers
 //===----------------------------------------------------------------------===//
 
-SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
-                               ArrayRef<Value> vals) {
+/// Checks for each value if it originates from an allocation operation. If so,
+/// inserts load operations to access the stored value.
+static SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
+                                      ArrayRef<Value> vals) {
   SmallVector<Value> loadedOps;
   for (Value operand : vals) {
     if (operand.getDefiningOp() != nullptr &&
@@ -116,12 +126,15 @@ SmallVector<Value> createLoads(PatternRewriter &rewriter, Location loc,
   return loadedOps;
 }
 
-Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
+/// Wrapper function for the above helper function. Instead of a list of values
+/// this function instead just takes a single value.
+static Value createLoad(PatternRewriter &rewriter, Location loc, Value val) {
   SmallVector<Value> loadedOps = {val};
   return createLoads(rewriter, loc, loadedOps)[0];
 }
 
-Operation *getParentSDFG(Operation *op) {
+/// Returns the closest SDFG node or nested SDFG node.
+static Operation *getParentSDFG(Operation *op) {
   Operation *parent = op->getParentOp();
 
   if (isa<SDFGNode>(parent))
@@ -133,7 +146,8 @@ Operation *getParentSDFG(Operation *op) {
   return getParentSDFG(parent);
 }
 
-uint32_t getSDFGNumArgs(Operation *op) {
+/// Returns the number of arguments for a SDFG node or nested SDFG node.
+static uint32_t getSDFGNumArgs(Operation *op) {
   if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
     return sdfg.getNumArgs();
   }
@@ -145,7 +159,8 @@ uint32_t getSDFGNumArgs(Operation *op) {
   return -1;
 }
 
-StateNode getFirstState(Operation *op) {
+/// Returns the first state of a SDFG node or nested SDFG node.
+static StateNode getFirstState(Operation *op) {
   if (SDFGNode sdfg = dyn_cast<SDFGNode>(op)) {
     return sdfg.getFirstState();
   }
@@ -157,17 +172,11 @@ StateNode getFirstState(Operation *op) {
   return nullptr;
 }
 
-ModuleOp getTopModuleOp(Operation *op) {
-  Operation *parent = op->getParentOp();
-
-  if (isa<ModuleOp>(parent))
-    return cast<ModuleOp>(parent);
-
-  return getTopModuleOp(parent);
-}
-
-void linkToLastState(PatternRewriter &rewriter, Location loc,
-                     StateNode &state) {
+/// Searches for the state appearing before the provided state and inserts an
+/// edge without assignemnts or conditions from the previous state to the
+/// current state.
+static void linkToLastState(PatternRewriter &rewriter, Location loc,
+                            StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
   rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
@@ -184,8 +193,11 @@ void linkToLastState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
-void linkToNextState(PatternRewriter &rewriter, Location loc,
-                     StateNode &state) {
+/// Searches for the state appearing after the provided state and inserts an
+/// edge without assignments or condition from the current state to the next
+/// one.
+static void linkToNextState(PatternRewriter &rewriter, Location loc,
+                            StateNode &state) {
   Operation *sdfg = getParentSDFG(state);
   OpBuilder::InsertPoint ip = rewriter.saveInsertionPoint();
   rewriter.setInsertionPointToEnd(&sdfg->getRegion(0).getBlocks().front());
@@ -203,17 +215,23 @@ void linkToNextState(PatternRewriter &rewriter, Location loc,
   rewriter.restoreInsertionPoint(ip);
 }
 
-void markToLink(Operation &op) {
+/// Marks (using a boolean attribute) an operation (i.e. state) to be connected
+/// to the next state with an edge.
+static void markToLink(Operation &op) {
   BoolAttr boolAttr = BoolAttr::get(op.getContext(), true);
   op.setAttr("linkToNext", boolAttr);
 }
 
-bool markedToLink(Operation &op) {
+/// Checks if a operation (i.e. state) is marked (using a boolean attribute) to
+/// be connected to the next state with an edge.
+static bool markedToLink(Operation &op) {
   return op.hasAttr("linkToNext") &&
          op.getAttr("linkToNext").cast<BoolAttr>().getValue();
 }
 
-Value getTransientValue(Value val) {
+/// Returns the allocation operation from a value originating from a load
+/// operation.
+static Value getTransientValue(Value val) {
   if (val.getDefiningOp() != nullptr && isa<LoadOp>(val.getDefiningOp())) {
     LoadOp load = cast<LoadOp>(val.getDefiningOp());
     AllocOp alloc = cast<AllocOp>(load.getArr().getDefiningOp());
@@ -227,6 +245,7 @@ Value getTransientValue(Value val) {
 // Func Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a func::FuncOp to a SDFG node.
 class FuncToSDFG : public OpConversionPattern<func::FuncOp> {
 public:
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
@@ -280,14 +299,14 @@ public:
 
     SmallVector<Type> args = {};
     for (unsigned i = 0; i < op.getNumArguments(); ++i) {
-      MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op.getArgumentTypes()[i]);
+      ToArrayConverter tac;
+      Type nt = tac.convertType(op.getArgumentTypes()[i]);
       args.push_back(nt);
     }
 
     for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      MemrefToMemletConverter memo;
-      Type nt = memo.convertType(op.getResultTypes()[i]);
+      ToArrayConverter tac;
+      Type nt = tac.convertType(op.getResultTypes()[i]);
 
       if (!nt.isa<ArrayType>()) {
         SizedType sized = SizedType::get(nt.getContext(), nt, {}, {}, {});
@@ -326,6 +345,8 @@ public:
   }
 };
 
+/// Converts a func::CallOp to a nested SDFG node or to a tasklet in special
+/// cases.
 class CallToSDFG : public OpConversionPattern<func::CallOp> {
 public:
   using OpConversionPattern<func::CallOp>::OpConversionPattern;
@@ -337,7 +358,7 @@ public:
     // TODO: Support external calls
     // TODO: Support return values
     std::string callee = op.getCallee().str();
-    ModuleOp mod = getTopModuleOp(op);
+    ModuleOp mod = sdfg::utils::getTopModuleOp(op);
     func::FuncOp funcOp = dyn_cast<func::FuncOp>(mod.lookupSymbol(callee));
 
     // HACK: The function call got replaced at `FuncToSDFG` (PolybenchC)
@@ -349,7 +370,7 @@ public:
 
     // HACK: Removes special function calls (cbrt, exit) and creates tasklet
     //  with annotation (LULESH)
-    if (callee == "cbrt" || callee == "exit") {
+    if (callee == "cbrt" || callee == "exit" || funcOp.isExternal()) {
       StateNode state = StateNode::create(rewriter, op->getLoc(), callee);
 
       SmallVector<Value> operands = adaptor.getOperands();
@@ -369,8 +390,8 @@ public:
       rewriter.setInsertionPointAfter(task);
 
       if (task.getNumResults() == 1) {
-        MemrefToMemletConverter memo;
-        Type nt = memo.convertType(op->getResultTypes()[0]);
+        ToArrayConverter tac;
+        Type nt = tac.convertType(op->getResultTypes()[0]);
         SizedType sized =
             SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
         nt = ArrayType::get(op->getLoc().getContext(), sized);
@@ -461,6 +482,7 @@ public:
   }
 };
 
+/// Converts a func::ReturnOp to copy and store operations.
 class ReturnToSDFG : public OpConversionPattern<func::ReturnOp> {
 public:
   using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
@@ -507,6 +529,7 @@ public:
 // Arith & Math Patterns
 //===----------------------------------------------------------------------===//
 
+/// Wraps any arith and math operation into a tasklet.
 class OpToTasklet : public ConversionPattern {
 public:
   OpToTasklet(TypeConverter &converter, MLIRContext *context)
@@ -535,8 +558,8 @@ public:
       SmallVector<AllocOp> allocs;
 
       for (Type opType : op->getResultTypes()) {
-        MemrefToMemletConverter memo;
-        Type newType = memo.convertType(opType);
+        ToArrayConverter tac;
+        Type newType = tac.convertType(opType);
         SizedType sizedType =
             SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
         newType = ArrayType::get(op->getLoc().getContext(), sizedType);
@@ -595,6 +618,7 @@ public:
 // Memref Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a memref::LoadOp to a sdfg::LoadOp.
 class MemrefLoadToSDFG : public OpConversionPattern<memref::LoadOp> {
 public:
   using OpConversionPattern<memref::LoadOp>::OpConversionPattern;
@@ -636,6 +660,7 @@ public:
   }
 };
 
+/// Converts a memref::StoreOp to a sdfg::StoreOp.
 class MemrefStoreToSDFG : public OpConversionPattern<memref::StoreOp> {
 public:
   using OpConversionPattern<memref::StoreOp>::OpConversionPattern;
@@ -662,6 +687,30 @@ public:
   }
 };
 
+/// Converts a memref::CopyOp to a sdfg::CopyOp.
+class MemrefCopyToSDFG : public OpConversionPattern<memref::CopyOp> {
+public:
+  using OpConversionPattern<memref::CopyOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::CopyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    StateNode state = StateNode::create(rewriter, op->getLoc(), "copy");
+
+    Value source = createLoad(rewriter, op.getLoc(), adaptor.getSource());
+    Value target = createLoad(rewriter, op.getLoc(), adaptor.getTarget());
+    CopyOp::create(rewriter, op.getLoc(), source, target);
+
+    linkToLastState(rewriter, op->getLoc(), state);
+    if (markedToLink(*op))
+      linkToNextState(rewriter, op->getLoc(), state);
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+/// Erases memref::GlobalOp.
 class MemrefGlobalToSDFG : public OpConversionPattern<memref::GlobalOp> {
 public:
   using OpConversionPattern<memref::GlobalOp>::OpConversionPattern;
@@ -674,6 +723,7 @@ public:
   }
 };
 
+/// Converts a memref::GetGlobalOp to an allocation operation.
 class MemrefGetGlobalToSDFG : public OpConversionPattern<memref::GetGlobalOp> {
 public:
   using OpConversionPattern<memref::GetGlobalOp>::OpConversionPattern;
@@ -699,6 +749,7 @@ public:
   }
 };
 
+/// Converts a memref::AllocOp to a sdfg::AllocOp.
 class MemrefAllocToSDFG : public OpConversionPattern<memref::AllocOp> {
 public:
   using OpConversionPattern<memref::AllocOp>::OpConversionPattern;
@@ -746,6 +797,7 @@ public:
   }
 };
 
+/// Converts a memref::AllocaOp to a sdfg::AllocOp.
 class MemrefAllocaToSDFG : public OpConversionPattern<memref::AllocaOp> {
 public:
   using OpConversionPattern<memref::AllocaOp>::OpConversionPattern;
@@ -793,6 +845,7 @@ public:
   }
 };
 
+/// Erases memref::DeallocOp.
 class MemrefDeallocToSDFG : public OpConversionPattern<memref::DeallocOp> {
 public:
   using OpConversionPattern<memref::DeallocOp>::OpConversionPattern;
@@ -805,6 +858,7 @@ public:
   }
 };
 
+/// Converts a memref::CastOp to an allocation and copy operation.
 class MemrefCastToSDFG : public OpConversionPattern<memref::CastOp> {
 public:
   using OpConversionPattern<memref::CastOp>::OpConversionPattern;
@@ -851,6 +905,8 @@ public:
 // SCF Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a scf::ForOp to multiple states, modeling a for loop with
+/// assignment and conditional edges.
 class SCFForToSDFG : public OpConversionPattern<scf::ForOp> {
 public:
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
@@ -872,8 +928,8 @@ public:
     for (unsigned i = 0; i < op.getNumIterOperands(); ++i) {
       Value iterOp = op.getIterOperands()[i];
 
-      MemrefToMemletConverter memo;
-      Type newType = memo.convertType(iterOp.getType());
+      ToArrayConverter tac;
+      Type newType = tac.convertType(iterOp.getType());
       SizedType sizedType =
           SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
       newType = ArrayType::get(op->getLoc().getContext(), sizedType);
@@ -1018,6 +1074,8 @@ public:
   }
 };
 
+/// Converts a scf::WhileOp to multiple states, modeling a while loop with
+/// assignment and conditional edges.
 class SCFWhileToSDFG : public OpConversionPattern<scf::WhileOp> {
 public:
   using OpConversionPattern<scf::WhileOp>::OpConversionPattern;
@@ -1041,7 +1099,7 @@ public:
 
     // Itervars
     for (BlockArgument arg : op.getBeforeArguments()) {
-      MemrefToMemletConverter converter;
+      ToArrayConverter converter;
       Type newType = converter.convertType(arg.getType());
       SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
       ArrayType arrayType = ArrayType::get(context, sizedType);
@@ -1054,7 +1112,7 @@ public:
     }
 
     // Condition
-    MemrefToMemletConverter converter;
+    ToArrayConverter converter;
     Type newType = converter.convertType(conditionOp.getCondition().getType());
     SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
     ArrayType arrayType = ArrayType::get(context, sizedType);
@@ -1064,7 +1122,7 @@ public:
 
     // Condition Arguments
     for (Value arg : conditionOp.getArgs()) {
-      MemrefToMemletConverter converter;
+      ToArrayConverter converter;
       Type newType = converter.convertType(arg.getType());
       SizedType sizedType = SizedType::get(context, newType, {}, {}, {});
       ArrayType arrayType = ArrayType::get(context, sizedType);
@@ -1178,6 +1236,8 @@ public:
   }
 };
 
+/// Converts a scf::ConditionOp to store operations, storing the condition and
+/// arguments.
 class SCFConditionToSDFG : public OpConversionPattern<scf::ConditionOp> {
 public:
   using OpConversionPattern<scf::ConditionOp>::OpConversionPattern;
@@ -1213,6 +1273,8 @@ public:
   }
 };
 
+/// Converts a scf::IfOp to multiple states, modeling an if-clause with
+/// conditional edges.
 class SCFIfToSDFG : public OpConversionPattern<scf::IfOp> {
 public:
   using OpConversionPattern<scf::IfOp>::OpConversionPattern;
@@ -1228,9 +1290,9 @@ public:
     AllocSymbolOp::create(rewriter, op.getLoc(), condName);
 
     for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      MemrefToMemletConverter memo;
+      ToArrayConverter tac;
 
-      Type nt = memo.convertType(op.getResultTypes()[0]);
+      Type nt = tac.convertType(op.getResultTypes()[0]);
       SizedType sized =
           SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
       nt = ArrayType::get(op->getLoc().getContext(), sized);
@@ -1324,6 +1386,8 @@ public:
   }
 };
 
+/// Converts a scf::YieldOp to store operations, storing the values being
+/// yielded in for/while/if clauses.
 class SCFYieldToSDFG : public OpConversionPattern<scf::YieldOp> {
 public:
   using OpConversionPattern<scf::YieldOp>::OpConversionPattern;
@@ -1366,6 +1430,7 @@ public:
 // LLVM Patterns
 //===----------------------------------------------------------------------===//
 
+/// Converts a LLVM::AllocaOp to sdfg::AllocOp.
 class LLVMAllocaToSDFG : public OpConversionPattern<mlir::LLVM::AllocaOp> {
 public:
   using OpConversionPattern<mlir::LLVM::AllocaOp>::OpConversionPattern;
@@ -1413,6 +1478,7 @@ public:
   }
 };
 
+/// Converts a LLVM::BitcastOp to sdfg::ViewCastOp.
 class LLVMBitcastToSDFG : public OpConversionPattern<mlir::LLVM::BitcastOp> {
 public:
   using OpConversionPattern<mlir::LLVM::BitcastOp>::OpConversionPattern;
@@ -1432,6 +1498,7 @@ public:
   }
 };
 
+/// Converts a LLVM::GEPOp to an index computation.
 class LLVMGEPToSDFG : public OpConversionPattern<mlir::LLVM::GEPOp> {
 public:
   using OpConversionPattern<mlir::LLVM::GEPOp>::OpConversionPattern;
@@ -1463,6 +1530,7 @@ public:
   }
 };
 
+/// Converts a LLVM::LoadOp to sdfg::LoadOp.
 class LLVMLoadToSDFG : public OpConversionPattern<mlir::LLVM::LoadOp> {
 public:
   using OpConversionPattern<mlir::LLVM::LoadOp>::OpConversionPattern;
@@ -1510,6 +1578,7 @@ public:
   }
 };
 
+/// Converts a LLVM::StoreOp to sdfg::StoreOp.
 class LLVMStoreToSDFG : public OpConversionPattern<mlir::LLVM::StoreOp> {
 public:
   using OpConversionPattern<mlir::LLVM::StoreOp>::OpConversionPattern;
@@ -1539,6 +1608,7 @@ public:
   }
 };
 
+/// Erases LLVM::GlobalOp.
 class LLVMGlobalToSDFG : public OpConversionPattern<mlir::LLVM::GlobalOp> {
 public:
   using OpConversionPattern<mlir::LLVM::GlobalOp>::OpConversionPattern;
@@ -1552,6 +1622,7 @@ public:
   }
 };
 
+/// Erases LLVM::LLVMFuncOp.
 class LLVMFuncToSDFG : public OpConversionPattern<mlir::LLVM::LLVMFuncOp> {
 public:
   using OpConversionPattern<mlir::LLVM::LLVMFuncOp>::OpConversionPattern;
@@ -1565,6 +1636,7 @@ public:
   }
 };
 
+/// Wraps LLVM::UndefOp into tasklets.
 class LLVMUndefToSDFG : public OpConversionPattern<mlir::LLVM::UndefOp> {
 public:
   using OpConversionPattern<mlir::LLVM::UndefOp>::OpConversionPattern;
@@ -1575,8 +1647,8 @@ public:
     std::string name = sdfg::utils::operationToString(*op);
     StateNode state = StateNode::create(rewriter, op->getLoc(), name);
 
-    MemrefToMemletConverter memo;
-    Type nt = memo.convertType(op->getResultTypes()[0]);
+    ToArrayConverter tac;
+    Type nt = tac.convertType(op->getResultTypes()[0]);
     SizedType sized = SizedType::get(op->getLoc().getContext(), nt, {}, {}, {});
     nt = ArrayType::get(op->getLoc().getContext(), sized);
 
@@ -1587,8 +1659,8 @@ public:
     SmallVector<AllocOp> allocs;
 
     for (Type opType : op->getResultTypes()) {
-      MemrefToMemletConverter memo;
-      Type newType = memo.convertType(opType);
+      ToArrayConverter tac;
+      Type newType = tac.convertType(opType);
       SizedType sizedType =
           SizedType::get(op->getLoc().getContext(), newType, {}, {}, {});
       newType = ArrayType::get(op->getLoc().getContext(), sizedType);
@@ -1640,6 +1712,7 @@ public:
 // Pass
 //===----------------------------------------------------------------------===//
 
+/// Registers all the patterns above in a RewritePatternSet.
 void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
                                              TypeConverter &converter) {
   MLIRContext *ctxt = patterns.getContext();
@@ -1651,6 +1724,7 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
 
   patterns.add<MemrefLoadToSDFG>(converter, ctxt);
   patterns.add<MemrefStoreToSDFG>(converter, ctxt);
+  patterns.add<MemrefCopyToSDFG>(converter, ctxt);
   patterns.add<MemrefGlobalToSDFG>(converter, ctxt);
   patterns.add<MemrefGetGlobalToSDFG>(converter, ctxt);
   patterns.add<MemrefAllocToSDFG>(converter, ctxt);
@@ -1688,7 +1762,7 @@ struct GenericToSDFGPass
 };
 } // namespace
 
-// Gets the name of the first function that isn't called by any other function
+/// Gets the name of the first function that isn't called by any other function.
 llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
   for (func::FuncOp mainFuncOp : moduleOp.getOps<func::FuncOp>()) {
     // No need to check function declarations
@@ -1725,10 +1799,11 @@ llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
   return std::nullopt;
 }
 
+/// Runs the pass on the top-level module operation.
 void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
-  // TODO: Find a way to get func name via CLI instead of inferring
+  // FIXME: Find a way to get func name via CLI instead of inferring
   llvm::Optional<std::string> mainFuncNameOpt = getMainFunctionName(module);
   if (mainFuncNameOpt)
     mainFuncName = *mainFuncNameOpt;
@@ -1738,7 +1813,7 @@ void GenericToSDFGPass::runOnOperation() {
     module->removeAttr(a.getName());
 
   SDFGTarget target(getContext());
-  MemrefToMemletConverter converter;
+  ToArrayConverter converter;
 
   RewritePatternSet patterns(&getContext());
   populateGenericToSDFGConversionPatterns(patterns, converter);
@@ -1747,6 +1822,7 @@ void GenericToSDFGPass::runOnOperation() {
     signalPassFailure();
 }
 
+/// Returns a unique pointer to this pass.
 std::unique_ptr<Pass>
 conversion::createGenericToSDFGPass(StringRef getMainFuncName) {
   return std::make_unique<GenericToSDFGPass>(getMainFuncName);

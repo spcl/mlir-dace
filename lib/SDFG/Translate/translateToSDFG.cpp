@@ -1,3 +1,9 @@
+// Copyright (c) 2021-2023, Scalable Parallel Computing Lab, ETH Zurich
+
+/// This file contains function to translate the SDFG dialect to the SDFG IR. It
+/// performs the translation in two passes. First it collects all operations and
+/// generates an internal IR, which in the second pass is used to generate JSON.
+
 #include "SDFG/Translate/Node.h"
 #include "SDFG/Translate/Translation.h"
 #include "SDFG/Translate/liftToPython.h"
@@ -13,8 +19,11 @@ using namespace sdfg;
 // Helpers
 //===----------------------------------------------------------------------===//
 
-void insertTransientArray(Location location, translation::Connector connector,
-                          Value value, translation::ScopeNode &scope) {
+/// Inserts a transient array connecting to the provided connector and mapping
+/// to the provided value.
+static void insertTransientArray(Location location,
+                                 translation::Connector connector, Value value,
+                                 translation::ScopeNode &scope) {
   using namespace translation;
 
   Array array(sdfg::utils::generateName("tmp"), /*transient=*/true,
@@ -46,6 +55,7 @@ void insertTransientArray(Location location, translation::Connector connector,
   scope.mapConnector(value, accOut);
 }
 
+/// Collects a operation by performing a case distinction on the operation type.
 LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
   using namespace translation;
 
@@ -139,6 +149,7 @@ LogicalResult collectOperations(Operation &op, translation::ScopeNode &scope) {
   return success();
 }
 
+/// Collects all operations in a SDFG.
 LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
   using namespace translation;
 
@@ -200,6 +211,8 @@ LogicalResult collectSDFG(Operation &op, translation::SDFG &sdfg) {
 // Module
 //===----------------------------------------------------------------------===//
 
+/// Translates a module containing SDFG dialect to SDFG IR, outputs the result
+/// to the provided output stream.
 LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
   if (++op.getOps<SDFGNode>().begin() != op.getOps<SDFGNode>().end()) {
     emitError(op.getLoc(), "Must have exactly one top-level SDFGNode");
@@ -220,6 +233,7 @@ LogicalResult translation::translateToSDFG(ModuleOp &op, JsonEmitter &jemit) {
 // State
 //===----------------------------------------------------------------------===//
 
+/// Collects state node information in a top-level SDFG.
 LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
   State state(op.getLoc());
   state.setName(op.getName());
@@ -235,6 +249,7 @@ LogicalResult translation::collect(StateNode &op, SDFG &sdfg) {
 // EdgeOp
 //===----------------------------------------------------------------------===//
 
+/// Collects edge information in a top-level SDFG.
 LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
   Operation *sdfgNode = sdfg::utils::getParentSDFG(*op);
 
@@ -286,6 +301,7 @@ LogicalResult translation::collect(EdgeOp &op, SDFG &sdfg) {
 // AllocOp
 //===----------------------------------------------------------------------===//
 
+/// Collects array/stream allocation information in a top-level SDFG.
 LogicalResult translation::collect(AllocOp &op, SDFG &sdfg) {
   Array array(op.getContainerName(), op.getTransient(), op.isStream(),
               sdfg::utils::getSizedType(op.getType()));
@@ -294,6 +310,7 @@ LogicalResult translation::collect(AllocOp &op, SDFG &sdfg) {
   return success();
 }
 
+/// Collects array/stream allocation information in a scope.
 LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
   Array array(op.getContainerName(), op.getTransient(), op.isStream(),
               sdfg::utils::getSizedType(op.getType()));
@@ -306,6 +323,7 @@ LogicalResult translation::collect(AllocOp &op, ScopeNode &scope) {
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
+/// Collects symbol allocation information in a top-level SDFG.
 LogicalResult translation::collect(AllocSymbolOp &op, SDFG &sdfg) {
   // IDEA: Support other types?
   Symbol sym(op.getSym(), DType::int64);
@@ -317,6 +335,7 @@ LogicalResult translation::collect(AllocSymbolOp &op, SDFG &sdfg) {
 // TaskletNode
 //===----------------------------------------------------------------------===//
 
+/// Collects tasklet information in a scope.
 LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
   Tasklet tasklet(op.getLoc());
   tasklet.setName(getTaskletName(*op));
@@ -347,11 +366,30 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
       Code code(nameOut + " = " + nameIn + " ** (1. / 3.)",
                 CodeLanguage::Python);
       tasklet.setCode(code);
-    }
-
-    if (operation == "exit") {
+    } else if (operation == "exit") {
       Code code("sys.exit()", CodeLanguage::Python);
       tasklet.setCode(code);
+    } else {
+      // TODO: Support inputs & outputs
+      if (tasklet.getOutConnectorCount() > 0) {
+        emitError(op.getLoc(), "return types not supported");
+        return failure();
+      }
+
+      if (tasklet.getInConnectorCount() > 0) {
+        emitError(op.getLoc(), "input types not supported");
+        return failure();
+      }
+
+      std::string declString = "extern \\\"C\\\" void " + operation + "();\\n";
+      std::string codeString = operation + "();";
+
+      Code code_global(declString, CodeLanguage::CPP);
+      Code code(codeString, CodeLanguage::CPP);
+
+      tasklet.setGlobalCode(code_global);
+      tasklet.setCode(code);
+      tasklet.setHasSideEffect(true);
     }
 
   } else {
@@ -371,6 +409,7 @@ LogicalResult translation::collect(TaskletNode &op, ScopeNode &scope) {
 // LibCallOp
 //===----------------------------------------------------------------------===//
 
+/// Collects library call information in a scope.
 LogicalResult translation::collect(LibCallOp &op, ScopeNode &scope) {
   Library lib(op.getLoc());
   lib.setName(sdfg::utils::generateName(op.getCallee().str()));
@@ -399,6 +438,7 @@ LogicalResult translation::collect(LibCallOp &op, ScopeNode &scope) {
 // NestedSDFGNode
 //===----------------------------------------------------------------------===//
 
+/// Collects nested SDFG node information in a scope.
 LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
   SDFG sdfg(op.getLoc());
 
@@ -450,6 +490,7 @@ LogicalResult translation::collect(NestedSDFGNode &op, ScopeNode &scope) {
 // MapNode
 //===----------------------------------------------------------------------===//
 
+/// Collects map node information in a scope.
 LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
   MapEntry mapEntry(op.getLoc());
   mapEntry.setName(sdfg::utils::generateName("mapEntry"));
@@ -540,6 +581,7 @@ LogicalResult translation::collect(MapNode &op, ScopeNode &scope) {
 // ConsumeNode
 //===----------------------------------------------------------------------===//
 
+/// Collects consume node information in a scope.
 LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
   ConsumeEntry consumeEntry(op.getLoc());
   consumeEntry.setName(sdfg::utils::generateName("consumeEntry"));
@@ -612,6 +654,7 @@ LogicalResult translation::collect(ConsumeNode &op, ScopeNode &scope) {
 // CopyOp
 //===----------------------------------------------------------------------===//
 
+/// Collects copy operation information in a scope.
 LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
   Access access(op.getLoc());
 
@@ -639,6 +682,7 @@ LogicalResult translation::collect(CopyOp &op, ScopeNode &scope) {
 // StoreOp
 //===----------------------------------------------------------------------===//
 
+/// Collects store operation information in a scope.
 LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
   std::string name = sdfg::utils::valueToString(op.getArr());
 
@@ -774,6 +818,7 @@ LogicalResult translation::collect(StoreOp &op, ScopeNode &scope) {
 // LoadOp
 //===----------------------------------------------------------------------===//
 
+/// Collects load operation information in a scope.
 LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
   // TODO: Implement a dce pass
   if (op.use_empty())
@@ -907,6 +952,7 @@ LogicalResult translation::collect(LoadOp &op, ScopeNode &scope) {
 // AllocSymbolOp
 //===----------------------------------------------------------------------===//
 
+/// Collects symbol allocation information in a scope.
 LogicalResult translation::collect(AllocSymbolOp &op, ScopeNode &scope) {
   // IDEA: Support other types?
   Symbol sym(op.getSym(), DType::int64);
@@ -919,6 +965,7 @@ LogicalResult translation::collect(AllocSymbolOp &op, ScopeNode &scope) {
 // SymOp
 //===----------------------------------------------------------------------===//
 
+/// Collects symbolic expression information in a scope.
 LogicalResult translation::collect(SymOp &op, ScopeNode &scope) {
   Tasklet task(op.getLoc());
   task.setName("SYM_" + op.getExpr().str());
@@ -939,6 +986,7 @@ LogicalResult translation::collect(SymOp &op, ScopeNode &scope) {
 // StreamPushOp
 //===----------------------------------------------------------------------===//
 
+/// Collects stream push operation information in a scope.
 LogicalResult translation::collect(StreamPushOp &op, ScopeNode &scope) {
   Access access(op.getLoc());
   std::string name = sdfg::utils::valueToString(op.getStr());
@@ -965,6 +1013,7 @@ LogicalResult translation::collect(StreamPushOp &op, ScopeNode &scope) {
 // StreamPopOp
 //===----------------------------------------------------------------------===//
 
+/// Collects stream pop operation information in a scope.
 LogicalResult translation::collect(StreamPopOp &op, ScopeNode &scope) {
   Connector connector = scope.lookup(op.getStr());
   scope.mapConnector(op.getRes(), connector);
