@@ -2,7 +2,6 @@
 
 /// This file defines a converter from builtin dialects to the SDFG dialect.
 
-#include "SDFG/Conversion/GenericToSDFG/PassDetail.h"
 #include "SDFG/Conversion/GenericToSDFG/Passes.h"
 #include "SDFG/Dialect/Dialect.h"
 #include "SDFG/Utils/Utils.h"
@@ -16,6 +15,11 @@
 using namespace mlir;
 using namespace sdfg;
 using namespace conversion;
+
+namespace mlir::sdfg::conversion {
+#define GEN_PASS_DEF_GENERICTOSDFGPASS
+#include "SDFG/Conversion/GenericToSDFG/Passes.h.inc"
+} // namespace mlir::sdfg::conversion
 
 //===----------------------------------------------------------------------===//
 // Target & Type Converter
@@ -245,6 +249,9 @@ static Value getTransientValue(Value val) {
 // Func Patterns
 //===----------------------------------------------------------------------===//
 
+// FIXME: Find a cleaner way to pass the name to the pattern.
+llvm::StringRef mainfuncName;
+
 /// Converts a func::FuncOp to a SDFG node.
 class FuncToSDFG : public OpConversionPattern<func::FuncOp> {
 public:
@@ -258,15 +265,14 @@ public:
       return success();
     }
 
-    // TODO: Should be passed by a subflag
-    if (!op.getName().equals("main")) {
+    if (!op.getName().equals(mainfuncName)) {
       // NOTE: The nested SDFG is created at the call operation conversion
       rewriter.eraseOp(op);
       return success();
     }
 
     // HACK: Replaces the print_array call with returning arrays (PolybenchC)
-    if (op.getName().equals("main")) {
+    if (op.getName().equals(mainfuncName)) {
       for (int i = op.getNumArguments() - 1; i >= 0; --i)
         if (op.getArgument(i).getUses().empty())
           op.eraseArgument(i);
@@ -1750,13 +1756,11 @@ void populateGenericToSDFGConversionPatterns(RewritePatternSet &patterns,
 
 namespace {
 struct GenericToSDFGPass
-    : public sdfg::conversion::GenericToSDFGPassBase<GenericToSDFGPass> {
-  std::string mainFuncName;
-
+    : public sdfg::conversion::impl::GenericToSDFGPassBase<GenericToSDFGPass> {
   GenericToSDFGPass() = default;
-
-  explicit GenericToSDFGPass(StringRef mainFuncName)
-      : mainFuncName(mainFuncName.str()) {}
+  GenericToSDFGPass(const sdfg::conversion::GenericToSDFGPassOptions &options)
+      : sdfg::conversion::impl::GenericToSDFGPassBase<GenericToSDFGPass>(
+            options) {}
 
   void runOnOperation() override;
 };
@@ -1803,10 +1807,13 @@ llvm::Optional<std::string> getMainFunctionName(ModuleOp moduleOp) {
 void GenericToSDFGPass::runOnOperation() {
   ModuleOp module = getOperation();
 
-  // FIXME: Find a way to get func name via CLI instead of inferring
-  llvm::Optional<std::string> mainFuncNameOpt = getMainFunctionName(module);
-  if (mainFuncNameOpt)
-    mainFuncName = *mainFuncNameOpt;
+  // Get name of the main function to convert.
+  if (this->mainFuncName.empty()) {
+    llvm::Optional<std::string> mainFuncNameOpt = getMainFunctionName(module);
+    if (mainFuncNameOpt.has_value())
+      this->mainFuncName = mainFuncNameOpt.value();
+  }
+  mainfuncName = this->mainFuncName;
 
   // Clear all attributes
   for (NamedAttribute a : module->getAttrs())
@@ -1820,10 +1827,4 @@ void GenericToSDFGPass::runOnOperation() {
 
   if (applyFullConversion(module, target, std::move(patterns)).failed())
     signalPassFailure();
-}
-
-/// Returns a unique pointer to this pass.
-std::unique_ptr<Pass>
-conversion::createGenericToSDFGPass(StringRef getMainFuncName) {
-  return std::make_unique<GenericToSDFGPass>(getMainFuncName);
 }
