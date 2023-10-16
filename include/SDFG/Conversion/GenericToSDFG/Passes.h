@@ -9,12 +9,9 @@
 
 namespace mlir::sdfg::conversion {
 
-/// Creates a generic to sdfg converting pass
-std::unique_ptr<Pass> createGenericToSDFGPass(StringRef getMainFuncName = "");
-
-//===----------------------------------------------------------------------===//
-// Registration
-//===----------------------------------------------------------------------===//
+/// Generate the code for declaring passes.
+#define GEN_PASS_DECL
+#include "SDFG/Conversion/GenericToSDFG/Passes.h.inc"
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
